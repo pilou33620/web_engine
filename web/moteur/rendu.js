@@ -5,7 +5,7 @@ import { centre } from "./themes/outils.js";
 
 const P = window.PIXI;
 // Ordre d'empilement, du sol vers le ciel. Le « calque » d'une entité choisit sa place.
-export const CALQUES = ["sol", "eau", "vegetation", "routes", "reseaux", "frontieres", "batiments", "etiquettes", "unites"];
+export const CALQUES = ["sol", "eau", "vegetation", "relief", "routes", "reseaux", "frontieres", "batiments", "etiquettes", "unites"];
 const CALQUE_PAR_DEFAUT = { zone: "sol", ligne: "routes", batiment: "batiments", unite: "unites" };
 
 // Dessin d'une entité : style du thème, sinon dessin par défaut « _ » du type
@@ -62,8 +62,10 @@ export class Rendu {
     this.animations = [];
     const [L, H] = carte.taille;
     this.calques.base.addChild(new P.Graphics().rect(0, 0, L, H).fill(t.base));
-    const decor = t.decor?.(this, carte);
-    if (decor) this.calques.base.addChild(decor);
+    // Décor du thème : « sous » le terrain (papier, fond) et « sur » le terrain (ombrage du relief)
+    const decor = t.decor?.(this, carte) ?? {};
+    if (decor.sous) this.calques.base.addChild(decor.sous);
+    if (decor.sur) this.calques.relief.addChild(decor.sur);
 
     const graphiques = {};
     const graphique = (nom) => graphiques[nom] ?? (graphiques[nom] = this.calques[nom].addChild(new P.Graphics()));
