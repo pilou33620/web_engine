@@ -56,6 +56,8 @@ export class Details {
       return { x: e.x * km, y: e.y * km, pop, ere: er, r, rh: rayon(p0 * f1790, "classique"), ri: rayon(p0 * epoques.facteurPopulation(1930), "industrielle"),
         axes, rivieres, murs: close && er !== "celte" && er !== "romaine", graine: Math.round(e.x * 7 + e.y) };
     });
+    // villes voisines : chacune s'arrête où commence le territoire de l'autre
+    for (const v of this.villes) v.voisines = this.villes.filter((o) => o !== v && Math.hypot(o.x - v.x, o.y - v.y) < 2.6 * (v.r + o.r) + 0.3).map((o) => [o.x, o.y, o.r]);
   }
 
   // Code d'occupation en un point exprimé en km

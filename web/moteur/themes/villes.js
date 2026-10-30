@@ -55,7 +55,7 @@ const BOIS = ["#2f5e2c", "#3a6c34", "#45793c", "#2b5427", "#518644"];
 // ---------- taille : densité (hab./km²) selon l'ère, plus forte dans les grandes villes
 const DENSITE = { celte: 5000, romaine: 11000, classique: 16000, industrielle: 13000, moderne: 4000, futur: 7000 };
 export const rayon = (pop, ere) =>
-  Math.max(0.05, Math.sqrt(pop / (DENSITE[ere] * Math.min(2.5, Math.max(0.35, (pop / 30000) ** 0.25)) * Math.PI)));
+  Math.max(0.05, Math.sqrt(pop / (DENSITE[ere] * Math.min(2.5, Math.max(0.28, (pop / 30000) ** 0.25)) * Math.PI)));
 const RUE = { celte: "#b9a67a", romaine: "#d2c6a6", classique: "#c9b58e", industrielle: "#b6aa90", moderne: "#8e8f8c", futur: "#a5aaa4" };
 
 // ---------- géométrie (polygones = listes de [x, y])
@@ -167,15 +167,17 @@ function tronquer(pts, cx, cy, B) {
   return out;
 }
 
+const PRIO = { axe: 1, mur: 2, boulevard: 2, riviere: 3 };  // aux croisements, les quais l'emportent sur les remparts, qui l'emportent sur les routes
+
 // Quartiers : demi-largeur de rue (km), sol, teinte du bâti vu de loin, profondeur des maisons
 const QUARTIERS = {
   vieux: [0.0032, "#cdbd99", "#b0654a", 0.016], faubourg: [0.0025, "#87a35b", null, 0], maraichers: [0.002, "#86a159", null, 0],
   place: [0.0035, "#ddd0ae", null, 0], eglise: [0.0032, "#d6c8a6", "#7d8794", 0.014], jardin: [0.004, "#78a453", null, 0],
   insula: [0.003, "#dccdaa", "#bd6e4c", 0.013], horti: [0.0025, "#88a65c", null, 0], forum: [0.0045, "#e5d9bb", "#c07a55", 0.006], thermes: [0.004, "#dccfae", "#b97250", 0.01],
   ouvrier: [0.004, "#7f9d55", "#a85940", 0.011], immeubles: [0.006, "#c9bfa8", "#8b8f93", 0.018], usine: [0.006, "#a39a86", "#85827c", 0.03], gare: [0.006, "#b2a78f", "#9aaab3", 0.03],
-  pavillons: [0.0045, "#88ac5e", "#b49a80", 0.016], grandEnsemble: [0.007, "#80a65b", null, 0], zone: [0.008, "#a2a3a1", "#d6d6d2", 0.03], parc: [0.004, "#6f9f4f", null, 0],
+  pavillons: [0.0045, "#88ac5e", "#b49a80", 0.016], grandEnsemble: [0.007, "#80a65b", null, 0], zone: [0.008, "#a2a3a1", "#d6d6d2", 0.03], parc: [0.0015, "#6f9f4f", null, 0],
   tours: [0.008, "#d2d6d0", "#8299ab", 0.02], dense: [0.006, "#80ae5e", "#9fb08f", 0.016], eco: [0.004, "#86b15e", "#7f95a0", 0.016],
-  enclos: [0, "#b7a578", null, 0], sanctuaire: [0, "#c8b689", null, 0], villa: [0, "#8aa85c", null, 0], amphi: [0, "#cdb68b", null, 0],
+  enclos: [0, "#a99a6c", null, 0], sanctuaire: [0, "#c8b689", null, 0], villa: [0, "#8aa85c", null, 0], amphi: [0, "#cdb68b", null, 0],
 };
 
 function tissu(P, v, eau, urbain) {
@@ -184,9 +186,13 @@ function tissu(P, v, eau, urbain) {
   const D = (x, y) => Math.hypot(x - cx, y - cy);
   // lignes qui découpent le tissu : routes, rivières, enceinte (ou boulevards à sa place)
   const axes = (v.axes ?? []).map((a) => ({ pts: tronquer(a.pts, cx, cy, B), demi: a.grand ? 0.0075 : 0.0055, kind: "axe" })).filter((a) => a.pts.length > 1);
-  P.axes = axes;
-  const lignes = [...axes, ...(v.rivieres ?? []).map((r) => ({ pts: r.pts, ws: r.ws.map((w) => w + 0.012), kind: "riviere" }))];
-  const dirAxe = axes[0] ? Math.atan2(axes[0].pts[1][1] - cy, axes[0].pts[1][0] - cx) : hash(g, 1) * TAU;
+  P.axes = axes;  // toutes les routes écartent les maisons ; les plus marquantes (directions distinctes) tracent des rues
+  const angle = (a) => Math.atan2(a.pts[1][1] - cy, a.pts[1][0] - cx), traces = [];
+  for (const a of [...axes].sort((a, b) => b.demi - a.demi)) {
+    if (traces.length < 7 && traces.every((t) => Math.abs(Math.atan2(Math.sin(angle(a) - angle(t)), Math.cos(angle(a) - angle(t)))) > 0.45)) traces.push(a);
+  }
+  const lignes = [...traces, ...(v.rivieres ?? []).map((r) => ({ pts: r.pts, ws: r.ws.map((w) => w + 0.012), kind: "riviere" }))];
+  const dirAxe = traces[0] ? angle(traces[0]) : hash(g, 1) * TAU;
   const co = Math.cos(dirAxe), si = Math.sin(dirAxe);
   const forme = (x, y) => 0.82 + 0.5 * (bruit(x, y, Math.max(0.3, R * 0.8), g % 251) - 0.5) + 0.3 * (bruit(x, y, Math.max(0.12, R * 0.3), (g % 241) + 50) - 0.5);
   const base = romaine
@@ -196,6 +202,8 @@ function tissu(P, v, eau, urbain) {
       const lu = 2 * R * forme(x, y);  // banlieues : là où le sol est urbain, jusqu'à une limite irrégulière
       return (ere === "moderne" || ere === "futur") && b <= 0 && d < lu && urbain(x, y) ? 0.15 * (1 - d / lu) : b;
     };
+  // territoire : plus près de ce centre que de celui des villes voisines (distances rapportées aux rayons)
+  const chez = (x, y) => { const q = D(x, y) / R; return (v.voisines ?? []).every(([ox, oy, or]) => Math.hypot(x - ox, y - oy) / or >= q); };
   const fa = (x, y) => { let m = 0; for (const a of axes) m = Math.max(m, 1 - ecart(a, x, y) / 0.1); return m * (1 - D(x, y) / B); };
   if (v.murs && !romaine) {  // enceinte : courtines droites entre des angles irréguliers
     const n = Math.min(16, 7 + Math.round(Rh * 5)), pts = [];
@@ -213,7 +221,7 @@ function tissu(P, v, eau, urbain) {
   const esp = (d, fin = false) => {
     if (!fin && d > lim) return 0.25;  // hors de la ville : graines lâches, qui ne servent que de voisines
     if (romaine) return 0.075;
-    if (d < Rh || ere === "classique") return Math.min(0.09, 0.05 + (0.035 * d) / Math.max(Rh, 0.1));
+    if (d < Rh || ere === "classique") return Math.min(0.09, 0.05 + (0.035 * d) / Math.max(Rh, 0.6));
     if (ere === "industrielle") return 0.08;
     if (ere === "moderne") return d < Ri ? 0.085 : d < 1.2 * R ? 0.13 : 0.17;
     return d < 0.5 * R ? 0.1 : d < 1.2 * R ? 0.12 : 0.17;
@@ -253,12 +261,11 @@ function tissu(P, v, eau, urbain) {
       for (; t < L;) {
         const x = a[0] + ux * t, y = a[1] + uy * t, d = D(x, y), s = esp(d, true), demi = l.ws ? l.ws[k - 1] + ((l.ws[k] - l.ws[k - 1]) * t) / L : l.demi;
         if (actives(l, x, y) && d > 0.9 * s0) {
-          const o = demi + 0.5 * s, i0 = seeds.length;
+          const o = demi + 0.5 * s;
           for (const c of [1, -1]) {
             const sx = x - uy * o * c, sy = y + ux * o * c;
-            if (!eau(sx, sy) && !lignes.some((m, mi) => mi !== li && ecart(m, sx, sy) < 0.6 * s)) seeds.push({ x: sx, y: sy, s, ligne: li });
+            if (!eau(sx, sy) && !lignes.some((m, mi) => mi !== li && PRIO[m.kind] >= PRIO[l.kind] && ecart(m, sx, sy) < 0.6 * s)) seeds.push({ x: sx, y: sy, s, ligne: li, cote: c, o });
           }
-          if (seeds.length === i0 + 2) { seeds[i0].pair = i0 + 1; seeds[i0 + 1].pair = i0; }
         }
         t += s * asp * 0.95;
       }
@@ -269,7 +276,7 @@ function tissu(P, v, eau, urbain) {
   for (const [k, sd] of seeds.entries()) {
     sd.b = base(sd.x, sd.y);
     const f = sd.ligne !== undefined && lignes[sd.ligne].kind === "axe" ? fa(sd.x, sd.y) : 0;
-    sd.garde = sd.b > 0 || (f > 0.12 && hash(k, g, 4) < 0.85);
+    sd.garde = (sd.b > 0 || (f > 0.12 && hash(k, g, 4) < 0.85)) && chez(sd.x, sd.y);
   }
   const grille = new Map();
   P.nbGraines = seeds.length;
@@ -285,7 +292,7 @@ function tissu(P, v, eau, urbain) {
   const cellules = [];
   seeds.forEach((sd, k) => {
     if (!sd.garde) return;
-    const h = (sd.ligne === undefined ? 1.5 : 1.1) * sd.s * asp;
+    const h = sd.ligne === undefined ? 1.5 * sd.s * asp : Math.max(0.8 * sd.s * asp, 1.15 * sd.o);  // la cellule d'une graine en miroir atteint sa ligne
     let Q, U, r0 = 2.4 * sd.s * asp;
     for (let essai = 0; essai < 2; essai++) {
       Q = [[sd.x - h, sd.y - h], [sd.x + h, sd.y - h], [sd.x + h, sd.y + h], [sd.x - h, sd.y + h]];
@@ -315,7 +322,7 @@ function tissu(P, v, eau, urbain) {
     const [x, y] = ce.c, d = D(x, y), sd = seeds[ce.k], b = sd.b, n = hash(ce.k, g, 11), f = fa(x, y);
     let t;
     if (romaine) t = b > 0.1 ? "insula" : "horti";
-    else if (ere === "classique") t = (P.mur ? dedans(x, y) : b > 0.3) ? "vieux" : b > 0.1 || f > 0.3 ? "faubourg" : "maraichers";
+    else if (ere === "classique") t = (P.mur ? dedans(x, y) : b > (R < 0.3 ? 0.12 : 0.3)) ? "vieux" : b > 0.1 || f > 0.3 ? "faubourg" : "maraichers";
     else if (ere !== "futur" && (dedans(x, y) || d < Rh * 0.85)) t = "vieux";
     else if (ere === "industrielle") t = b < 0.08 ? (f > 0.3 ? "faubourg" : "maraichers") : n < 0.1 ? "usine" : d < Rh * 1.3 && n < 0.5 ? "immeubles" : "ouvrier";
     else if (ere === "moderne") {
@@ -323,10 +330,11 @@ function tissu(P, v, eau, urbain) {
       else if (f > 0.25 && n < 0.35) t = "zone";
       else if (bruit(x, y, 0.6, (g % 89) + 9) > 0.66 && v.pop > 15000) t = "grandEnsemble";
       else t = n > 0.95 ? "parc" : "pavillons";
-    } else {  // futur : cœur ancien, tours, quartiers denses et verts, coulées vertes
-      if (d < Rh * 0.6) t = "vieux";
+    } else {  // futur : cœur ancien, tours, quartiers denses et verts, coulées vertes ; lointaines banlieues rendues à la nature
+      if (d > 1.05 * R) t = n < 0.3 ? "eco" : "parc";
+      else if (d < Rh * 0.6) t = "vieux";
       else if (Math.abs(bruit(x, y, 1.1, (g % 83) + 4) - 0.5) < 0.04 || n > 0.93) t = "parc";
-      else if (d < 0.5 * R) t = n < 0.55 ? "tours" : "dense";
+      else if (d < 0.6 * R) t = n < 0.6 ? "tours" : "dense";
       else t = d < 0.8 * R ? "dense" : "eco";
     }
     ce.type = t;
@@ -335,7 +343,8 @@ function tissu(P, v, eau, urbain) {
   const ilots = [];
   for (const ce of cellules) {
     const sd = seeds[ce.k];
-    const kinds = ce.tags.map((j) => (j >= 0 && sd.pair === j ? lignes[sd.ligne].kind : j < 0 || !seeds[j].cellule ? "bord" : "rue"));
+    // face à une graine de l'autre rive de la même ligne : c'est la route, le quai ou le rempart
+    const kinds = ce.tags.map((j) => (j >= 0 && sd.ligne !== undefined && seeds[j].ligne === sd.ligne && seeds[j].cote !== sd.cote ? lignes[sd.ligne].kind : j < 0 || !seeds[j].cellule ? "bord" : "rue"));
     const r = rentrer(ce.pts, kinds, (i) => {
       const kd = kinds[i], a = ce.pts[i], b = ce.pts[(i + 1) % ce.pts.length];
       if (kd === "bord") return 0;
@@ -345,7 +354,7 @@ function tissu(P, v, eau, urbain) {
     if (!r || Math.abs(aire(r[0])) < 0.00015) continue;
     const [bloc, bk] = r, mouille = bloc.filter((p) => eau(p[0], p[1])).length;
     if (mouille >= 2 || eau(...centre(bloc))) continue;
-    ilots.push({ pts: ce.pts, bloc, kinds: bk, type: ce.type, c: centre(bloc), graine: hash(ce.k, g, 77) });
+    ilots.push({ pts: ce.pts, bloc, kinds: bk, type: ce.type, c: centre(bloc), graine: hash(ce.k, g, 77), sec: !mouille });  // sec : îlot sans eau, on ne teste plus
   }
   // lieux : place et église (forum), églises du vieux centre, jardin public, gare
   const pres = (p, f = () => true) => { let m = Infinity, r = null; for (const il of ilots) { const d = (il.c[0] - p[0]) ** 2 + (il.c[1] - p[1]) ** 2; if (d < m && f(il)) { m = d; r = il; } } return r; };
@@ -403,7 +412,7 @@ function celte(P, v, eau) {
     for (let j = -n; j <= n; j++) {
       const x = cx + (i + (hash(i, j, g) - 0.5) * 0.7) * pas, y = cy + (j + (hash(j, i, g + 1) - 0.5) * 0.7) * pas, b = base(x, y);
       if (b <= 0 || hash(i, j, g + 2) > 0.5 + 0.7 * b || Math.hypot(x - cx, y - cy) < 0.045 || eau(x, y)) continue;
-      enclos(x, y, 0.012 + 0.012 * hash(i, j, g + 3), hash(i, j, g + 4));
+      enclos(x, y, 0.015 + 0.012 * hash(i, j, g + 3), hash(i, j, g + 4));
     }
   }
   if (P.ilots.length < 3) enclos(cx - 0.04, cy + 0.03, 0.018, hash(g, 2));
@@ -460,7 +469,7 @@ function perimetre(x, q) {
       if (r() < q.vide) continue;
       const k = q.prof[0] + r() * (q.prof[1] - q.prof[0]), f0 = lerp(A, Bb, t0), f1 = lerp(A, Bb, t1), b0 = lerp(f0, lerp(mA, mB, t0), k), b1 = lerp(f1, lerp(mA, mB, t1), k);
       const m = [(f0[0] + f1[0] + b0[0] + b1[0]) / 4, (f0[1] + f1[1] + b0[1] + b1[1]) / 4];
-      if (P.eau(m[0], m[1]) || P.eau((f0[0] + f1[0]) / 2, (f0[1] + f1[1]) / 2) || x.axes.some((l) => ecart(l, m[0], m[1]) < 0.004)) continue;
+      if ((!il.sec && (P.eau(m[0], m[1]) || P.eau((f0[0] + f1[0]) / 2, (f0[1] + f1[1]) / 2))) || x.axes.some((l) => ecart(l, m[0], m[1]) < 0.004)) continue;
       if (q.plat) { const col = q.plat(r); x.o.push(["p", col, [f0, f1, b1, b0], q.h, q.deco ? q.deco(col) : 0]); }
       else x.o.push(["t", q.pal(r), f0, f1, b1, b0, q.h * (0.85 + 0.3 * r())]);
     }
@@ -510,7 +519,7 @@ const REMPLIR = {
   },
   faubourg(x) {
     x.o.push(["s", QUARTIERS.faubourg[1], x.il.bloc]);
-    const inn = perimetre(x, { D: 0.013, w: [0.01, 0.017], vide: 0.18, prof: [0.7, 1], pal: (r) => pal(r() < 0.8 ? "canal" : "tuile", r), h: 0.007, cotes: RUES });
+    const inn = perimetre(x, { D: 0.013, w: [0.01, 0.016], vide: 0.06, prof: [0.7, 1], pal: (r) => pal(r() < 0.8 ? "canal" : "tuile", r), h: 0.007, cotes: RUES });
     jardins(x, inn ?? x.il.bloc);
   },
   maraichers(x) {
@@ -699,8 +708,8 @@ const REMPLIR = {
   enclos(x) {
     const { o, il, r } = x, huttes = [];
     o.push(["s", QUARTIERS.enclos[1], il.bloc], ["l", "#6e5636", 0.0013, il.bloc, true]);
-    for (let k = 0; k < 30 && huttes.length < 2 + r() * 4; k++) {
-      const a = r() * TAU, d = Math.sqrt(r()) * rin(il.bloc) * 0.8, hx = il.c[0] + Math.cos(a) * d, hy = il.c[1] + Math.sin(a) * d, hr = 0.0045 + r() * 0.003;
+    for (let k = 0; k < 30 && huttes.length < 3 + r() * 4; k++) {
+      const a = r() * TAU, d = Math.sqrt(r()) * rin(il.bloc) * 0.8, hx = il.c[0] + Math.cos(a) * d, hy = il.c[1] + Math.sin(a) * d, hr = 0.0055 + r() * 0.0035;
       if (huttes.every(([x2, y2, r2]) => Math.hypot(hx - x2, hy - y2) > hr + r2 + 0.002)) huttes.push([hx, hy, hr]);
     }
     for (const [hx, hy, hr] of huttes) o.push(["h", hx, hy, hr]);
@@ -716,7 +725,8 @@ const REMPLIR = {
 };
 
 // ---------- dessin
-const chemin = (g, P) => { g.moveTo(P[0][0], P[0][1]); for (let i = 1; i < P.length; i++) g.lineTo(P[i][0], P[i][1]); g.closePath(); };
+// (pas de closePath : Chrome le paie au prix fort sur un chemin de milliers de sous-chemins ; on revient au départ)
+const chemin = (g, P) => { g.moveTo(P[0][0], P[0][1]); for (let i = 1; i < P.length; i++) g.lineTo(P[i][0], P[i][1]); g.lineTo(P[0][0], P[0][1]); };
 function enveloppe(pts) {  // enveloppe convexe (ombres des tours)
   const p = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]), x = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
   const bas = [], haut = [];
@@ -821,7 +831,7 @@ function dessinerPrims(g, prims, px) {
   for (const [k, liste] of lignes) {
     const [col, w] = k.split("|");
     g.strokeStyle = col; g.lineWidth = W(+w); g.beginPath();
-    for (const p of liste) { p[3].forEach((q, i) => (i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]))); if (p[4]) g.closePath(); }
+    for (const p of liste) { p[3].forEach((q, i) => (i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]))); if (p[4]) g.lineTo(p[3][0][0], p[3][0][1]); }
     g.stroke();
   }
   // cheminées d'usine et leur longue ombre
@@ -883,6 +893,7 @@ export function dessinerPlan(g, plan, x0, y0, x1, y1, L) {
     const sols = new Map(), bati = new Map();
     for (const il of vus) {
       const [, sol, teinte, D] = QUARTIERS[il.type];
+      if (teinte && L < 48) { groupe(sols, teinte).push(il.bloc); continue; }  // très loin : l'îlot prend la teinte de ses toits
       groupe(sols, sol).push(il.bloc);
       if (teinte) groupe(bati, teinte).push([il.bloc, il.cour === undefined ? (il.cour = interieur(il.bloc, Math.min(D, rin(il.bloc) * 0.92))) : il.cour]);
     }
@@ -971,6 +982,21 @@ if (typeof process !== "undefined" && process.argv[1]?.endsWith("villes.js")) {
   verifier("industrielle", 143000);
   verifier("moderne", 221000); verifier("moderne", 300);
   verifier("futur", 299000);
+  // berges : une ville sur un large fleuve que croisent beaucoup de routes garde des maisons jusqu'aux quais
+  const fleuve = { pts: [[-9, 0.3], [0, 0], [9, -0.4]], ws: [0.16, 0.16, 0.16] }, large = (x, y) => ecart(fleuve, x, y) < 0.006;
+  const etoile = Array.from({ length: 12 }, (_, k) => ({ pts: [[0, 0], [9 * Math.cos(k * 0.52 + 0.1), 9 * Math.sin(k * 0.52 + 0.1)]], grand: k % 2 === 0 }));
+  const quais = genererPlan({ x: 0, y: 0, pop: 4e5, ere: "moderne", r: rayon(4e5, "moderne"), rh: 1.5, ri: 2.5, graine: 3, axes: etoile, rivieres: [fleuve], murs: true }, large);
+  let n = 0, ok = 0;
+  for (let x = -2; x < 2; x += 0.05) {
+    for (const o of [0.2, 0.25, -0.2, -0.25]) {
+      const y = -x * 0.04 + o;
+      if (Math.hypot(x, y) < 0.4 || large(x, y)) continue;
+      n++;
+      if (quais.ilots.some((il) => il.pts && dansPoly(il.pts, x, y))) ok++;
+    }
+  }
+  console.assert(ok > 0.9 * n, "berges vides", ok, n);
+  console.log(`berges couvertes : ${ok}/${n}`);
   // pire cas : Paris en 2100, tout le sol alentour urbain (temps processeur, la machine peut être chargée)
   const t = process.cpuUsage(), paris = { x: 0, y: 0, pop: 2.4e6, ere: "futur", r: rayon(2.4e6, "futur"), rh: rayon(630000, "classique"), ri: rayon(1.2e6, "industrielle"), graine: 7, axes, rivieres: [riviere], murs: true };
   const pl = genererPlan(paris, eau, () => true), ms = process.cpuUsage(t).user / 1000;
