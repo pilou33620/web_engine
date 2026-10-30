@@ -1,5 +1,5 @@
 /* Kit d'interface partagé ; chaque thème ne change que les variables. */
-body[data-theme="ferme"] {
+body[data-theme="aerienne"] {
   --fond: #1b211a; --fond2: #273026; --texte: #ecede2; --doux: #9ca592; --bord: transparent;
   --accent: #e8b84a; --accent-texte: #1f1a0c; --lecture: #6fc27a; --rayon: 14px;
   --police: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -21,7 +21,7 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; -webkit-tap-
 .ligne { display: flex; align-items: center; gap: 12px; }
 .titre { display: flex; align-items: center; gap: 8px; font-size: 1.25rem; }
 .blason { width: 22px; height: 26px; background: #b83a2e; border: 2px solid var(--accent); border-radius: 3px 3px 11px 11px; }
-body[data-theme="ferme"] .titre { display: none; }
+body[data-theme="aerienne"] .titre { display: none; }
 .date { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; }
 .date strong { font-size: 1.05rem; }
 .date small, .ressource small { color: var(--doux); }
@@ -29,7 +29,7 @@ body[data-theme="ferme"] .titre { display: none; }
 .ressource { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .ressource b { font-size: 1.05rem; }
 .ressource .plus { color: #7fc77f; } .ressource .moins { color: #e07a6a; }
-body[data-theme="ferme"] .ressource:first-child b { color: var(--accent); }
+body[data-theme="aerienne"] .ressource:first-child b { color: var(--accent); }
 
 .zones { display: flex; gap: 6px; overflow-x: auto; padding-top: 6px; scrollbar-width: none; }
 .zones button { white-space: nowrap; background: var(--fond2); border: 1px solid var(--bord); border-radius: 999px; padding: 3px 10px; font-size: .85rem; }
@@ -51,10 +51,10 @@ body[data-theme="ferme"] .ressource:first-child b { color: var(--accent); }
 .journal li { background: color-mix(in srgb, var(--fond) 92%, transparent); border: 1px solid var(--bord); border-radius: var(--rayon); padding: 10px 14px; }
 .journal time { color: var(--doux); margin-right: 10px; }
 .journal .evt-bonne { border-left: 4px solid #6fc27a; }
-body[data-theme="ferme"] .journal { left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 12px); }
-body[data-theme="ferme"] .journal li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-body[data-theme="ferme"] .journal li:not(:first-child) { display: none; }
-body[data-theme="ferme"] .journal time { font-family: ui-monospace, Menlo, monospace; }
+body[data-theme="aerienne"] .journal { left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 12px); }
+body[data-theme="aerienne"] .journal li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body[data-theme="aerienne"] .journal li:not(:first-child) { display: none; }
+body[data-theme="aerienne"] .journal time { font-family: ui-monospace, Menlo, monospace; }
 body[data-theme="carte"] .journal { right: 72px; bottom: calc(env(safe-area-inset-bottom) + 12px); width: min(360px, calc(100vw - 96px)); display: flex; flex-direction: column; gap: 8px; }
 body[data-theme="carte"] .journal li { border-left: 4px solid #b83a2e; }
 body[data-theme="carte"] .journal li:nth-child(n+4) { display: none; }

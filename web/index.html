@@ -6,8 +6,12 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>web_engine</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="css/socle.css">
+  <link rel="stylesheet" href="css/construction.css">
+  <link rel="stylesheet" href="css/interface.css">
+  <link rel="stylesheet" href="css/carte.css">
 </head>
-<body data-theme="ferme">
+<body data-theme="aerienne">
   <div id="scene"></div>
 
   <header class="barre">
@@ -27,6 +31,9 @@
     <button id="recentrer" class="rond" aria-label="Recentrer">⌖</button>
   </nav>
 
+  <nav id="outils" class="outils" aria-label="Construire"></nav>
+  <div id="decisions" class="decisions"></div>
+
   <ul id="journal" class="journal"></ul>
 
   <div id="temps" class="temps">
@@ -38,7 +45,7 @@
     <div class="entete"><h2>Réglages</h2><button id="menu-fermer" class="rond" aria-label="Fermer">✕</button></div>
     <h3>Thème graphique</h3>
     <div class="choix" id="choix-theme">
-      <button data-theme="ferme">Ferme</button><button data-theme="carte">Carte</button>
+      <button data-theme="aerienne">Vue aérienne</button><button data-theme="carte">Carte</button>
     </div>
     <h3>Temps</h3>
     <div class="choix" id="choix-mode">
@@ -46,6 +53,7 @@
     </div>
     <h3>Calques</h3>
     <div id="calques" class="calques"></div>
+    <div id="menu-extensions"></div>
     <h3>Partie</h3>
     <div class="choix"><button id="sauver">Sauvegarder</button><button id="charger">Charger</button></div>
   </aside>

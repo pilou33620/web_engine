@@ -1,16 +1,25 @@
-// Interface générique : relie le serveur, le rendu et le kit d'interface.
+// Interface générique : relie le serveur, le rendu, le kit d'interface et les modules.
+// Les modules (vues, minicarte, construction, décisions, tutoriel) reçoivent un contexte « ctx »
+// et s'y branchent ; ils ne modifient pas ce fichier.
 import { Rendu, CALQUES } from "./moteur/rendu.js";
-import { THEMES } from "./moteur/themes.js";
+import { THEMES, fusionnerStyles } from "./moteur/themes/index.js";
+import * as vues from "./moteur/vues.js";
+import * as minicarte from "./moteur/minicarte.js";
+import * as construction from "./moteur/construction.js";
+import * as decisions from "./moteur/decisions.js";
+import * as tutoriel from "./moteur/tutoriel.js";
 
+const MODULES = [vues, minicarte, construction, decisions, tutoriel];
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const memo = {
   lire(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
   ecrire(k, v) { try { localStorage.setItem(k, v); } catch { /* stockage indisponible */ } },
 };
-const NOMS_CALQUES = { sol: "Sols", haies: "Haies", eau: "Rivières", routes: "Routes", frontieres: "Frontières", villes: "Villes", unites: "Unités", etiquettes: "Noms" };
-const RESSOURCES = { argent: ["€", "Trésorerie"], ble: ["🌾", "Blé"], bois: ["🪵", "Bois"], population: ["👥", "Population"] };
-const SOLS = { chaume: "Chaume", culture: "Blé en herbe", prairie: "Prairie", labour: "Labour", colza: "Colza", foret: "Forêt" };
+const NOMS_CALQUES = { sol: "Sols", eau: "Eaux", vegetation: "Végétation", routes: "Routes", reseaux: "Réseaux",
+  frontieres: "Frontières", batiments: "Bâtiments", unites: "Unités", etiquettes: "Noms" };
+const RESSOURCES = { argent: ["€", "Trésorerie"], ble: ["🌾", "Blé"], bois: ["🪵", "Bois"], population: ["👥", "Population"],
+  energie: ["⚡", "Énergie (MWh)"] };
 const METEO = { soleil: "☀️", nuages: "☁️", pluie: "🌧️", neige: "❄️", orage: "⛈️", brouillard: "🌫️" };
 const VENTS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"];
 const virgule = (v, d = 1) => v.toFixed(d).replace(".", ",");
@@ -21,11 +30,27 @@ const nombre = new Intl.NumberFormat("fr-FR");
 const dateLongue = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 const jour = (iso) => new Date(iso + "T12:00:00");
 
+// Styles et images propres au jeu (jeux/<nom>/web/styles.js), s'il en a
+try { fusionnerStyles((await import("/jeu/styles.js")).default); } catch { /* pas de styles propres */ }
+
 const app = new PIXI.Application();
 await app.init({ resizeTo: window, antialias: true, resolution: Math.min(devicePixelRatio, 2), autoDensity: true });
 $("scene").appendChild(app.canvas);
 const rendu = new Rendu(app);
-let etat = null, versionCarte = -1, dernierJournal = "", dernieresZones = "", selection = null;
+const abonnes = { etat: [], carte: [] };
+let etat = null, versionCarte = -1, dernierJournal = "", dernieresZones = "", selection = null, fiche = null;
+
+// --- Contexte partagé avec les modules ---
+const ctx = {
+  app, rendu, api, action, toast, $, esc, nombre,
+  get etat() { return etat; },
+  get carte() { return rendu.carte; },
+  get selection() { return selection; },
+  outil: null,              // outil actif : { tap(pointMonde, entite), survol?(pointMonde), annuler?() }
+  surEtat: (f) => abonnes.etat.push(f),     // f(etat) à chaque mise à jour (5 fois/s)
+  surCarte: (f) => abonnes.carte.push(f),   // f(carte) après chaque redessin de la carte
+  afficherInfo,
+};
 
 // --- Serveur ---
 async function api(chemin, corps) {
@@ -39,7 +64,11 @@ async function action(nom, params = {}) {
     const res = await api("/api/action", { nom, params });
     if (res.message) toast(res.message);
     await rafraichir();
-  } catch (e) { toast(e.message, true); }
+    return res;
+  } catch (e) {
+    toast(e.message, true);
+    return null;
+  }
 }
 async function rafraichir() {
   etat = await api("/api/etat");
@@ -47,14 +76,16 @@ async function rafraichir() {
     const carte = await api("/api/carte");
     versionCarte = carte.version;
     rendu.dessinerCarte(carte);
-    if (selection) afficherInfo(carte.entites.find((e) => e.id === selection.id));
+    for (const f of abonnes.carte) f(carte);
+    if (selection?.id) afficherInfo(carte.entites.find((e) => e.id === selection.id) ?? null);
   }
   rendu.majEtat(etat);
   majInterface();
+  for (const f of abonnes.etat) f(etat);
 }
 // shortcut: interrogation du serveur 5 fois/s ; passer au WebSocket si le réseau sature ou pour le multijoueur
 async function boucle() {
-  try { await rafraichir(); } catch { $("date").textContent = "Serveur injoignable"; }
+  try { await rafraichir(); } catch (e) { $("date").textContent = "Serveur injoignable"; console.error(e); }
   setTimeout(boucle, 200);
 }
 
@@ -100,10 +131,14 @@ function toast(texte, erreur = false) {
   minuterieToast = setTimeout(() => t.classList.remove("visible"), 2500);
 }
 
-// Météo locale d'une sélection (parcelle, ville ou zone), mise à jour en direct
+// Météo locale d'une sélection (entité ou zone climatique), mise à jour en direct
 function climatDe(sel) {
-  const z = sel.type === "zone" ? etat.climat.zones[sel.index]
-    : rendu.climat.zoneDe(sel.x + (sel.w ?? 0) / 2, sel.y + (sel.h ?? 0) / 2);
+  let z;
+  if (sel.type === "climat") z = etat.climat.zones[sel.index];
+  else {
+    const p = sel.points ? { x: sel.points[0][0], y: sel.points[0][1] } : { x: sel.x + (sel.w ?? 0) / 2, y: sel.y + (sel.h ?? 0) / 2 };
+    z = rendu.climat.zoneDe(p.x, p.y);
+  }
   const s = etat.climat.soleil, alerte = (v, t) => (v ? ` <b class="alerte">${t}</b>` : "");
   return `<ul class="climat">
     <li>${ciel(z)} <span>${esc(z.nom)}</span></li>
@@ -117,43 +152,46 @@ function climatDe(sel) {
   </ul>`;
 }
 
-function afficherInfo(e) {
+// Fiche d'une entité (fournie par les règles du jeu) ou d'une zone climatique
+async function afficherInfo(e) {
   selection = e;
+  rendu.surligner?.(e?.id ? e : null);
   const info = $("info");
   if (!e) return (info.hidden = true);
-  if (e.type === "zone") {
-    info.innerHTML = `<h2>Climat</h2><div id="info-climat">${climatDe(e)}</div>
-      <div class="actions"><button data-action="fermer">Fermer</button></div>`;
-  } else if (e.type === "ville") {
-    info.innerHTML = `<h2>${esc(e.nom)}</h2><p>Population : ${nombre.format(e.population)}</p><div id="info-climat">${climatDe(e)}</div>
-      <div class="actions"><button data-action="fermer">Fermer</button></div>`;
+  if (e.type === "climat") {
+    fiche = { titre: "Climat", lignes: [], actions: [] };
   } else {
-    const ha = ((e.w * e.h) / 10000).toFixed(1).replace(".", ",");
-    info.innerHTML = `<h2>${esc(SOLS[e.sol] ?? e.sol)}</h2><p>Parcelle de ${ha} ha</p><div id="info-climat">${climatDe(e)}</div>
-      <div class="actions">${e.sol === "labour" ? `<button class="bouton-or" data-action="semer">Semer du colza (800 €)</button>` : ""}
-      <button data-action="fermer">Fermer</button></div>`;
+    try { fiche = await api(`/api/info?id=${encodeURIComponent(e.id)}`); } catch { return afficherInfo(null); }
+    if (selection !== e) return;  // une autre sélection est arrivée entre-temps
   }
+  info.innerHTML = `<h2>${esc(fiche.titre)}</h2>${fiche.lignes.map((l) => `<p>${esc(l)}</p>`).join("")}
+    <div id="info-climat">${climatDe(e)}</div>
+    <div class="actions">${fiche.actions.map((a, i) => `<button class="bouton-or" data-index="${i}">${esc(a.libelle)}</button>`).join("")}
+    <button data-action="fermer">Fermer</button></div>`;
   info.hidden = false;
 }
 $("zones").addEventListener("click", (ev) => {
   const b = ev.target.closest("button");
-  if (b) afficherInfo({ type: "zone", index: Number(b.dataset.zone) });
+  if (b) afficherInfo({ type: "climat", index: Number(b.dataset.zone) });
 });
 $("info").addEventListener("click", (ev) => {
-  const a = ev.target.closest("button")?.dataset.action;
-  if (a === "semer") action("semer", { id: selection.id });
-  if (a === "fermer") afficherInfo(null);
+  const b = ev.target.closest("button");
+  if (!b) return;
+  if (b.dataset.action === "fermer") return afficherInfo(null);
+  const a = fiche?.actions[Number(b.dataset.index)];
+  if (a) action(a.nom, a.params);
 });
 
 function changerTheme(nom) {
-  const theme = THEMES[nom] ?? THEMES.ferme;
-  document.body.dataset.theme = theme.css;
-  rendu.appliquerTheme(theme);
+  if (!THEMES[nom]) nom = "aerienne";
+  document.body.dataset.theme = THEMES[nom].css;
+  rendu.appliquerTheme(THEMES[nom]);
   memo.ecrire("theme", nom);
   for (const b of $("choix-theme").children) b.classList.toggle("actif", b.dataset.theme === nom);
+  if (selection?.id) rendu.surligner?.(selection);
 }
 
-// --- Gestes : glisser, pincer, molette, toucher ---
+// --- Gestes : glisser, pincer, molette, toucher ; un outil actif reçoit les touchers ---
 const toile = app.canvas, pointeurs = new Map();
 let glisse = 0;
 toile.addEventListener("pointerdown", (e) => {
@@ -162,6 +200,7 @@ toile.addEventListener("pointerdown", (e) => {
   if (pointeurs.size === 1) glisse = 0;
 });
 toile.addEventListener("pointermove", (e) => {
+  ctx.outil?.survol?.(rendu.versMonde(e.clientX, e.clientY));
   const p = pointeurs.get(e.pointerId);
   if (!p) return;
   if (pointeurs.size === 1) {
@@ -177,17 +216,22 @@ toile.addEventListener("pointermove", (e) => {
   p.y = e.clientY;
 });
 const relacher = (e) => {
-  if (e.type === "pointerup" && pointeurs.size === 1 && glisse < 8) afficherInfo(rendu.chercher(e.clientX, e.clientY));
+  if (e.type === "pointerup" && pointeurs.size === 1 && glisse < 8) {
+    const entite = rendu.chercher(e.clientX, e.clientY);
+    if (ctx.outil) ctx.outil.tap(rendu.versMonde(e.clientX, e.clientY), entite);
+    else afficherInfo(entite);
+  }
   pointeurs.delete(e.pointerId);
 };
 toile.addEventListener("pointerup", relacher);
 toile.addEventListener("pointercancel", relacher);
 toile.addEventListener("wheel", (e) => { e.preventDefault(); rendu.zoomer(Math.exp(-e.deltaY * 0.0015), e.clientX, e.clientY); }, { passive: false });
+addEventListener("keydown", (e) => { if (e.key === "Escape") ctx.outil?.annuler?.(); });
 
 // --- Boutons ---
-const centre = () => [innerWidth / 2, innerHeight / 2];
-$("zoom-plus").onclick = () => rendu.zoomer(1.4, ...centre());
-$("zoom-moins").onclick = () => rendu.zoomer(1 / 1.4, ...centre());
+const milieu = () => [innerWidth / 2, innerHeight / 2];
+$("zoom-plus").onclick = () => rendu.zoomer(1.4, ...milieu());
+$("zoom-moins").onclick = () => rendu.zoomer(1 / 1.4, ...milieu());
 $("recentrer").onclick = () => rendu.recentrer();
 $("lecture").onclick = () => action("pause", { valeur: !etat.horloge.pause });
 $("vitesse").onclick = () => action("vitesse", { valeur: VITESSES[(VITESSES.indexOf(etat.horloge.vitesse) + 1) % VITESSES.length] });
@@ -198,8 +242,9 @@ $("choix-theme").onclick = (e) => e.target.dataset.theme && changerTheme(e.targe
 $("choix-mode").onclick = (e) => e.target.dataset.mode && action("mode", { valeur: e.target.dataset.mode });
 $("sauver").onclick = () => action("sauver");
 $("charger").onclick = () => action("charger");
-$("calques").innerHTML = CALQUES.map((c) => `<label><input type="checkbox" data-calque="${c}" checked>${NOMS_CALQUES[c]}</label>`).join("");
+$("calques").innerHTML = CALQUES.map((c) => `<label><input type="checkbox" data-calque="${c}" checked>${NOMS_CALQUES[c] ?? c}</label>`).join("");
 $("calques").onchange = (e) => rendu.afficherCalque(e.target.dataset.calque, e.target.checked);
 
-changerTheme(memo.lire("theme", "ferme"));
+changerTheme(memo.lire("theme", "aerienne"));
+for (const m of MODULES) m.installer(ctx);
 boucle();

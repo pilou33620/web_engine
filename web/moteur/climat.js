@@ -22,9 +22,9 @@ export class ClimatRendu {
   constructor(rendu) {
     this.r = rendu;
     const m = rendu.monde, avant = (nom) => m.getChildIndex(rendu.calques[nom]);
-    this.neige = m.addChildAt(new P.Graphics(), avant("haies"));     // posée sur le sol
+    this.neige = m.addChildAt(new P.Graphics(), avant("eau"));     // posée sur le sol
     this.crue = m.addChildAt(new P.Graphics(), avant("eau"));        // débordement sous la rivière
-    this.ombres = m.addChildAt(new P.Container(), avant("villes"));  // nuages au-dessus du paysage
+    this.ombres = m.addChildAt(new P.Container(), avant("batiments"));  // nuages au-dessus du paysage
     // Flou puis transparence appliqués à l'ensemble : les nuages qui se chevauchent ne s'assombrissent pas
     this.opaciteOmbres = new P.AlphaFilter({ alpha: 0.2 });
     this.ombres.filters = [new P.BlurFilter({ strength: 40, quality: 3 }), this.opaciteOmbres];
@@ -52,9 +52,9 @@ export class ClimatRendu {
   // Appelé à chaque (re)dessin de la carte
   carte(carte) {
     this.taille = carte.taille;
-    this.rivieres = carte.entites.filter((e) => e.type === "riviere");
+    this.rivieres = carte.entites.filter((e) => e.style === "riviere");
     for (const c of [...this.lumieres.removeChildren(), ...this.ombres.removeChildren()]) c.destroy();
-    for (const v of carte.entites.filter((e) => e.type === "ville")) {
+    for (const v of carte.entites.filter((e) => e.lumiere)) {  // entités qui s'éclairent la nuit
       const g = new P.Graphics();
       for (const r of [110, 75, 45, 22]) g.circle(v.x, v.y, r).fill({ color: 0xffb25a, alpha: 0.13 });
       this.lumieres.addChild(g);
@@ -77,7 +77,7 @@ export class ClimatRendu {
     this.tour = h.mode === "tour";
     this.vitesse = h.vitesse;
     const teinte = TEINTE_SAISON[h.saison] ?? 0xffffff;
-    for (const nom of ["sol", "haies"]) this.r.calques[nom].tint = teinte;
+    for (const nom of ["sol", "vegetation"]) this.r.calques[nom].tint = teinte;
     // Neige et crues ne se redessinent que si les valeurs ont changé
     const cle = etat.climat.zones.map((z) => `${Math.round(z.neige_cm)}|${z.debit.toFixed(1)}`).join();
     if (cle !== this.cle && this.taille) {

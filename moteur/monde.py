@@ -1,4 +1,7 @@
-"""Cœur de simulation générique : horloge, météo, ressources, entités, événements.
+"""Cœur de simulation générique : horloge, climat, ressources, entités, événements, décisions, constructions.
+
+Entités universelles : type "zone" (rect x,y,w,h ou polygone points), "ligne" (points), "batiment" (x,y,taille)
+ou "unite" (mobile, x,y,angle). Le "style" dit comment les thèmes la dessinent ; le "calque" où elle s'affiche.
 
 Un jeu fournit un objet « règles » avec les méthodes :
   initialiser(monde), tick(monde, heures), nouveau_jour(monde), action(monde, nom, params)
@@ -7,6 +10,7 @@ import datetime as dt
 import json
 import random
 
+from . import construction
 from .climat import Climat
 
 SAISONS = ["Hiver", "Hiver", "Printemps", "Printemps", "Printemps", "Été",
@@ -39,14 +43,16 @@ class Monde:
         self.taille = [2000, 1400]
         self.entites, self.ressources, self.evenements = {}, {}, []
         self.version_carte, self._compteur = 0, 0
+        self.decisions, self.relief = {}, None
         # Un jeu règle son climat avec un dict CLIMAT (latitude, normales, zones), voir moteur/climat.py
         self.climat = Climat(self.rng, self.horloge.date, **getattr(regles, "CLIMAT", {}))
+        self.climat.avancer(self.horloge.date, self.horloge.heure - 1, 1)  # météo de l'heure de départ
         regles.initialiser(self)
 
     # --- API pour les règles du jeu ---
-    def ajouter(self, type, mobile=False, **props):
+    def ajouter(self, type, style, mobile=False, **props):
         self._compteur += 1
-        e = {"id": f"{type}-{self._compteur}", "type": type, "mobile": mobile, **props}
+        e = {"id": f"{style}-{self._compteur}", "type": type, "style": style, "mobile": mobile, **props}
         self.entites[e["id"]] = e
         if not mobile:
             self.version_carte += 1
@@ -59,8 +65,25 @@ class Monde:
             self.version_carte += 1  # le client redessine la carte
         return e
 
+    def supprimer(self, id):
+        e = self.entites.pop(id)
+        if not e["mobile"]:
+            self.version_carte += 1
+        return e
+
     def de_type(self, type):
         return [e for e in self.entites.values() if e["type"] == type]
+
+    def de_style(self, *styles):
+        return [e for e in self.entites.values() if e["style"] in styles]
+
+    def proposer(self, titre, texte, choix):
+        """Décision à prendre par le joueur. choix : [(libellé, action, params)] ; action None = ne rien faire."""
+        self._compteur += 1
+        id = f"decision-{self._compteur}"
+        self.decisions[id] = {"id": id, "titre": titre, "texte": texte,
+                              "choix": [{"libelle": l, "action": a, "params": p} for l, a, p in choix]}
+        return id
 
     def ressource(self, nom, quantite):
         r = self.ressources.setdefault(nom, {"valeur": 0, "delta": 0})
@@ -112,17 +135,49 @@ class Monde:
             h.mode, h.pause = params["valeur"], True
         elif nom == "tour_suivant":
             self.tour_suivant()
+        elif nom == "construire":
+            return construction.construire(self, params)
+        elif nom == "demolir":
+            return construction.demolir(self, params.get("id"))
+        elif nom == "decider":
+            d = self.decisions.pop(params.get("id"), None)
+            if d is None:
+                raise ValueError("Décision introuvable.")
+            c = d["choix"][int(params["index"])]
+            return self.action(c["action"], c["params"]) if c["action"] else None
         else:
             return self.regles.action(self, nom, params)
 
     # --- Données envoyées au client ---
     def carte(self):
-        return {"version": self.version_carte, "taille": self.taille,
-                "entites": [e for e in self.entites.values() if not e["mobile"]]}
+        r = self.regles
+        return {"version": self.version_carte, "taille": self.taille, "titre": getattr(r, "TITRE", ""),
+                "entites": [e for e in self.entites.values() if not e["mobile"]],
+                "constructions": getattr(r, "CONSTRUCTIONS", []), "vues": getattr(r, "VUES", []),
+                "tutoriel": getattr(r, "TUTORIEL", []), "relief": self.relief}
+
+    def info(self, id):
+        """Fiche d'une entité : {titre, lignes, actions:[{libelle, nom, params}]}, fournie par les règles."""
+        e = self.entites.get(id)
+        if e is None:
+            raise ValueError("Entité introuvable.")
+        fiche = {"titre": e.get("nom") or e["style"], "lignes": [], "actions": []}
+        if hasattr(self.regles, "info"):
+            fiche.update(self.regles.info(self, e) or {})
+        if e.get("constructible"):
+            fiche["actions"] = fiche["actions"] + [{"libelle": "Démolir", "nom": "demolir", "params": {"id": id}}]
+        return fiche
+
+    def vue(self, id):
+        """Carte de données : {id_entite: valeur entre 0 et 1}, calculée par les règles."""
+        if id not in {v["id"] for v in getattr(self.regles, "VUES", [])}:
+            raise ValueError("Vue inconnue.")
+        return {"valeurs": self.regles.vue(self, id)}
 
     def etat(self):
         return {"horloge": self.horloge.etat(), "climat": self.climat.etat(), "ressources": self.ressources,
                 "evenements": self.evenements[:8], "version_carte": self.version_carte,
+                "decisions": list(self.decisions.values()),
                 "mobiles": [e for e in self.entites.values() if e["mobile"]]}
 
     # --- Sauvegarde ---
@@ -130,7 +185,8 @@ class Monde:
         h = self.horloge
         data = {"horloge": {"date": h.date.isoformat(), "heure": h.heure, "mode": h.mode, "vitesse": h.vitesse},
                 "taille": self.taille, "climat": self.climat.sauver(), "entites": self.entites,
-                "ressources": self.ressources, "evenements": self.evenements, "compteur": self._compteur}
+                "ressources": self.ressources, "evenements": self.evenements, "compteur": self._compteur,
+                "decisions": self.decisions}
         with open(chemin, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False)
 
@@ -144,4 +200,5 @@ class Monde:
         self.climat.charger(data["climat"])
         self.entites, self.ressources = data["entites"], data["ressources"]
         self.evenements, self._compteur = data["evenements"], data["compteur"]
+        self.decisions = data.get("decisions", {})
         self.version_carte += 1

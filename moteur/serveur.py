@@ -4,6 +4,7 @@ import json
 import pathlib
 import threading
 import time
+import urllib.parse
 
 from .monde import Monde
 
@@ -45,6 +46,16 @@ def servir(regles, nom_jeu, port=8080, hote="0.0.0.0"):
             self.wfile.write(corps)
 
         def do_GET(self):
+            url = urllib.parse.urlsplit(self.path)
+            if url.path in ("/api/info", "/api/vue"):
+                id = urllib.parse.parse_qs(url.query).get("id", [""])[0]
+                try:
+                    with verrou:
+                        return self._json(monde.info(id) if url.path == "/api/info" else monde.vue(id))
+                except ValueError as e:
+                    return self._json({"erreur": str(e)}, 400)
+            if url.path.startswith("/jeu/"):
+                return self._fichier_du_jeu(url.path[len("/jeu/"):])
             if self.path == "/api/etat":
                 with verrou:
                     return self._json(monde.etat())
@@ -52,6 +63,19 @@ def servir(regles, nom_jeu, port=8080, hote="0.0.0.0"):
                 with verrou:
                     return self._json(monde.carte())
             return super().do_GET()
+
+        def _fichier_du_jeu(self, relatif):
+            """Fichiers propres au jeu (styles.js, images) servis depuis jeux/<nom>/web/."""
+            base = (RACINE / "jeux" / nom_jeu / "web").resolve()
+            chemin = (base / urllib.parse.unquote(relatif)).resolve()
+            if base not in chemin.parents or not chemin.is_file():  # refuse ../ et l'absent
+                return self._json({"erreur": "introuvable"}, 404)
+            corps = chemin.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", self.guess_type(str(chemin)))
+            self.send_header("Content-Length", str(len(corps)))
+            self.end_headers()
+            self.wfile.write(corps)
 
         def do_POST(self):
             if self.path != "/api/action":
