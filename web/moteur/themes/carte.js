@@ -249,6 +249,14 @@ function angleProche(points, x, y) {
   return angle;
 }
 
+// Nom de bourg ou de village : petites capitales claires sur un halo sombre, sans plaque (web_conquete)
+function nomVillage(texte, rang) {
+  const t = new P.Text({ text: texte.toUpperCase(), style: { fontFamily: SERIF, fontSize: rang ? 11 : 9.5, fontWeight: "700",
+    fill: 0xf4ecd6, letterSpacing: 0.6, stroke: { color: 0x241c14, width: 3, join: "round" } } });
+  t.anchor.set(0.5);
+  return t;
+}
+
 // Pastille sombre à liseré doré (population, effectif)
 function pastille(texte, taille = 11) {
   const c = new P.Container();
@@ -275,13 +283,13 @@ function cartouche(texte, taille, chefLieu) {
 // Route : vraie largeur (m) mais au moins px à l'écran. Ancienne : chaussée claire bordée d'encre ;
 // moderne : comme une carte routière, grands axes rouges, petites routes blanches, liseré sombre
 function routeCarte(g, e, metres, px) {
-  const w = largeur(metres / vue.echelle, px), bord = 1.6 / vue.zoom, grand = metres > 10;
+  // (comme web_conquete : de minces chemins de terre claire, presque un fil vu de loin)
+  const w = largeur(metres / vue.echelle, px), grand = metres > 10;
   if (vue.epoque === "moderne") {
-    trait(g, e.points, { width: w + bord, color: 0x3a3030, alpha: 0.8 });
-    return trait(g, e.points, { width: w, color: grand ? 0xc8402e : 0xf6f0e0 });
+    trait(g, e.points, { width: w + 1 / vue.zoom, color: 0x3a3030, alpha: 0.55 });
+    return trait(g, e.points, { width: w, color: grand ? 0xd0503a : 0xf2ead6 });
   }
-  trait(g, e.points, { width: w + bord, color: 0x5a4030, alpha: grand ? 0.85 : 0.5 });
-  trait(g, e.points, { width: w, color: grand ? 0xe6d6ae : 0xdcc9a0 });
+  trait(g, e.points, { width: w, color: 0xe9dcb4, alpha: grand ? 0.85 : 0.6 });
 }
 
 // Icônes de lieux habités, à l'échelle de l'écran, selon l'époque (vue.epoque) et le rang de la ville.
@@ -355,13 +363,13 @@ export const carte = {
     // Fleuve : `largeur` (unités du monde, nombre ou une par point) si fournie, sinon 8 ; liseré clair et reflet au milieu
     // Eau bleue entre des berges vertes, reflet clair au fil de l'eau (web_conquete) ; jamais plus fine que px à l'écran
     riviere(g, e) {
-      const l = e.largeur ?? 8, px = [1.6, 3.2, 2.1, 1.3, 1.1][e.rang ?? 0], z = vue.zoom;
-      traitVariable(g, e.points, l, { color: 0x4b7438, alpha: 0.85 }, 1, 2.2 / z, (px + 2.2) / z);
-      traitVariable(g, e.points, l, { color: 0x4a78b4 }, 1, 0, px / z);
-      if (z * l > 6) traitVariable(g, e.points, l, { color: 0x8fb4dc, alpha: 0.5 }, 0.3);
+      const l = e.largeur ?? 8, px = [2, 4, 2.6, 1.7, 1.3][e.rang ?? 0], z = vue.zoom;
+      traitVariable(g, e.points, l, { color: 0x34619a }, 1, 1.2 / z, (px + 1.2) / z);
+      traitVariable(g, e.points, l, { color: 0x4a7fc0 }, 1, 0, px / z);
+      if (z * l > 5) traitVariable(g, e.points, l, { color: 0x9cc0ea, alpha: 0.55 }, 0.15, 0, 0.9 / z);
     },
-    route(g, e) { routeCarte(g, e, 14, 3); },
-    chemin(g, e) { routeCarte(g, e, 6, 1.6); },
+    route(g, e) { routeCarte(g, e, 14, 1.6); },
+    chemin(g, e) { routeCarte(g, e, 6, 1); },
     ligne_electrique(g, e) {
       const k = ech;
       trait(g, e.points, { width: 1.8 * k, color: ENCRE, alpha: 0.85 });
@@ -395,10 +403,10 @@ export const carte = {
       const lab = new P.Container();
       const icone = new P.Graphics();
       (moderne ? ICONES_MODERNES : ICONES)[n](icone);
-      const nom = cartouche(e.nom, [11, 13, 15][n], e.prefecture);
-      nom.y = 22;
+      const nom = n === 2 || e.prefecture ? cartouche(e.nom, n === 2 ? 14 : 12, e.prefecture) : nomVillage(e.nom, n);
+      nom.y = n === 2 || e.prefecture ? 22 : 16;
       lab.addChild(icone, nom);
-      if (e.population != null) {
+      if (e.population != null && n === 2) {
         const pop = pastille(habitants(e.population));
         pop.position.set(nom.width / 2 + pop.width / 2 - 2, 22 - nom.height / 2 - 2);
         lab.addChild(pop);

@@ -42,8 +42,7 @@ function routeAerienne(g, e, metres, px) {
     if (metres > 10 && w * vue.zoom > 7) pointilles(g, e.points, w * 1.5, w * 1.2, { width: w / 10, color: 0xeeeeea });
     return;
   }
-  trait(g, e.points, { width: w + bord, color: 0x8a7550, alpha: 0.6 });
-  trait(g, e.points, { width: w, color: metres > 10 ? 0xd9c79b : 0xcdbb8e });
+  trait(g, e.points, { width: w, color: 0xe9dcb4, alpha: metres > 10 ? 0.85 : 0.6 });  // fin chemin de terre claire
 }
 
 function libelle(e, sous = "") {
@@ -92,18 +91,18 @@ export const aerienne = {
     },
     riviere(g, e) {
       if (e.largeur !== undefined) {  // carte de région ou de pays : vraie largeur, mais lisible à l'écran
-        const px = [1.6, 3.2, 2.1, 1.3, 1.1][e.rang ?? 0], z = vue.zoom;
-        traitVariable(g, e.points, e.largeur, { color: 0x4b7438 }, 1, 2.4 / z, (px + 2.4) / z);
-        traitVariable(g, e.points, e.largeur, { color: 0x4a78b4 }, 1, 0, px / z);
-        if (z * e.largeur > 6) traitVariable(g, e.points, e.largeur, { color: 0x8fb4dc, alpha: 0.45 }, 0.3);
+        const px = [2, 4, 2.6, 1.7, 1.3][e.rang ?? 0], z = vue.zoom;
+        traitVariable(g, e.points, e.largeur, { color: 0x34619a }, 1, 1.2 / z, (px + 1.2) / z);
+        traitVariable(g, e.points, e.largeur, { color: 0x4a7fc0 }, 1, 0, px / z);
+        if (z * e.largeur > 5) traitVariable(g, e.points, e.largeur, { color: 0x9cc0ea, alpha: 0.55 }, 0.15, 0, 0.9 / z);
         return;
       }
       trait(g, e.points, { width: 40, color: 0x5d8a46 });
       trait(g, e.points, { width: 24, color: 0x3a6ea6 });
       trait(g, e.points, { width: 5, color: 0x77a6d6, alpha: 0.5 });
     },
-    route(g, e) { routeAerienne(g, e, 14, 2.6); },
-    chemin(g, e) { routeAerienne(g, e, 6, 1.4); },
+    route(g, e) { routeAerienne(g, e, 14, 1.6); },
+    chemin(g, e) { routeAerienne(g, e, 6, 1); },
     ligne_electrique(g, e) {
       trait(g, e.points, { width: 2, color: 0x2a2a2a, alpha: 0.8 });
       lelong(e.points, 60, (x, y) => g.rect(x - 4, y - 4, 8, 8).fill(0x6a6a6a).stroke({ width: 1.5, color: 0x2a2a2a }));

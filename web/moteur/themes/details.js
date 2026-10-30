@@ -2,40 +2,13 @@
 // champs en parcelles avec leurs sillons, rangs de vigne, buissons des landes. Peints par tuiles de 256 px quand le
 // zoom dépasse ~14 px/km, une tuile par image au plus, gardés en cache ; le fond (decor.js terrain) reste dessous.
 // Tout vient d'une grille absolue en km : deux tuiles voisines se raccordent sans couture.
-import { paysage, bruit } from "./decor.js";
+import { paysage, bruit, SOLS, hash, parcelles, culture } from "./decor.js";
 import { vue } from "./outils.js";
 
 const P = window.PIXI;
 const TUILE = 256, CACHE = 96, SEUIL = 14;
 const TAU = Math.PI * 2;
 const BOIS = ["#2f5e2c", "#3a6c34", "#45793c", "#2b5427", "#518644"], PIN = "#2f5a33", OMBRE = "rgba(20,32,12,.42)";
-const SOLS = {
-  chaume: ["#cfb87e", "#bea86b", 5, 2], ble: ["#d3bd70", "#c2aa5c", 4, 1.7], labour: ["#7d5c40", "#6a4c33", 5, 2.4],
-  pre: ["#86a660", "#7b9c57", 8, 3.5], colza: ["#6f9a4c", "#628c42", 4, 2], friche: ["#9c9858", "#8f8b4e", 5, 2.2],
-};
-// Un pays se reconnaît à ses couleurs : chaque culture a sa part selon un bruit de quelques km (pas un damier)
-const CULTURES = { c: ["chaume", "ble", "chaume", "ble", "friche", "pre", "colza", "labour"], p: ["pre", "pre", "pre", "friche", "chaume", "pre"] };
-
-const hash = (i, j, k = 0) => {
-  let n = (Math.imul(i | 0, 374761393) + Math.imul(j | 0, 668265263) + Math.imul(k | 0, 1442695041)) | 0;
-  n = Math.imul(n ^ (n >>> 13), 1274126177);
-  return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
-};
-
-// Parcelles en briques de tailles variées (km), sur des rangs qui ne suivent pas la grille de la carte
-function parcelles(x0, y0, x1, y1, fn) {
-  const hr = 0.78;
-  for (let r = Math.floor(y0 / hr) - 1; r * hr < y1 + hr; r++) {
-    const ya = r * hr + (hash(r, 1, 9) - 0.5) * 0.12, yb = (r + 1) * hr + (hash(r + 1, 1, 9) - 0.5) * 0.12;
-    const lx = 0.62 + hash(r, 3, 9) * 0.4, dec = hash(r, 5, 9) * lx;
-    for (let k = Math.floor((x0 - dec) / lx) - 1; k * lx + dec < x1 + lx; k++) {
-      const xa = k * lx + dec + (hash(r, k, 2) - 0.5) * lx * 0.5, xb = (k + 1) * lx + dec + (hash(r, k + 1, 2) - 0.5) * lx * 0.5;
-      if (xb < x0 || xa > x1 || yb < y0 || ya > y1) continue;
-      fn(xa, ya, xb - xa, yb - ya, hash(r, k, 7));
-    }
-  }
-}
-
 export class Details {
   constructor(rendu, carte) {
     this.rendu = rendu;
@@ -44,10 +17,20 @@ export class Details {
     this.conteneur = new P.Container();
     this.tuiles = new Map();  // clé → { sprite, vue }
     this.horloge = 0;
+    // villes dessinées en plan : centre et rayon en km
+    // rayon du plan (km) : villes serrées d'autrefois, agglomérations étalées d'aujourd'hui
+    const moderne = vue.epoque === "moderne";
+    this.villes = carte.entites.filter((e) => e.style === "ville").map((e) => ({
+      x: e.x * this.km, y: e.y * this.km,
+      r: moderne ? ((e.taille ?? 0) * this.km) / 2.2 : 0.12 * Math.sqrt((e.population ?? 2000) / 1000),
+      murs: e.prefecture || e.population > 15000, graine: e.x * 7 + e.y }));
   }
 
   // Code d'occupation en un point exprimé en km
-  code(x, y) { return this.P.codeA(x / this.km, y / this.km); }
+  code(x, y) {
+    const c = this.P.codeA(x / this.km, y / this.km);
+    return c === "u" && vue.epoque !== "moderne" ? "c" : c;  // autrefois, les champs venaient jusqu'aux remparts
+  }
 
   image() {
     const r = this.rendu, pxKm = (r.zoom * devicePixelRatio) / this.km;
@@ -115,8 +98,7 @@ export class Details {
         else for (let xx = px + 1.5 * u; xx < px + pw; xx += e) rangs.moveTo(xx, py), rangs.lineTo(xx, py + ph);
         return;
       }
-      const liste = CULTURES[t], pays = bruit(x, y, 3, 40) * 0.7 + hash(Math.floor(x * 7), Math.floor(y * 7), 3) * 0.3;
-      const sol = liste[Math.min(liste.length - 1, Math.floor(pays * liste.length))];
+      const sol = culture(t, x, y, hh);
       const [base, raie, pas, ep] = SOLS[sol];
       lot(`f|${base}`).rect(px, py, pw, ph);
       const sillons = lot(`s|${raie}|${ep * u}`), e = pas * u;
@@ -143,49 +125,99 @@ export class Details {
     }
   }
 
-  // Villes : maisons serrées aux toits de tuile (ancien) ou immeubles et rues (moderne), sur une grille absolue en km
+  // Villes en plan, comme web_conquete : autrefois des îlots de maisons rouges en anneaux autour de la place, coupés
+  // de rues rayonnantes, dans leurs remparts ; aujourd'hui des îlots carrés d'immeubles entre des rues en grille.
+  // Hors du plan, dans les abords bâtis (cases « u »), quelques maisons éparses.
   batiments(g, L, x0, y0, span) {
-    const moderne = vue.epoque === "moderne", pas = moderne ? 0.11 : 0.055, M = 2;
-    const toits = moderne ? ["#7d8186", "#9a9ea2", "#c4c2bb", "#6c7480", "#b3aca0", "#8c8f8a"] : ["#a8473a", "#9a5a3a", "#b5653f", "#8c4a34", "#6f7f8f", "#b9704a"];
-    const i0 = Math.floor(x0 / pas) - M, j0 = Math.floor(y0 / pas) - M, n = Math.ceil(span / pas) + 2 * M;
-    const maisons = [];
-    for (let j = j0; j < j0 + n; j++) {
-      for (let i = i0; i < i0 + n; i++) {
-        const x = (i + 0.5) * pas, y = (j + 0.5) * pas;
-        if (this.code(x, y) !== "u" || hash(i, j, 21) < (moderne ? 0.18 : 0.12)) continue;  // trous : places, jardins, rues
-        const w = pas * (moderne ? 0.55 + 0.35 * hash(i, j, 22) : 0.6 + 0.3 * hash(i, j, 22));
-        const h = pas * (moderne ? 0.45 + 0.4 * hash(i, j, 23) : 0.45 + 0.3 * hash(i, j, 23));
-        const dx = (hash(i, j, 24) - 0.5) * (pas - w) * (moderne ? 0.3 : 1), dy = (hash(i, j, 25) - 0.5) * (pas - h) * (moderne ? 0.3 : 1);
-        maisons.push([x + dx - w / 2, y + dy - h / 2, w, h, toits[Math.floor(hash(i, j, 26) * toits.length)]]);
+    const moderne = vue.epoque === "moderne";
+    for (const v of this.villes) {
+      if (v.x + v.r < x0 - 0.2 || v.x - v.r > x0 + span + 0.2 || v.y + v.r < y0 - 0.2 || v.y - v.r > y0 + span + 0.2) continue;
+      if (moderne) this.planModerne(g, v);
+      else this.planAncien(g, v);
+    }
+  }
+
+  planAncien(g, v) {
+    const R = Math.max(0.12, v.r), rue = 0.016, toits = ["#b5553f", "#a8473a", "#c0664a", "#9a4632"];
+    const blocs = toits.map(() => new Path2D()), ombre = new Path2D();
+    const nRues = Math.max(6, Math.round(R * 16)), pasA = 0.065;
+    for (let r0 = 0.05; r0 < R; r0 += pasA) {
+      const r1 = Math.min(R, r0 + pasA - rue), tours = Math.max(nRues, Math.round((TAU * r0) / 0.15));
+      for (let k = 0; k < tours; k++) {
+        if (hash(Math.round(r0 * 100), k, v.graine | 0) < 0.12 + 0.25 * (r0 / R) ** 2) continue;  // jardins, plus nombreux au bord
+        const a0 = (k / tours) * TAU + rue / Math.max(r0, 0.05), a1 = ((k + 1) / tours) * TAU - rue / Math.max(r0, 0.05);
+        const p = new Path2D();
+        p.arc(v.x, v.y, r1, a0, a1);
+        p.arc(v.x, v.y, r0, a1, a0, true);
+        p.closePath();
+        blocs[Math.floor(hash(k, Math.round(r0 * 100), 7) * blocs.length)].addPath(p);
+        const o = new DOMMatrix().translate(0.006, 0.008);
+        ombre.addPath(p, o);
       }
     }
-    if (!maisons.length) return;
-    if (moderne) {  // le bitume des rues sous les immeubles
-      g.fillStyle = "#5c5d5f";
-      g.beginPath();
-      for (const [x, y, w, h] of maisons) g.rect(x - pas * 0.25, y - pas * 0.25, w + pas * 0.5, h + pas * 0.5);
-      g.fill();
-    }
-    g.fillStyle = "rgba(20,18,14,.35)";  // ombre portée au sud-est
+    g.fillStyle = "#d8c8a4";  // terre battue des rues et de la place
     g.beginPath();
-    for (const [x, y, w, h] of maisons) g.rect(x + pas * 0.12, y + pas * 0.15, w, h);
+    g.arc(v.x, v.y, R + 0.02, 0, TAU);
     g.fill();
-    const parCouleur = new Map();
-    for (const m of maisons) (parCouleur.get(m[4]) ?? parCouleur.set(m[4], []).get(m[4])).push(m);
-    for (const [c, liste] of parCouleur) {
-      g.fillStyle = c;
-      g.beginPath();
-      for (const [x, y, w, h] of liste) g.rect(x, y, w, h);
-      g.fill();
-    }
-    g.strokeStyle = moderne ? "rgba(255,255,255,.25)" : "rgba(60,25,15,.35)";  // faîtage ou acrotère
-    g.lineWidth = pas * 0.06;
+    g.fillStyle = "rgba(30,20,10,.35)";
+    g.fill(ombre);
+    blocs.forEach((p, i) => { g.fillStyle = toits[i]; g.fill(p); });
+    g.fillStyle = "#e6dcc0";  // la place, l'église
     g.beginPath();
-    for (const [x, y, w, h] of maisons) {
-      if (moderne) g.rect(x, y, w, h);
-      else w > h ? (g.moveTo(x, y + h / 2), g.lineTo(x + w, y + h / 2)) : (g.moveTo(x + w / 2, y), g.lineTo(x + w / 2, y + h));
+    g.arc(v.x, v.y, 0.045, 0, TAU);
+    g.fill();
+    g.fillStyle = "#8a5a44";
+    g.fillRect(v.x - 0.012, v.y - 0.025, 0.024, 0.05);
+    if (v.murs) {  // remparts et tours
+      g.strokeStyle = "#ece4d0";
+      g.lineWidth = 0.014;
+      g.beginPath();
+      g.arc(v.x, v.y, R + 0.03, 0, TAU);
+      g.stroke();
+      g.fillStyle = "#f0e8d4";
+      const n = Math.max(6, Math.round(R * 14));
+      g.beginPath();
+      for (let k = 0; k < n; k++) {
+        const a = (k / n) * TAU, x = v.x + Math.cos(a) * (R + 0.03), y = v.y + Math.sin(a) * (R + 0.03);
+        g.moveTo(x + 0.02, y);
+        g.arc(x, y, 0.02, 0, TAU);
+      }
+      g.fill();
+      g.strokeStyle = "#7a6a52";
+      g.lineWidth = 0.006;
+      g.stroke();
     }
-    g.stroke();
+  }
+
+  planModerne(g, v) {
+    const R = Math.max(0.25, v.r), pas = 0.16, rue = 0.035, toits = ["#8d9196", "#a9adb0", "#c9c6bd", "#767d86", "#b7afa3"];
+    const bord = (cx, cy) => Math.hypot(cx - v.x, cy - v.y) / R + 0.18 * (bruit(cx, cy, 0.4, v.graine % 97) - 0.5);  // bords irréguliers
+    const ombre = new Path2D(), lots = toits.map(() => new Path2D());
+    for (let x = v.x - R; x < v.x + R; x += pas) {
+      for (let y = v.y - R; y < v.y + R; y += pas) {
+        const cx = x + pas / 2, cy = y + pas / 2;
+        if (bord(cx, cy) > 1) continue;
+        g.fillStyle = "#6a6b6d";  // bitume de l'îlot et de sa moitié de rue
+        g.fillRect(x, y, pas, pas);
+        const i = Math.round(x / pas), j = Math.round(y / pas);
+        if (hash(i, j, 31) < 0.08) {  // un square
+          g.fillStyle = "#6f9a52";
+          g.fillRect(x + rue / 2, y + rue / 2, pas - rue, pas - rue);
+          continue;
+        }
+        // un îlot : deux à quatre immeubles
+        const n = 2 + Math.floor(hash(i, j, 32) * 3), w = (pas - rue) / (n === 4 ? 2 : 1), h = (pas - rue) / (n >= 3 ? 2 : n);
+        for (let k = 0; k < n; k++) {
+          const bx = x + rue / 2 + (n === 4 ? (k % 2) * w : 0), by = y + rue / 2 + (n === 4 ? Math.floor(k / 2) * h : k * h);
+          const m = 0.012;
+          lots[Math.floor(hash(i * 5 + k, j, 33) * lots.length)].rect(bx + m, by + m, (n === 4 ? w : pas - rue) - 2 * m, h - 2 * m);
+          ombre.rect(bx + m + 0.01, by + m + 0.012, (n === 4 ? w : pas - rue) - 2 * m, h - 2 * m);
+        }
+      }
+    }
+    g.fillStyle = "rgba(20,20,20,.35)";
+    g.fill(ombre);
+    lots.forEach((p, i) => { g.fillStyle = toits[i]; g.fill(p); });
   }
 
   // Bois : houppiers ronds là où le fond dit forêt (et quelques arbres isolés ailleurs) ; ombre, feuillage, reflet
@@ -196,7 +228,7 @@ export class Details {
     for (let j = 0; j < n; j++) {
       for (let i = 0; i < n; i++) {
         const gi = gi0 + i, gj = gj0 + j, x = (gi + 0.5) * pas, y = (gj + 0.5) * pas, t = this.code(x, y);
-        const densite = t === "f" ? 190 : t === "l" ? 14 : t === "p" ? 3 : t === "c" ? 0.6 : t === "v" ? 0.3 : t === "u" ? 2 : 0;  // arbres par km²
+        const densite = t === "f" ? 190 : t === "l" ? 14 : t === "p" ? 3 : t === "c" ? 0.6 : t === "v" ? 0.3 : 0;  // arbres par km²
         if (!densite || hash(gi, gj, L) >= densite * a2) continue;
         const ax = x + (hash(gj, gi, 3) - 0.5) * pas, ay = y + (hash(gi, gj, 4) - 0.5) * pas;
         // grands massifs de pins (une dizaine de km), lisières mêlées de feuillus

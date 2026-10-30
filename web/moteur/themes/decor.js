@@ -157,9 +157,50 @@ export function bruit(x, y, f, decal = 0) {
   return h + (b - h) * sy;
 }
 
+// Les cultures de web_conquete (carte/lib.js SOLS) : couleur, couleur des raies, écart et épaisseur des raies
+export const SOLS = {
+  chaume: ["#cfb87e", "#bea86b", 5, 2], ble: ["#d8bf6c", "#c7aa55", 4, 1.7], labour: ["#6f4a31", "#5b3b26", 5, 2.4],
+  pre: ["#7aa659", "#72a052", 8, 3.5], colza: ["#418d3e", "#377d35", 4, 2], friche: ["#8e8b4e", "#817e45", 5, 2.2],
+};
+// Comme champDe de web_conquete : la culture suit un bruit de quelques km mêlé au tirage de la parcelle
+export const CULTURES = { c: ["chaume", "ble", "labour", "pre", "colza", "friche", "pre", "chaume"], p: ["pre", "pre", "friche", "pre", "chaume", "pre"] };
+
+export const hash = (i, j, k = 0) => {
+  let n = (Math.imul(i | 0, 374761393) + Math.imul(j | 0, 668265263) + Math.imul(k | 0, 1442695041)) | 0;
+  n = Math.imul(n ^ (n >>> 13), 1274126177);
+  return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+};
+
+// Parcelles en briques de tailles variées (km), sur des rangs qui ne suivent pas la grille de la carte
+export function parcelles(x0, y0, x1, y1, fn) {
+  const hr = 0.78;
+  for (let r = Math.floor(y0 / hr) - 1; r * hr < y1 + hr; r++) {
+    const ya = r * hr + (hash(r, 1, 9) - 0.5) * 0.12, yb = (r + 1) * hr + (hash(r + 1, 1, 9) - 0.5) * 0.12;
+    const lx = 0.62 + hash(r, 3, 9) * 0.4, dec = hash(r, 5, 9) * lx;
+    for (let k = Math.floor((x0 - dec) / lx) - 1; k * lx + dec < x1 + lx; k++) {
+      const xa = k * lx + dec + (hash(r, k, 2) - 0.5) * lx * 0.5, xb = (k + 1) * lx + dec + (hash(r, k + 1, 2) - 0.5) * lx * 0.5;
+      if (xb < x0 || xa > x1 || yb < y0 || ya > y1) continue;
+      fn(xa, ya, xb - xa, yb - ya, hash(r, k, 7));
+    }
+  }
+}
+
+// Culture d'une parcelle (comme champDe de web_conquete) : un bruit de quelques km mêlé au tirage de la parcelle
+export function culture(code, xk, yk, tirage) {
+  const liste = CULTURES[code], pays = bruit(xk, yk, 2.5, 40) * 0.8 + tirage * 0.2;
+  return liste[Math.min(liste.length - 1, Math.floor(pays * liste.length))];
+}
+
+// Parcelle qui contient un point (km), même découpage que parcelles() ; rend son tirage
+function tirageParcelle(xk, yk) {
+  const r = Math.floor(yk / 0.78), lx = 0.62 + hash(r, 3, 9) * 0.4, dec = hash(r, 5, 9) * lx;
+  return hash(r, Math.floor((xk - dec) / lx), 7);
+}
+const RGB = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+
 const lerp = (a, b, t) => a + (b - a) * t;
 export const MER_LARGE = [28, 88, 108];
-const MER_BORD = [70, 150, 148], SABLE = [227, 211, 163], ECUME = [196, 226, 222];
+const MER_BORD = [70, 150, 148], SABLE = [227, 211, 163], ECUME = [196, 226, 222];  // couleurs de web_conquete
 const COUL = { f: [58, 104, 52], v: [143, 132, 86], l: [163, 158, 104], r: [178, 172, 156] };
 
 // Lecture de la carte d'occupation du sol et du relief, partagée par le fond et par les détails
@@ -215,8 +256,8 @@ export function paysage(carte) {
 }
 
 // Couleur du fond en un point (unités du monde) ; null = rien (hors carte)
-function couleur(P, x, y) {
-  const code = P.codeA(x, y), cases = x / P.pas, lignes = y / P.pas;
+function couleur(P, x, y, force) {
+  const code = force ?? P.codeA(x, y), cases = x / P.pas, lignes = y / P.pas;
   if (code === ".") {
     const m = P.merA(x, y);
     if (m < 0.35) return ECUME;
@@ -231,18 +272,29 @@ function couleur(P, x, y) {
     const a = bruit(cases, lignes, 4, 5) * 0.75 + bruit(cases, lignes, 1.2, 6) * 0.25, b = bruit(cases, lignes, 7, 7) * 0.4;
     const vert = code === "p" ? 0.35 + 0.5 * a : a;
     c = [lerp(lerp(206, 124, vert), 196, b), lerp(lerp(186, 166, vert), 178, b), lerp(lerp(122, 90, vert), 120, b)];
+    // la mosaïque des parcelles, vue de loin (web_conquete) : la couleur de chaque culture, adoucie
+    const xk = (x * vue.echelle) / 1000, yk = (y * vue.echelle) / 1000, h = tirageParcelle(xk, yk);
+    const s = RGB(SOLS[culture(code, xk, yk, h)][0]);
+    c = [lerp(c[0], s[0], 0.45), lerp(c[1], s[1], 0.45), lerp(c[2], s[2], 0.45)];
   } else if (code === "u") {
-    // ville : tuiles et pierre d'autrefois, ou béton et bitume d'aujourd'hui (vue.epoque)
-    const n = bruit(cases, lignes, 0.6, 12);
-    c = vue.epoque === "moderne" ? [lerp(128, 160, n), lerp(126, 156, n), lerp(124, 150, n)] : [lerp(150, 182, n), lerp(102, 130, n), lerp(80, 100, n)];
+    // agglomération moderne en béton ; autrefois, les champs venaient jusqu'aux remparts (plans dans details.js)
+    if (vue.epoque !== "moderne") return couleur(P, x, y, "c");
+    const n = bruit(cases, lignes, 0.15, 12);  // de loin, le grain gris clair des toits et des rues
+    c = [lerp(132, 176, n), lerp(130, 172, n), lerp(126, 164, n)];
   } else c = [...COUL[code]];
   if (code === "f") {
-    const n = bruit(cases, lignes, 2.5, 8);
-    c = [lerp(c[0], 47, n * 0.5), lerp(c[1], 90, n * 0.5), lerp(c[2], 51, n * 0.5)];  // feuillus et pins mêlés
+    // pinèdes claires et feuillus sombres, en grands massifs (même tirage que les arbres de details.js), grain fin
+    const xk = (x * vue.echelle) / 1000, yk = (y * vue.echelle) / 1000;
+    const pin = bruit(xk, yk, 12, 30) * 0.8 + bruit(xk, yk, 0.6, 31) * 0.35 < 0.5;
+    c = pin ? [86, 112, 64] : [52, 98, 48];
+    const g = 0.86 + 0.28 * bruit(cases, lignes, 0.11, 13);
+    c = [c[0] * g, c[1] * g, c[2] * g];
   }
   if (P.rivageA(x, y) < 0.9 + 0.5 * bruit(cases, lignes, 1.5, 10)) c = [...SABLE];  // plages et dunes au bord de l'eau
-  const [gx, gy] = P.pente(x, y), k = Math.min(1.3, Math.max(0.62, 1 - (gx * 0.6 + gy * 0.8) * 0.9)) * (0.95 + 0.1 * bruit(cases, lignes, 0.9, 9));
-  return [c[0] * k, c[1] * k, c[2] * k];
+  // relief bien marqué (web_conquete) : versants nord-ouest éclairés, versants à l'ombre bleuis et verdis
+  const [gx, gy] = P.pente(x, y), k = Math.min(1.35, Math.max(0.5, 1 - (gx * 0.6 + gy * 0.8) * 1.8)) * (0.95 + 0.1 * bruit(cases, lignes, 0.9, 9));
+  if (k < 1) c = [lerp(c[0], 40, (1 - k) * 0.6), lerp(c[1], 62, (1 - k) * 0.6), lerp(c[2], 48, (1 - k) * 0.6)];
+  return [c[0] * Math.max(k, 0.8), c[1] * Math.max(k, 0.8), c[2] * Math.max(k, 0.8)];
 }
 
 const fonds = {};  // une texture de fond par carte (partagée par les thèmes)

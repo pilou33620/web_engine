@@ -53,3 +53,9 @@ body[data-theme="carte"] .journal .evt-alerte { border-left-color: #d0662e; }
 @media (max-width: 600px) {
   body[data-theme="carte"] .journal li:nth-child(n+2) { display: none; }
 }
+
+/* Vignettage aux bords de l'écran, comme la carte de web_conquete */
+body[data-theme="carte"] #scene::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at 50% 52%, transparent 55%, #0b0d0c55 82%, #0b0d0caa 100%);
+}
