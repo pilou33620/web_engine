@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>web_engine</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-theme="ferme">
+  <div id="scene"></div>
+
+  <header class="barre">
+    <div class="ligne">
+      <div class="titre"><span class="blason" aria-hidden="true"></span><span>Démo</span></div>
+      <button id="tour" class="bouton-or" hidden>Tour suivant<small id="tour-date"></small></button>
+      <div class="date"><strong id="date">…</strong><small id="heure"></small></div>
+      <button id="menu-btn" class="rond" aria-label="Menu">☰</button>
+    </div>
+    <div id="ressources" class="ressources"></div>
+  </header>
+
+  <nav class="cote">
+    <button id="zoom-plus" class="rond" aria-label="Zoomer">+</button>
+    <button id="zoom-moins" class="rond" aria-label="Dézoomer">−</button>
+    <button id="recentrer" class="rond" aria-label="Recentrer">⌖</button>
+  </nav>
+
+  <ul id="journal" class="journal"></ul>
+
+  <div id="temps" class="temps">
+    <button id="vitesse" class="rond sombre" aria-label="Vitesse">1×</button>
+    <button id="lecture" class="rond lecture" aria-label="Lecture">▶</button>
+  </div>
+
+  <aside id="menu" class="panneau" hidden>
+    <div class="entete"><h2>Réglages</h2><button id="menu-fermer" class="rond" aria-label="Fermer">✕</button></div>
+    <h3>Thème graphique</h3>
+    <div class="choix" id="choix-theme">
+      <button data-theme="ferme">Ferme</button><button data-theme="carte">Carte</button>
+    </div>
+    <h3>Temps</h3>
+    <div class="choix" id="choix-mode">
+      <button data-mode="temps_reel">Temps réel</button><button data-mode="tour">Tour par tour</button>
+    </div>
+    <h3>Calques</h3>
+    <div id="calques" class="calques"></div>
+    <h3>Partie</h3>
+    <div class="choix"><button id="sauver">Sauvegarder</button><button id="charger">Charger</button></div>
+  </aside>
+
+  <div id="info" class="info" hidden></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="vendor/pixi.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

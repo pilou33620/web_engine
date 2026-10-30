@@ -1,0 +1,79 @@
+/* Kit d'interface partagé ; chaque thème ne change que les variables. */
+body[data-theme="ferme"] {
+  --fond: #1b211a; --fond2: #273026; --texte: #ecede2; --doux: #9ca592; --bord: transparent;
+  --accent: #e8b84a; --accent-texte: #1f1a0c; --lecture: #6fc27a; --rayon: 14px;
+  --police: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+body[data-theme="carte"] {
+  --fond: #23252a; --fond2: #2e3036; --texte: #efe6cf; --doux: #a89f88; --bord: #7d6a3c;
+  --accent: #d9b25e; --accent-texte: #2a2110; --lecture: #d9b25e; --rayon: 10px;
+  --police: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--fond); color: var(--texte); font-family: var(--police); -webkit-user-select: none; user-select: none; }
+#scene, #scene canvas { position: fixed; inset: 0; display: block; touch-action: none; }
+button { font: inherit; color: inherit; cursor: pointer; border: 0; -webkit-tap-highlight-color: transparent; }
+[hidden] { display: none !important; }
+
+/* Barre du haut */
+.barre { position: fixed; top: 0; left: 0; right: 0; padding: calc(env(safe-area-inset-top) + 8px) 12px 8px; background: color-mix(in srgb, var(--fond) 94%, transparent); border-bottom: 1px solid var(--bord); z-index: 5; }
+.ligne { display: flex; align-items: center; gap: 12px; }
+.titre { display: flex; align-items: center; gap: 8px; font-size: 1.25rem; }
+.blason { width: 22px; height: 26px; background: #b83a2e; border: 2px solid var(--accent); border-radius: 3px 3px 11px 11px; }
+body[data-theme="ferme"] .titre { display: none; }
+.date { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; }
+.date strong { font-size: 1.05rem; }
+.date small, .ressource small { color: var(--doux); }
+.ressources { display: flex; gap: 16px; overflow-x: auto; padding-top: 6px; scrollbar-width: none; }
+.ressource { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ressource b { font-size: 1.05rem; }
+.ressource .plus { color: #7fc77f; } .ressource .moins { color: #e07a6a; }
+body[data-theme="ferme"] .ressource:first-child b { color: var(--accent); }
+
+.rond { width: 46px; height: 46px; border-radius: 50%; background: var(--fond2); border: 1px solid var(--bord); font-size: 1.3rem; display: grid; place-items: center; box-shadow: 0 2px 8px #0006; }
+.bouton-or { background: var(--accent); color: var(--accent-texte); border-radius: var(--rayon); padding: 6px 16px; font-size: 1.1rem; display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+.bouton-or small { font-size: .75rem; opacity: .8; }
+
+/* Commandes latérales et temps */
+.cote { position: fixed; right: 12px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 10px; z-index: 4; }
+.temps { position: fixed; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 72px); display: flex; flex-direction: column; align-items: center; gap: 12px; z-index: 4; }
+.temps .sombre { font-size: 1rem; font-weight: 700; }
+.temps .lecture { width: 64px; height: 64px; background: var(--lecture); color: #13200f; font-size: 1.6rem; border: 0; }
+
+/* Journal d'événements */
+.journal { position: fixed; list-style: none; margin: 0; padding: 0; z-index: 3; }
+.journal li { background: color-mix(in srgb, var(--fond) 92%, transparent); border: 1px solid var(--bord); border-radius: var(--rayon); padding: 10px 14px; }
+.journal time { color: var(--doux); margin-right: 10px; }
+.journal .evt-bonne { border-left: 4px solid #6fc27a; }
+body[data-theme="ferme"] .journal { left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 12px); }
+body[data-theme="ferme"] .journal li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body[data-theme="ferme"] .journal li:not(:first-child) { display: none; }
+body[data-theme="ferme"] .journal time { font-family: ui-monospace, Menlo, monospace; }
+body[data-theme="carte"] .journal { right: 72px; bottom: calc(env(safe-area-inset-bottom) + 12px); width: min(360px, calc(100vw - 96px)); display: flex; flex-direction: column; gap: 8px; }
+body[data-theme="carte"] .journal li { border-left: 4px solid #b83a2e; }
+body[data-theme="carte"] .journal li:nth-child(n+4) { display: none; }
+body[data-theme="carte"] .temps { bottom: calc(env(safe-area-inset-bottom) + 12px); }
+
+/* Panneaux */
+.panneau, .info { position: fixed; z-index: 10; background: var(--fond); border: 1px solid var(--bord); border-radius: var(--rayon); box-shadow: 0 8px 30px #000a; padding: 16px; }
+.panneau { top: calc(env(safe-area-inset-top) + 10px); right: 10px; width: min(340px, calc(100vw - 20px)); max-height: calc(100vh - 20px); overflow-y: auto; }
+.entete { display: flex; justify-content: space-between; align-items: center; }
+.panneau h2 { margin: 0; font-size: 1.2rem; }
+.panneau h3 { margin: 18px 0 8px; font-size: .85rem; text-transform: uppercase; letter-spacing: .05em; color: var(--doux); }
+.choix { display: flex; background: var(--fond2); border-radius: var(--rayon); overflow: hidden; }
+.choix button { flex: 1; padding: 10px; background: none; }
+.choix button.actif { background: var(--accent); color: var(--accent-texte); }
+.calques { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.calques label { display: flex; align-items: center; gap: 8px; background: var(--fond2); padding: 8px 10px; border-radius: 8px; }
+.calques input { accent-color: var(--accent); width: 18px; height: 18px; }
+.info { left: 12px; top: calc(env(safe-area-inset-top) + 110px); width: min(300px, calc(100vw - 84px)); }
+.info h2 { margin: 0 0 6px; font-size: 1.15rem; }
+.info p { margin: 4px 0; color: var(--doux); }
+.info .actions { display: flex; gap: 8px; margin-top: 12px; }
+.info .actions button { flex: 1; padding: 10px; border-radius: var(--rayon); background: var(--fond2); }
+.info .actions .bouton-or { display: block; }
+
+.toast { position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 120px); transform: translateX(-50%); background: var(--fond2); border: 1px solid var(--bord); padding: 10px 16px; border-radius: var(--rayon); z-index: 20; opacity: 0; transition: opacity .25s; pointer-events: none; max-width: 90vw; }
+.toast.visible { opacity: 1; }
+.toast.erreur { border-color: #e07a6a; color: #f2b0a5; }
