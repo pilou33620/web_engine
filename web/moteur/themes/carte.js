@@ -1,106 +1,462 @@
-// Thème « Carte » : carte stratégique ancienne (couleurs passées, noms en lettres à empattements).
+// Thème « Carte » : carte stratégique ancienne (couleurs passées, relief ombré, noms en lettres à empattements).
 // Même structure que aerienne.js : tables de styles par type, « _ » par défaut.
-import { alea, trait, pointilles, lelong, forme, boite, semis, etiquette, nomLieu } from "./outils.js";
+import { alea, trait, traitVariable, pointilles, lelong, forme, boite, etiquette, nomLieu } from "./outils.js";
+import { decor } from "./decor.js";
 
 const P = window.PIXI;
 export const SERIF = "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif";
-const TERRES = { chaume: 0xcdb984, culture: 0xa3aa6c, prairie: 0xb5b379, labour: 0xb99a6b, colza: 0xb2b262, foret: 0x7a8550 };
+const TERRES = { chaume: 0xd2c08e, culture: 0xaeb07a, prairie: 0xbdb985, labour: 0xc4a77a, colza: 0xbcb76e, foret: 0x76814e };
+const ENCRE = 0x2a2018, CREME = 0xefe3c4, ROUGE = 0xa8322a, OR = 0xd9b25e, MER = 0x2b4656, ECUME = 0x9fb9c0;
+// Teintes passées des départements (aquarelle sur papier)
+const PASTELS = [0xdcc9a0, 0xcdc69b, 0xd8bca2, 0xc6c7a2, 0xdfcfae, 0xcbbf98, 0xd3c3a8, 0xc2bf98];
+
+// Préparé une fois par carte (voir decor) : épaisseur de référence, rang des villes, arêtes partagées, côtes
+let ech = 1, rangs = () => 0, aretes = new Map(), traces = new Set(), cotes = [];
+const cle = (a, b) => (a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]) ? a + "|" + b : b + "|" + a);
+const terreFerme = (e) => e.type === "zone" && e.points && e.style !== "mer" && e.style !== "lac";
+
+function preparer(carte) {
+  const [L, H] = carte.taille;
+  // Traits lisibles quelle que soit l'unité du monde : 1 pour une carte de 2 400 de côté, plus au-delà
+  ech = Math.max(1, Math.max(L, H) / 2400);
+  // Rang d'une ville selon sa place parmi celles de la carte (marche de 300 habitants à 2 millions)
+  const valeur = (e) => e.population ?? e.taille ?? 0;
+  const tri = carte.entites.filter((e) => e.style === "ville").map(valeur).sort((a, b) => a - b);
+  rangs = (e) => {
+    const part = tri.filter((v) => v <= valeur(e)).length / (tri.length || 1);
+    return part > 0.8 ? 2 : part > 0.4 ? 1 : 0;
+  };
+  aretes = new Map();
+  traces = new Set();
+  for (const e of carte.entites.filter(terreFerme)) {
+    e.points.forEach((a, i) => {
+      const k = cle(a, e.points[(i + 1) % e.points.length]);
+      aretes.set(k, [...(aretes.get(k) ?? []), e.style]);
+    });
+  }
+  // Côte = arête d'un seul polygone de terre, sauf le bord découpé de la carte ; chaînée en polylignes
+  const bord = (a, b) => (a[0] === b[0] && (a[0] <= 0 || a[0] >= L)) || (a[1] === b[1] && (a[1] <= 0 || a[1] >= H));
+  const libres = new Map();
+  for (const [k, v] of aretes) {
+    if (v.length !== 1) continue;
+    const [a, b] = k.split("|").map((p) => p.split(",").map(Number));
+    if (bord(a, b)) continue;
+    for (const [p, q] of [[a, b], [b, a]]) libres.set(String(p), [...(libres.get(String(p)) ?? []), [k, q]]);
+  }
+  const vus = new Set();
+  cotes = [];
+  for (const [depart, liste] of libres) {
+    for (const [k0, q0] of liste) {
+      if (vus.has(k0)) continue;
+      vus.add(k0);
+      const ligne = [depart.split(",").map(Number), q0];
+      for (let suite = true; suite;) {
+        suite = false;
+        for (const [k, q] of libres.get(String(ligne.at(-1))) ?? []) {
+          if (vus.has(k)) continue;
+          vus.add(k);
+          ligne.push(q);
+          suite = true;
+          break;
+        }
+      }
+      cotes.push(ligne);
+    }
+  }
+}
+
+// Morceaux consécutifs d'un polygone fermé dont les arêtes passent le filtre
+function troncons(pts, garder) {
+  const res = [];
+  let cur = null;
+  pts.forEach((a, i) => {
+    const b = pts[(i + 1) % pts.length];
+    if (!garder(a, b)) return (cur = null);
+    if (!cur) res.push((cur = [a]));
+    cur.push(b);
+  });
+  return res;
+}
+
+// Tirets continus le long d'une polyligne (le motif ne repart pas à chaque sommet)
+function tirets(g, pts, long, vide) {
+  let parcouru = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const [x1, y1] = pts[i - 1], [x2, y2] = pts[i], d = Math.hypot(x2 - x1, y2 - y1);
+    const p = (s) => [x1 + ((x2 - x1) * s) / d, y1 + ((y2 - y1) * s) / d];
+    // Début du premier motif qui touche ce segment, en abscisse locale
+    for (let s = Math.floor(parcouru / (long + vide)) * (long + vide) - parcouru; s < d; s += long + vide) {
+      const debut = Math.max(0, s), fin = Math.min(d, s + long);
+      if (fin > debut) g.moveTo(...p(debut)).lineTo(...p(fin));
+    }
+    parcouru += d;
+  }
+}
+
+function toile(w, h, dessiner) {
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  dessiner(c.getContext("2d"));
+  return P.Texture.from(c);
+}
+
+// Motifs répétés, créés une seule fois (sources 2× plus fines que le monde, voir echelle())
+const motifs = {};
+function motif(nom) {
+  return (motifs[nom] ??= {
+    // Petites couronnes d'arbres ombrées au sud-est
+    foret: () => toile(128, 128, (ctx) => {
+      const r = alea("foret");
+      for (let i = 0; i < 70; i++) {
+        const x = r() * 128, y = r() * 128, t = 3 + r() * 2.5;
+        for (const [dx, dy] of [[0, 0], [128, 0], [0, 128], [128, 128], [-128, 0], [0, -128]]) {
+          ctx.fillStyle = "rgba(40, 45, 25, 0.45)";
+          ctx.beginPath(); ctx.arc(x + dx + 1.4, y + dy + 1.4, t, 0, 7); ctx.fill();
+          ctx.fillStyle = ["#5d6a3a", "#55613a", "#66733f"][i % 3];
+          ctx.beginPath(); ctx.arc(x + dx, y + dy, t, 0, 7); ctx.fill();
+          ctx.fillStyle = "rgba(200, 200, 140, 0.35)";
+          ctx.beginPath(); ctx.arc(x + dx - t / 3, y + dy - t / 3, t / 3, 0, 7); ctx.fill();
+        }
+      }
+    }),
+    // Petites vagues dispersées en quinconce
+    vagues: () => toile(128, 128, (ctx) => {
+      ctx.strokeStyle = "rgba(170, 200, 205, 0.28)";
+      ctx.lineWidth = 1.6;
+      for (const [x, y] of [[10, 20], [74, 52], [30, 86], [94, 118], [60, 4]]) {
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.quadraticCurveTo(x + 6, y - 5, x + 12, y);
+        ctx.quadraticCurveTo(x + 18, y + 5, x + 24, y);
+        ctx.stroke();
+      }
+    }),
+  }[nom]());
+}
+
+// Remplissage par motif répété en coordonnées du monde : `taille` unités de monde par pixel du motif
+function echelle(nom, taille) {
+  const m = new P.FillPattern(motif(nom), "repeat");
+  m.setTransform(new P.Matrix().scale(taille, taille));
+  return m;
+}
 
 function terre(g, e) {
   // Les zones débordent un peu pour effacer les chemins : à cette échelle on voit des terroirs, pas des parcelles
   if (e.points) forme(g, e).fill(TERRES[e.style] ?? 0xc8b88a);
   else g.rect(e.x - 4, e.y - 4, e.w + 8, e.h + 8).fill(TERRES[e.style] ?? 0xc8b88a);
-  if (e.style === "foret") semis(g, boite(e), alea(e.id), (e.w * e.h) / 90, [0x55603a, 0x4a5532, 0x606b40], 3, 6);
 }
 
-function eau(g, e) {
-  forme(g, e).fill(0x3e6782);
-  forme(g, e).stroke({ width: 10, color: 0x9fb4b0, alpha: 0.45 });
+function foret(g, e) {
+  terre(g, e);
+  if (e.points) forme(g, e).fill(echelle("foret", 0.5 * ech));
+  else g.rect(e.x - 4, e.y - 4, e.w + 8, e.h + 8).fill(echelle("foret", 0.5 * ech));
 }
+
+// Polygones administratifs : contour côtier à l'encre, frontières partagées en tirets tracées une seule fois
+function contours(g, e, couleur, largeur) {
+  const k = (a, b) => cle(a, b);
+  for (const t of troncons(e.points, (a, b) => aretes.get(k(a, b))?.length === 1)) trait(g, t, { width: 1.3 * ech, color: ENCRE, alpha: 0.8 });
+  const neuves = (a, b) => aretes.get(k(a, b))?.length > 1 && !traces.has(k(a, b));
+  for (const t of troncons(e.points, neuves)) {
+    const etat = t.some((p, i) => i && new Set(aretes.get(k(t[i - 1], p))).size > 1);  // limite avec un pays : plus marquée
+    t.forEach((p, i) => i && traces.add(k(t[i - 1], p)));
+    tirets(g, t, 6 * ech, 4 * ech);
+    g.stroke({ width: (etat ? 2.2 : largeur) * ech, color: couleur, alpha: etat ? 0.9 : 0.75 });
+  }
+}
+
+function departement(g, e) {
+  const c = e.couleur ? P.Color.shared.setValue(e.couleur).toNumber() : PASTELS[Math.floor(alea(e.id)() * PASTELS.length)];
+  if (!e.points) return terre(g, e);
+  forme(g, e).fill(c);
+  contours(g, e, 0x5a3a24, 1.1);
+}
+
+function pays(g, e) {
+  if (!e.points) return g.rect(e.x, e.y, e.w, e.h).fill(0xbdb6a6);
+  forme(g, e).fill(0xbdb6a6 - Math.floor(alea(e.id)() * 3) * 0x060606);
+  contours(g, e, 0x6e675c, 0.9);
+}
+
+// Contour décalé de d vers l'intérieur d'un polygone (lignes de vagues parallèles à la côte)
+function decale(points, d) {
+  const n = points.length;
+  let aire = 0;
+  for (let i = 0; i < n; i++) aire += points[i][0] * points[(i + 1) % n][1] - points[(i + 1) % n][0] * points[i][1];
+  const s = Math.sign(aire) || 1;
+  const normale = (a, b) => {
+    const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
+    return [(-dy / l) * s, (dx / l) * s];
+  };
+  const res = points.map((p, i) => {
+    const n1 = normale(points[(i - 1 + n) % n], p), n2 = normale(p, points[(i + 1) % n]);
+    const mx = n1[0] + n2[0], my = n1[1] + n2[1], l = Math.hypot(mx, my) || 1;
+    const k = d / Math.max(0.4, (mx * n1[0] + my * n1[1]) / l);
+    return [p[0] + (mx / l) * k, p[1] + (my / l) * k];
+  });
+  return [...res, res[0]];
+}
+
+function eau(anneaux) {
+  return (g, e) => {
+    forme(g, e).fill(MER);
+    forme(g, e).fill(echelle("vagues", 1.2 * ech));
+    if (!e.points) {
+      // Mer de fond (rectangle sous les terres) : anneaux autour des côtes, la moitié côté terre sera recouverte
+      if (e.w * e.h <= 0) return;
+      for (const d of [...anneaux].reverse()) {
+        for (const c of cotes) trait(g, c, { width: 2 * d * ech + 1.4 * ech, color: ECUME, alpha: 0.45 });
+        for (const c of cotes) trait(g, c, { width: 2 * d * ech - 1.4 * ech, color: MER });
+      }
+      return;
+    }
+    const b = boite(e), pts = e.points;
+    anneaux.filter((d) => d * ech < Math.min(b.w, b.h) / 4)
+      .forEach((d, i) => trait(g, decale(pts, d * ech), { width: 1.4 * ech, color: ECUME, alpha: 0.55 - i * 0.09 }));
+    // Liseré côtier : sable clair puis trait d'encre
+    trait(g, [...pts, pts[0]], { width: 5 * ech, color: 0xd8cca4, alpha: 0.8 });
+    trait(g, [...pts, pts[0]], { width: 1.2 * ech, color: ENCRE, alpha: 0.7 });
+  };
+}
+
+// Angle du segment le plus proche d'un point, ramené entre -90° et 90° pour rester lisible
+function angleProche(points, x, y) {
+  let best = Infinity, angle = 0;
+  for (let i = 1; i < points.length; i++) {
+    const [x1, y1] = points[i - 1], [x2, y2] = points[i];
+    const d = Math.hypot((x1 + x2) / 2 - x, (y1 + y2) / 2 - y);
+    if (d < best) [best, angle] = [d, Math.atan2(y2 - y1, x2 - x1)];
+  }
+  // Un tracé vertical se lit de bas en haut, comme sur les cartes anciennes
+  if (angle > Math.PI * 0.45) angle -= Math.PI;
+  if (angle < -Math.PI * 0.55) angle += Math.PI;
+  return angle;
+}
+
+// Pastille sombre à liseré doré (population, effectif)
+function pastille(texte, taille = 11) {
+  const c = new P.Container();
+  const t = new P.Text({ text: texte, style: { fontFamily: SERIF, fontSize: taille, fontWeight: "700", fill: CREME } });
+  t.anchor.set(0.5);
+  const w = Math.max(t.height + 4, t.width + 10), h = t.height + 4;
+  c.addChild(new P.Graphics().roundRect(-w / 2, -h / 2, w, h, h / 2).fill({ color: 0x1d1a17, alpha: 0.95 }).stroke({ width: 1.5, color: OR }), t);
+  return c;
+}
+
+// Étiquette de lieu : capitales à empattements sur fond sombre à liseré rouge
+// (préfecture / chef-lieu : étoile dorée et liseré doublé)
+function cartouche(texte, taille, chefLieu) {
+  const c = new P.Container();
+  const t = new P.Text({ text: (chefLieu ? "★ " : "") + texte.toUpperCase(), style: { fontFamily: SERIF, fontSize: taille, fontWeight: "600", fill: CREME, letterSpacing: 1.5 } });
+  t.anchor.set(0.5);
+  const w = t.width + 16, h = t.height + 6;
+  const g = new P.Graphics().roundRect(-w / 2, -h / 2, w, h, 2).fill({ color: 0x221e1b, alpha: 0.92 })
+    .stroke({ width: chefLieu ? 2.2 : 1.5, color: ROUGE }).roundRect(-w / 2 + 3, -h / 2 + 3, w - 6, h - 6, 1).stroke({ width: 0.6, color: OR, alpha: chefLieu ? 0.9 : 0.5 });
+  c.addChild(g, t);
+  return c;
+}
+
+// Icônes de lieux habités, à l'échelle de l'écran : 0 hameau, 1 bourg à clocher, 2 ville à château
+const ICONES = [
+  (g) => g.rect(-6, -3, 12, 8).fill(CREME).stroke({ width: 1.3, color: ENCRE })
+    .poly([-8, -3, 0, -10, 8, -3]).fill(ROUGE).stroke({ width: 1.3, color: ENCRE }),
+  (g) => g.rect(-10, -2, 14, 9).fill(CREME).stroke({ width: 1.3, color: ENCRE })
+    .poly([-11, -2, -3, -8, 5, -2]).fill(ROUGE).stroke({ width: 1.3, color: ENCRE })
+    .rect(4, -8, 7, 15).fill(CREME).stroke({ width: 1.3, color: ENCRE })
+    .poly([3, -8, 7.5, -19, 12, -8]).fill(0x5a4632).stroke({ width: 1.3, color: ENCRE })
+    .moveTo(7.5, -19).lineTo(7.5, -24).moveTo(5.5, -22).lineTo(9.5, -22).stroke({ width: 1.2, color: ENCRE }),
+  (g) => {
+    g.rect(-11, -6, 22, 14).fill(CREME).stroke({ width: 1.3, color: ENCRE });
+    for (const x of [-15, 9]) {
+      g.rect(x, -12, 6, 20).fill(CREME).stroke({ width: 1.3, color: ENCRE });
+      g.rect(x, -15, 2, 3).rect(x + 4, -15, 2, 3).fill(ENCRE);
+    }
+    for (let x = -9; x < 9; x += 4) g.rect(x, -9, 2, 3).fill(ENCRE);
+    g.roundRect(-3, 1, 6, 7, 3).fill(ENCRE)
+      .moveTo(0, -6).lineTo(0, -20).stroke({ width: 1.2, color: ENCRE }).poly([0, -20, 9, -17, 0, -14]).fill(ROUGE);
+  },
+];
+
+const compact = new Intl.NumberFormat("fr-FR", { notation: "compact", maximumFractionDigits: 1 });
+const habitants = (n) => (n >= 10000 ? compact.format(n) : n.toLocaleString("fr-FR"));
+
+function medaillon(e, dessinInterieur) {
+  const c = new P.Container();
+  const coul = P.Color.shared.setValue(e.couleur ?? 0x2b3f7a).toNumber();
+  const g = new P.Graphics().circle(1.5, 2, 19).fill({ color: 0x000000, alpha: 0.35 })
+    .circle(0, 0, 19).fill(coul).stroke({ width: 3, color: OR }).circle(0, 0, 21).stroke({ width: 1, color: ENCRE });
+  dessinInterieur(g);
+  c.addChild(g);
+  return c;
+}
+
+const decorCarte = decor("carte", { force: 0.45, teinte: true, vignette: 0.55, papier: true });
 
 export const carte = {
-  nom: "Carte", css: "carte", fond: 0x2b3d49, base: 0xcbb98a, unitesTailleFixe: true,
+  nom: "Carte", css: "carte", fond: 0x22343f, base: 0xcbb98a, unitesTailleFixe: true,
   orientation: () => 0,
+  decor(rendu, carte) {
+    preparer(carte);
+    return decorCarte(rendu, carte);
+  },
 
-  zone: { ...Object.fromEntries(Object.keys(TERRES).map((k) => [k, terre])), mer: eau, lac: eau, _: terre },
+  zone: {
+    ...Object.fromEntries(Object.keys(TERRES).map((k) => [k, terre])),
+    foret, departement, pays, mer: eau([9, 20, 34, 52]), lac: eau([6, 13]), _: terre,
+  },
 
   ligne: {
-    haie(g, e) { trait(g, e.points, { width: 2, color: 0x6b7340, alpha: 0.35 }); },
+    haie(g, e) { trait(g, e.points, { width: 2 * ech, color: 0x6b7340, alpha: 0.35 }); },
+    // Fleuve : `largeur` (unités du monde, nombre ou une par point) si fournie, sinon 8 ; liseré clair et reflet au milieu
     riviere(g, e) {
-      trait(g, e.points, { width: 22, color: 0x9fb4b0, alpha: 0.5 });
-      trait(g, e.points, { width: 10, color: 0x3e6f98 });
+      const l = e.largeur ?? 8;
+      traitVariable(g, e.points, l, { color: 0xd8cca4, alpha: 0.5 }, 1, 4 * ech);
+      traitVariable(g, e.points, l, { color: 0x2f4f63 }, 1, 0.8 * ech);
+      traitVariable(g, e.points, l, { color: 0x5b86a0 }, 0.55, 0.3 * ech);
     },
-    route(g, e) { pointilles(g, e.points, 18, 8, { width: 4, color: 0x7a5636, alpha: 0.85 }); },
+    // Route empierrée : double trait d'encre
+    route(g, e) {
+      trait(g, e.points, { width: 7 * ech, color: 0x5a4030, alpha: 0.85 });
+      trait(g, e.points, { width: 4 * ech, color: 0xe6d6ae });
+    },
     ligne_electrique(g, e) {
-      trait(g, e.points, { width: 2.5, color: 0x3a2a1a, alpha: 0.8 });
-      lelong(e.points, 50, (x, y) => g.circle(x, y, 3).fill(0x3a2a1a));
+      const k = ech;
+      trait(g, e.points, { width: 1.8 * k, color: ENCRE, alpha: 0.85 });
+      lelong(e.points, 50 * k, (x, y) => g.moveTo(x - 5 * k, y - 3 * k).lineTo(x + 5 * k, y - 3 * k).moveTo(x, y - 6 * k).lineTo(x, y + 4 * k).stroke({ width: 2 * k, color: ENCRE }));
     },
-    canalisation(g, e) { pointilles(g, e.points, 8, 6, { width: 3, color: 0x2f5f86, alpha: 0.85 }); },
+    canalisation(g, e) {
+      trait(g, e.points, { width: 6 * ech, color: 0xe6d6ae, alpha: 0.7 });
+      pointilles(g, e.points, 8 * ech, 6 * ech, { width: 3 * ech, color: 0x2f5f86 });
+    },
+    // Frontière en lueur colorée
     frontiere(g, e) {
       const c = P.Color.shared.setValue(e.couleur ?? "#9b4dca").toNumber();
-      trait(g, e.points, { width: 22, color: c, alpha: 0.22 });
-      trait(g, e.points, { width: 4, color: c, alpha: 0.9 });
+      for (const [w, a] of [[46, 0.07], [30, 0.1], [18, 0.16], [9, 0.3]]) trait(g, e.points, { width: w * ech, color: c, alpha: a });
+      trait(g, e.points, { width: 3 * ech, color: c, alpha: 0.95 });
+      trait(g, e.points, { width: ech, color: 0xffffff, alpha: 0.5 });
     },
-    _(g, e) { trait(g, e.points, { width: 3, color: 0x5a4a3a }); },
+    _(g, e) { trait(g, e.points, { width: 3 * ech, color: 0x5a4a3a }); },
   },
 
   batiment: {
     ville(e) {
-      const g = new P.Graphics()
-        .circle(e.x, e.y, 13).fill(0x5a3a2a).stroke({ width: 3, color: 0xf0e6cc })
-        .rect(e.x - 1, e.y - 34, 2, 22).fill(0x3a2a1a)
-        .poly([e.x + 1, e.y - 34, e.x + 16, e.y - 29, e.x + 1, e.y - 24]).fill(0xb83a2e);
+      // Au sol : îlots bâtis ; à l'écran : icône, nom et population
+      const g = new P.Graphics(), r = alea(e.id), t = e.taille ?? 60, n = rangs(e), b = t / 8;
+      for (let i = 0; i < 4 + n * 4; i++) {
+        const a = r() * Math.PI * 2, d = r() * t * 0.35;
+        g.rect(e.x + Math.cos(a) * d - b * 0.7, e.y + Math.sin(a) * d * 0.7 - b / 2, b * (1 + r()), b * (0.7 + r() * 0.6));
+      }
+      g.fill({ color: 0x7a3a2c, alpha: 0.7 });
       const lab = new P.Container();
-      const nom = etiquette(e.nom.toUpperCase(), { fontFamily: SERIF, fontSize: 15, fontWeight: "600", fill: 0xf0e6cc, letterSpacing: 0.5 }, { color: 0x262626, alpha: 0.92 }, 0xb83a2e);
-      const pop = etiquette(String(e.population ?? ""), { fontFamily: SERIF, fontSize: 12, fill: 0xf0e6cc }, { color: 0x3a2a2a, alpha: 0.95 });
-      nom.y = 30;
-      pop.position.set(nom.width / 2 + 4, 6);
-      lab.addChild(nom, pop);
+      const icone = new P.Graphics();
+      ICONES[n](icone);
+      const nom = cartouche(e.nom, [11, 13, 15][n], e.prefecture);
+      nom.y = 22;
+      lab.addChild(icone, nom);
+      if (e.population != null) {
+        const pop = pastille(habitants(e.population));
+        pop.position.set(nom.width / 2 + pop.width / 2 - 2, 22 - nom.height / 2 - 2);
+        lab.addChild(pop);
+      }
       lab.position.set(e.x, e.y);
       return { dessin: g, etiquette: lab };
     },
     eolienne(e) {
-      const g = new P.Graphics().moveTo(e.x, e.y + 10).lineTo(e.x, e.y - 8).stroke({ width: 2, color: 0x3a2a1a });
+      const c = new P.Container();
+      c.position.set(e.x, e.y);
+      const rotor = new P.Graphics();
       for (let i = 0; i < 3; i++) {
-        const a = (i * Math.PI * 2) / 3 - Math.PI / 2;
-        g.moveTo(e.x, e.y - 8).lineTo(e.x + Math.cos(a) * 10, e.y - 8 + Math.sin(a) * 10).stroke({ width: 2, color: 0x3a2a1a });
+        const a = (i * Math.PI * 2) / 3;
+        const p = (k, l) => [Math.cos(a + k) * l, Math.sin(a + k) * l];
+        rotor.poly([0, 0, ...p(-0.12, 10), ...p(-0.04, 18), ...p(0.06, 18)]).fill(CREME).stroke({ width: 1.2, color: ENCRE });
       }
-      return { dessin: g };
+      rotor.circle(0, 0, 2.5).fill(ENCRE);
+      rotor.position.set(0, -14);
+      c.addChild(new P.Graphics().ellipse(0, 14, 8, 3).fill({ color: ENCRE, alpha: 0.35 })
+        .poly([-2.5, 14, -1, -14, 1, -14, 2.5, 14]).fill(CREME).stroke({ width: 1.2, color: ENCRE }), rotor);
+      return { dessin: c, animer: (dt, ctx) => { rotor.rotation += dt * Math.min(25, ctx.vent(e.x, e.y)) * 0.5; } };
     },
     transformateur(e) {
-      return { dessin: new P.Graphics().rect(e.x - 7, e.y - 7, 14, 14).fill(0xf0e6cc).stroke({ width: 2, color: 0x3a2a1a }) };
+      const g = new P.Graphics().rect(e.x - 10, e.y - 9, 22, 20).fill({ color: ENCRE, alpha: 0.3 })
+        .rect(e.x - 11, e.y - 11, 22, 20).fill(CREME).stroke({ width: 1.5, color: ENCRE })
+        .poly([e.x + 2, e.y - 8, e.x - 5, e.y + 1, e.x, e.y + 1, e.x - 2, e.y + 7, e.x + 5, e.y - 2, e.x, e.y - 2]).fill(ROUGE);
+      return { dessin: g };
     },
     hangar(e) {
-      return { dessin: new P.Graphics().rect(e.x - 14, e.y - 9, 28, 18).fill(0x8a6a4a).stroke({ width: 2, color: 0x3a2a1a }) };
+      const g = new P.Graphics().rect(e.x - 25, e.y - 13, 54, 32).fill({ color: ENCRE, alpha: 0.3 })
+        .rect(e.x - 28, e.y - 16, 56, 32).fill(0xb08a62).stroke({ width: 1.5, color: ENCRE });
+      for (let x = -22; x < 28; x += 7) g.moveTo(e.x + x, e.y - 16).lineTo(e.x + x - 6, e.y + 16);
+      g.stroke({ width: 1, color: ENCRE, alpha: 0.45 }).moveTo(e.x - 28, e.y).lineTo(e.x + 28, e.y).stroke({ width: 1.5, color: ENCRE });
+      return { dessin: g };
     },
     _(e) {
-      const g = new P.Graphics().circle(e.x, e.y, 8).fill(0x5a3a2a).stroke({ width: 2, color: 0xf0e6cc });
-      const lab = e.nom ? etiquette(e.nom, { fontFamily: SERIF, fontSize: 13, fill: 0xf0e6cc }, { color: 0x262626, alpha: 0.9 }) : null;
+      const g = new P.Graphics().circle(e.x, e.y, 8).fill(0x5a3a2a).stroke({ width: 2, color: CREME });
+      const lab = e.nom ? etiquette(e.nom, { fontFamily: SERIF, fontSize: 13, fill: CREME }, { color: 0x221e1b, alpha: 0.9 }, ROUGE) : null;
       lab?.position.set(e.x, e.y + 24);
       return { dessin: g, etiquette: lab };
     },
   },
 
   unite: {
+    // Médaillon à l'uniforme (bicorne et buste) et effectif en dessous
     regiment(e) {
-      const c = new P.Container();
-      c.addChild(new P.Graphics()
-        .circle(0, 0, 20).fill(0xf0e6cc).stroke({ width: 3, color: 0x8a1f1f })
-        .circle(0, -4, 6).fill(0x2b3f7a)
-        .roundRect(-7, 2, 14, 12, 3).fill(0x2b3f7a));
-      const t = new P.Text({ text: String(e.effectif ?? ""), style: { fontFamily: SERIF, fontSize: 12, fontWeight: "700", fill: 0xf0e6cc } });
-      const fond = new P.Graphics().roundRect(-t.width / 2 - 5, 22, t.width + 10, t.height + 2, 3).fill({ color: 0x262626, alpha: 0.9 });
-      t.anchor.set(0.5, 0);
-      t.y = 23;
-      c.addChild(fond, t);
+      const c = medaillon(e, (g) => g.circle(0, -3, 5).fill(CREME)
+        .poly([-10, -6, 0, -12, 10, -6, 6, -5, -6, -5]).fill(ENCRE)
+        .poly([-10, 14, -8, 4, 0, 1, 8, 4, 10, 14]).fill(CREME).rect(-1, 3, 2, 11).fill(ROUGE));
+      if (e.effectif != null) {
+        const p = pastille(String(e.effectif), 12);
+        p.y = 27;
+        c.addChild(p);
+      }
       return c;
     },
     tracteur: () => null,
-    _: () => null,
+    _(e) {
+      const c = medaillon(e, () => {});
+      if (e.nom) {
+        const t = new P.Text({ text: e.nom[0].toUpperCase(), style: { fontFamily: SERIF, fontSize: 18, fontWeight: "700", fill: CREME } });
+        t.anchor.set(0.5);
+        c.addChild(t);
+      }
+      return c;
+    },
   },
 
   nomLieu(e) {
-    const style = { fontFamily: SERIF, fontSize: e.style === "mer" ? 30 : 17, fontStyle: "italic", fill: 0x2f4a5c, letterSpacing: 2 };
-    return ["mer", "lac", "riviere"].includes(e.style) ? nomLieu(e.style === "mer" ? e.nom.toUpperCase() : e.nom, style) : null;
+    if (e.constructible) return null;  // « Route », « Canalisation » : le nom du modèle n'apprend rien sur la carte
+    const halo = { color: 0xe9dfc2, width: 3, join: "round" };
+    let t;
+    if (e.style === "mer") {
+      t = nomLieu(e.nom.toUpperCase(), { fontFamily: SERIF, fontSize: 34, fontStyle: "italic", fill: 0xb9ced3, letterSpacing: 12 });
+      t.alpha = 0.85;
+    } else if (e.style === "lac") {
+      t = nomLieu(e.nom, { fontFamily: SERIF, fontSize: 14, fontStyle: "italic", fill: 0xdfe9ea, stroke: { color: MER, width: 3, join: "round" }, letterSpacing: 1 });
+    } else if (e.style === "riviere") {
+      t = nomLieu(e.nom, { fontFamily: SERIF, fontSize: 13, fontStyle: "italic", fontWeight: "600", fill: 0x24465e, stroke: halo, letterSpacing: 1.5 });
+    } else if (e.style === "departement") {
+      t = new P.Container();
+      const nom = nomLieu(e.nom.toUpperCase(), { fontFamily: SERIF, fontSize: 11, fill: 0x4a3420, stroke: halo, letterSpacing: 3 });
+      t.addChild(nom);
+      if (e.code) {
+        const code = nomLieu(e.code, { fontFamily: SERIF, fontSize: 11, fontStyle: "italic", fill: 0x8a3a2a, stroke: halo });
+        code.y = nom.height * 0.9;
+        t.addChild(code);
+      }
+    } else if (e.style === "pays") {
+      t = nomLieu(e.nom.toUpperCase(), { fontFamily: SERIF, fontSize: 13, fill: 0x7d776c, stroke: { ...halo, color: 0xd6d0c2 }, letterSpacing: 6 });
+    } else if (e.type === "zone") {
+      t = nomLieu(e.nom.toUpperCase(), { fontFamily: SERIF, fontSize: 14, fill: 0x4a3a28, stroke: halo, letterSpacing: 5 });
+    } else {
+      t = nomLieu(e.nom, { fontFamily: SERIF, fontSize: 13, fontStyle: "italic", fill: 0x4a3a28, stroke: halo });
+    }
+    // Les mers suivent leur côte, les lignes leur tracé (posées au-dessus du trait)
+    if (e.points && (e.type === "ligne" || e.style === "mer")) {
+      const m = e.points[e.points.length >> 1];
+      t.rotation = angleProche(e.points, ...(e.ancre ?? m));
+      if (e.type === "ligne") t.anchor.set(0.5, 1.2);
+    }
+    return t;
   },
 };

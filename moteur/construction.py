@@ -36,8 +36,8 @@ def construire(m, params):
         pts = [[_nombre(x), _nombre(y)] for x, y in pts]
         for x, y in pts:
             _dans_carte(m, x, y)
-        longueur = sum(math.dist(a, b) for a, b in zip(pts, pts[1:]))
-        if longueur < 1:
+        longueur = sum(math.dist(a, b) for a, b in zip(pts, pts[1:])) * m.echelle  # en mètres
+        if longueur < m.echelle:
             raise ValueError("Ligne trop courte.")
         cout, geometrie = modele["cout"] * longueur / 1000, {"points": pts}
     else:

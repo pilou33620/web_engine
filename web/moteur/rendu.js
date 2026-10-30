@@ -2,11 +2,29 @@
 // Le climat est rendu par climat.js.
 import { ClimatRendu } from "./climat.js";
 import { centre } from "./themes/outils.js";
+import { Effets } from "./effets.js";
 
 const P = window.PIXI;
 // Ordre d'empilement, du sol vers le ciel. Le « calque » d'une entité choisit sa place.
 export const CALQUES = ["sol", "eau", "vegetation", "relief", "routes", "reseaux", "frontieres", "batiments", "etiquettes", "unites"];
 const CALQUE_PAR_DEFAUT = { zone: "sol", ligne: "routes", batiment: "batiments", unite: "unites" };
+const TUILE = 512;  // m : zones et lignes sont regroupées par tuile selon leur point de départ, pour masquer le hors-écran
+
+// Remplace le dessin du thème par l'image de l'entité (e.image) une fois chargée ; le garde si elle échoue.
+// x, y : centre de l'image dans le conteneur rendu.
+export function avecImage(dessin, e, x = e.x, y = e.y) {
+  const c = new P.Container();
+  c.addChild(dessin);
+  P.Assets.load(e.image).then((texture) => {
+    if (c.destroyed) return;
+    const s = c.addChild(new P.Sprite(texture));
+    s.anchor.set(0.5);
+    s.position.set(x, y);
+    s.scale.set((e.largeur ?? 2 * (e.taille ?? 12)) / texture.width);
+    dessin.visible = false;
+  }, () => {});
+  return c;
+}
 
 // Dessin d'une entité : style du thème, sinon dessin par défaut « _ » du type
 const dessinateur = (theme, e) => theme[e.type]?.[e.style] ?? theme[e.type]?._;
@@ -26,6 +44,15 @@ function dansPolygone(x, y, pts) {
   return dedans;
 }
 
+// Importance d'un nom quand la place manque : mers et pays, puis préfectures, régions, autres villes, cours d'eau
+function priorite(e) {
+  if (e.style === "mer") return 1e9;
+  if (e.style === "pays") return 5e8;
+  if (e.population !== undefined) return (e.prefecture ? 2e7 : 0) + e.population;  // préfectures avant les noms de régions
+  if (e.type === "zone") return 1.5e7;
+  return e.type === "batiment" ? e.taille ?? 0 : 1e5;
+}
+
 export class Rendu {
   constructor(app) {
     this.app = app;
@@ -34,12 +61,29 @@ export class Rendu {
     for (const nom of ["base", ...CALQUES]) this.monde.addChild((this.calques[nom] = new P.Container()));
     app.stage.addChild(this.monde);
     this.climat = new ClimatRendu(this);
+    // Particules sous les unités ; ondes et surlignage au-dessus de tout le monde
+    this.dessus = this.monde.addChild(new P.Container());
+    this.effets = new Effets(this.monde.addChildAt(new P.Container(), this.monde.getChildIndex(this.calques.unites)), this.dessus);
+    this.surlignage = this.dessus.addChild(new P.Graphics());
+    this.selection = null;
+    this.culles = [];  // { objet, x0, y0, x1, y1, marge (px écran) } masqués hors de l'écran
     this.mobiles = new Map();
     this.animations = [];  // fonctions (dt, contexte) appelées à chaque image
     this.zoom = 1;
     // Ce que les animations des thèmes peuvent demander au monde
     this.contexte = { vent: (x, y) => (this.climat.etat ? this.climat.zoneDe(x, y).vent : 0) };
     app.ticker.add((t) => this.image(t.deltaMS / 1000));
+    // Onde discrète à l'endroit d'un toucher (sans glissé)
+    const appuis = new Map();
+    app.canvas.addEventListener("pointerdown", (e) => appuis.set(e.pointerId, [e.clientX, e.clientY]));
+    app.canvas.addEventListener("pointerup", (e) => {
+      const a = appuis.get(e.pointerId);
+      appuis.delete(e.pointerId);
+      if (a && Math.hypot(e.clientX - a[0], e.clientY - a[1]) < 8) {
+        const p = this.versMonde(e.clientX, e.clientY);
+        this.effets.emettre("onde", p.x, p.y, { zoom: this.zoom });
+      }
+    });
   }
 
   // --- Thème et carte ---
@@ -68,29 +112,110 @@ export class Rendu {
     if (decor.sur) this.calques.relief.addChild(decor.sur);
 
     const graphiques = {};
-    const graphique = (nom) => graphiques[nom] ?? (graphiques[nom] = this.calques[nom].addChild(new P.Graphics()));
+    const graphique = (nom, e) => {
+      const [x, y] = e.points?.[0] ?? [e.x, e.y], cle = `${nom}|${Math.floor(x / TUILE)}|${Math.floor(y / TUILE)}`;
+      return graphiques[cle] ?? (graphiques[cle] = this.calques[nom].addChild(new P.Graphics()));
+    };
+    const objets = [];  // bâtiments et étiquettes, masqués eux aussi hors de l'écran
     for (const e of carte.entites) {
       const calque = this.calques[e.calque] ? e.calque : CALQUE_PAR_DEFAUT[e.type] ?? "sol";
       const dessin = dessinateur(t, e);
       if (!dessin) continue;
       if (e.type === "zone" || e.type === "ligne") {
-        dessin(graphique(calque), e);
+        dessin(graphique(calque, e), e);
         const nom = e.nom && t.nomLieu?.(e);
         if (nom) {
           const c = centre(e);
           nom.position.set(c.x, c.y);
-          this.calques.etiquettes.addChild(nom);
+          nom.priorite = priorite(e);
+          objets.push([this.calques.etiquettes.addChild(nom), 150]);
         }
       } else if (e.type === "batiment") {
         const { dessin: objet, etiquette, animer } = dessin(e) ?? {};
-        if (objet) this.calques[calque].addChild(objet);
-        if (etiquette) this.calques.etiquettes.addChild(etiquette);
+        if (objet) objets.push([this.calques[calque].addChild(e.image ? avecImage(objet, e) : objet), 30]);
+        if (etiquette) {
+          etiquette.priorite = priorite(e);
+          objets.push([this.calques.etiquettes.addChild(etiquette), 150]);
+        }
         if (animer) this.animations.push(animer);
       }
     }
     this.climat.carte(carte);
     this.majEtiquettes();
+    this.culles = [...Object.values(graphiques).map((g) => [g, 30]), ...objets].map(([objet, marge]) => ({ objet, marge, ...this.boiteMonde(objet) }));
+    this.cleVue = "";
     if (premiere) this.recentrer();
+    this.dessinerSurlignage();
+  }
+
+  // Boîte d'un objet en coordonnées du monde, quelle que soit la caméra du moment
+  boiteMonde(objet) {
+    const b = objet.getBounds(), z = this.zoom, { x, y } = this.monde;
+    return { x0: (b.minX - x) / z, y0: (b.minY - y) / z, x1: (b.maxX - x) / z, y1: (b.maxY - y) / z };
+  }
+
+  // Masque ce qui sort de l'écran ; ne recalcule que si la caméra a bougé
+  cacherHorsEcran() {
+    const { width: w, height: h } = this.app.screen, z = this.zoom;
+    const cle = `${this.monde.x}|${this.monde.y}|${z}|${w}|${h}`;
+    if (cle === this.cleVue) return;
+    this.cleVue = cle;
+    const a = this.versMonde(0, 0), b = this.versMonde(w, h);
+    for (const c of this.culles) {
+      const m = c.marge / z;
+      c.objet.visible = c.x1 > a.x - m && c.x0 < b.x + m && c.y1 > a.y - m && c.y0 < b.y + m;
+    }
+    this.eviterChevauchements();
+  }
+
+  // Étiquettes qui se chevauchent à l'écran : seule la plus importante reste (comme sur une carte IGN)
+  eviterChevauchements() {
+    const places = [];
+    const etiquettes = this.calques.etiquettes.children.filter((e) => e.visible)
+      .sort((a, b) => (b.priorite ?? 0) - (a.priorite ?? 0));
+    for (const e of etiquettes) {
+      const r = e.getBounds();
+      const libre = !places.some((p) => r.minX < p.maxX && r.maxX > p.minX && r.minY < p.maxY && r.maxY > p.minY);
+      e.visible = libre;
+      if (libre) places.push({ minX: r.minX - 4, minY: r.minY - 2, maxX: r.maxX + 4, maxY: r.maxY + 2 });
+    }
+  }
+
+  // Image basse résolution de quelques calques sur toute la carte (minicarte), hors-écran compris
+  instantane(noms, largeur) {
+    const [L, H] = this.carte.taille, garder = new Set(noms.map((n) => this.calques[n]));
+    const etats = this.monde.children.map((c) => [c, c.visible]);
+    for (const [c] of etats) c.visible = garder.has(c);
+    for (const c of this.culles) c.objet.visible = true;
+    const toile = this.app.renderer.extract.canvas({
+      target: this.monde, frame: new P.Rectangle(0, 0, L, H), resolution: largeur / L, antialias: true });
+    for (const [c, v] of etats) c.visible = v;
+    this.cleVue = "";
+    return toile;
+  }
+
+  // --- Sélection : contour lumineux qui pulse, d'épaisseur constante à l'écran ---
+  surligner(e) {
+    this.selection = e;
+    this.dessinerSurlignage();
+  }
+
+  dessinerSurlignage() {
+    const e = this.selection, g = this.surlignage.clear(), z = this.zoom;
+    this.zoomSurlignage = z;
+    if (!e) return;
+    const forme = () => {
+      if (e.type === "batiment" || e.type === "unite") return g.circle(e.x, e.y, (e.taille ?? 20) + 6 / z);
+      if (e.type === "ligne") {
+        g.moveTo(...e.points[0]);
+        for (const p of e.points.slice(1)) g.lineTo(...p);
+        return g;
+      }
+      return e.points ? g.poly(e.points.flat()) : g.rect(e.x, e.y, e.w, e.h);
+    };
+    const halo = { color: 0xffd75e, cap: "round", join: "round" };
+    forme().stroke({ ...halo, width: (e.type === "ligne" ? 18 : 12) / z, alpha: 0.3 });
+    forme().stroke({ ...halo, width: 3 / z, color: 0xfff4c2 });
   }
 
   // --- Entités mobiles (positions interpolées entre deux mises à jour) ---
@@ -101,7 +226,8 @@ export class Rendu {
       vus.add(e.id);
       let s = this.mobiles.get(e.id);
       if (!s) {
-        const objet = dessinateur(this.theme, e)?.(e) ?? null;
+        const dessin = dessinateur(this.theme, e)?.(e);
+        const objet = dessin && e.image ? avecImage(dessin, e, 0, 0) : dessin ?? null;
         if (objet) {
           objet.position.set(e.x, e.y);
           if (this.theme.unitesTailleFixe) objet.scale.set(this.echelleEtiquettes());
@@ -120,15 +246,33 @@ export class Rendu {
   }
 
   image(dt) {
-    const k = Math.min(1, dt * 6);
-    for (const { objet, cible } of this.mobiles.values()) {
+    const k = Math.min(1, dt * 6), { width: w, height: h } = this.app.screen;
+    const a = this.versMonde(0, 0), b = this.versMonde(w, h), marge = 80 / this.zoom;
+    for (const s of this.mobiles.values()) {
+      const { objet, cible } = s;
       if (!objet) continue;
       // Saut direct si l'écart est grand (tour par tour, chargement)
-      if (Math.hypot(cible.x - objet.x, cible.y - objet.y) > 150) objet.position.set(cible.x, cible.y);
+      const ecart = Math.hypot(cible.x - objet.x, cible.y - objet.y);
+      if (ecart > 150) objet.position.set(cible.x, cible.y);
       else objet.position.set(objet.x + (cible.x - objet.x) * k, objet.y + (cible.y - objet.y) * k);
       objet.rotation = this.theme.orientation(cible);
+      objet.visible = objet.x > a.x - marge && objet.x < b.x + marge && objet.y > a.y - marge && objet.y < b.y + marge;
+      // Effet laissé derrière soi : une bouffée tous les 8 m parcourus
+      if (cible.effet && objet.visible && ecart <= 150) {
+        s.parcouru = (s.parcouru ?? 0) + ecart * k;
+        if (s.parcouru > 8) {
+          s.parcouru = 0;
+          this.effets.emettre(cible.effet, objet.x, objet.y, { dx: (cible.x - objet.x) / ecart, dy: (cible.y - objet.y) / ecart });
+        }
+      }
     }
     for (const animer of this.animations) animer(dt, this.contexte);
+    this.effets.image(dt);
+    this.cacherHorsEcran();
+    if (this.selection) {
+      if (this.zoom !== this.zoomSurlignage) this.dessinerSurlignage();
+      this.surlignage.alpha = 0.65 + 0.35 * Math.sin(performance.now() / 260);
+    }
     this.climat.image(dt);
   }
 

@@ -1,6 +1,7 @@
 // Thème « Vue aérienne » : vue du dessus aux couleurs plates, universel (campagne, ville, réseaux…).
 // Chaque type (zone, ligne, batiment, unite) a une table de styles ; « _ » est le dessin par défaut.
-import { alea, trait, pointilles, lelong, forme, boite, semis, etiquette, nomLieu } from "./outils.js";
+import { alea, trait, traitVariable, pointilles, lelong, forme, boite, semis, etiquette, nomLieu } from "./outils.js";
+import { decor } from "./decor.js";
 
 const P = window.PIXI;
 const SANS = "system-ui, -apple-system, 'Segoe UI', sans-serif";
@@ -37,6 +38,7 @@ function libelle(e, sous = "") {
 export const aerienne = {
   nom: "Vue aérienne", css: "aerienne", fond: 0x55703f, base: 0xa89668, unitesTailleFixe: false,
   orientation: (e) => (e.angle ?? -Math.PI / 2) + Math.PI / 2,
+  decor: decor("aerienne", { force: 0.18 }),
 
   zone: {
     ...Object.fromEntries(Object.keys(CULTURES).map((k) => [k, champ])),
@@ -47,6 +49,13 @@ export const aerienne = {
     },
     mer: eau,
     lac: eau,
+    // Régions administratives vues du ciel : campagne verte nuancée, limites en tirets clairs
+    departement(g, e) {
+      const teinte = e.couleur ? P.Color.shared.setValue(e.couleur).toNumber() : 0xd8cc9a;
+      forme(g, e).fill(0x6f9a4e).fill({ color: teinte, alpha: 0.28 });
+      pointilles(g, [...e.points, e.points[0]], 10, 7, { width: 2.5, color: 0xf2ecd2, alpha: 0.7 });
+    },
+    pays(g, e) { forme(g, e).fill(0x8a9378); },
     _(g, e) { forme(g, e).fill(0x9a9a8a); },
   },
 
@@ -57,6 +66,10 @@ export const aerienne = {
       lelong(e.points, 16, (x, y) => g.circle(x, y, 6 + r() * 6).fill(r() < 0.5 ? 0x2f6a2c : 0x3a7a35));
     },
     riviere(g, e) {
+      if (e.largeur !== undefined) {  // carte de région ou de pays : largeur donnée en unités
+        traitVariable(g, e.points, e.largeur, { color: 0x5d8a46 }, 1.6, 2);
+        return traitVariable(g, e.points, e.largeur, { color: 0x3a6ea6 }, 1, 1);
+      }
       trait(g, e.points, { width: 40, color: 0x5d8a46 });
       trait(g, e.points, { width: 24, color: 0x3a6ea6 });
       trait(g, e.points, { width: 5, color: 0x77a6d6, alpha: 0.5 });
@@ -141,6 +154,12 @@ export const aerienne = {
 
   // Noms des mers, lacs et rivières
   nomLieu(e) {
+    if (e.style === "departement" || e.style === "pays") {
+      const texte = e.code ? `${e.nom} (${e.code})` : e.nom;
+      return nomLieu(e.style === "pays" ? texte.toUpperCase() : texte, { fontFamily: SANS, fontSize: e.style === "pays" ? 13 : 12,
+        fontWeight: "600", fill: e.style === "pays" ? 0xd8dccf : 0xfbf6e4, letterSpacing: e.style === "pays" ? 3 : 0.5,
+        stroke: { color: 0x2c3a22, width: 3 } });
+    }
     const style = { fontFamily: SANS, fontSize: 14, fontStyle: "italic", fill: 0xe6f0f8, letterSpacing: 1 };
     return e.style === "mer" || e.style === "lac" || e.style === "riviere" ? nomLieu(e.nom, style) : null;
   },

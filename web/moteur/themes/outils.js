@@ -19,6 +19,15 @@ export function trait(g, points, style) {
   g.stroke({ cap: "round", join: "round", ...style });
 }
 
+// Trait dont l'épaisseur varie le long de la ligne : largeurs = un nombre ou une liste (une par point)
+export function traitVariable(g, points, largeurs, style, facteur = 1, ajout = 0) {
+  if (!Array.isArray(largeurs)) return trait(g, points, { ...style, width: largeurs * facteur + ajout });
+  for (let i = 0; i < points.length - 1; i++) {
+    const w = ((largeurs[i] + largeurs[i + 1]) / 2) * facteur + ajout;
+    g.moveTo(points[i][0], points[i][1]).lineTo(points[i + 1][0], points[i + 1][1]).stroke({ cap: "round", join: "round", ...style, width: w });
+  }
+}
+
 // Pointillés le long d'une polyligne
 export function pointilles(g, points, long, vide, style) {
   for (let i = 0; i < points.length - 1; i++) {

@@ -41,6 +41,7 @@ class Monde:
         self.rng = random.Random(graine)
         self.horloge = Horloge(dt.date(1790, 9, 1))
         self.taille = [2000, 1400]
+        self.echelle = 1.0  # mètres par unité de la carte (1 sur une carte locale, 250 sur la France)
         self.entites, self.ressources, self.evenements = {}, {}, []
         self.version_carte, self._compteur = 0, 0
         self.decisions, self.relief = {}, None
@@ -64,6 +65,11 @@ class Monde:
         if not e["mobile"]:
             self.version_carte += 1  # le client redessine la carte
         return e
+
+    def vider(self):
+        """Efface la carte (avant d'en charger ou d'en générer une autre). Les ressources restent."""
+        self.entites, self.decisions, self.relief = {}, {}, None
+        self.version_carte += 1
 
     def supprimer(self, id):
         e = self.entites.pop(id)
@@ -151,7 +157,7 @@ class Monde:
     # --- Données envoyées au client ---
     def carte(self):
         r = self.regles
-        return {"version": self.version_carte, "taille": self.taille, "titre": getattr(r, "TITRE", ""),
+        return {"version": self.version_carte, "taille": self.taille, "echelle": self.echelle, "titre": getattr(r, "TITRE", ""),
                 "entites": [e for e in self.entites.values() if not e["mobile"]],
                 "constructions": getattr(r, "CONSTRUCTIONS", []), "vues": getattr(r, "VUES", []),
                 "tutoriel": getattr(r, "TUTORIEL", []), "relief": self.relief}
@@ -184,7 +190,8 @@ class Monde:
     def sauver(self, chemin):
         h = self.horloge
         data = {"horloge": {"date": h.date.isoformat(), "heure": h.heure, "mode": h.mode, "vitesse": h.vitesse},
-                "taille": self.taille, "climat": self.climat.sauver(), "entites": self.entites,
+                "taille": self.taille, "echelle": self.echelle, "relief": self.relief,
+                "climat": self.climat.sauver(), "entites": self.entites,
                 "ressources": self.ressources, "evenements": self.evenements, "compteur": self._compteur,
                 "decisions": self.decisions}
         with open(chemin, "w", encoding="utf-8") as f:
@@ -196,7 +203,7 @@ class Monde:
         hd = data["horloge"]
         self.horloge = Horloge(dt.date.fromisoformat(hd["date"]), hd["heure"], hd["mode"])
         self.horloge.vitesse = hd["vitesse"]
-        self.taille = data["taille"]
+        self.taille, self.echelle, self.relief = data["taille"], data.get("echelle", 1.0), data.get("relief")
         self.climat.charger(data["climat"])
         self.entites, self.ressources = data["entites"], data["ressources"]
         self.evenements, self._compteur = data["evenements"], data["compteur"]

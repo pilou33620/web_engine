@@ -1,1 +1,55 @@
-/* Styles du module carte */
+/* Styles du module carte : finitions de l'interface du thème « Carte » (sombre, accents dorés, liserés rouges) */
+body[data-theme="carte"] {
+  --or-clair: #f0d48a; --rouge: #a8322a;
+  --or-degrade: linear-gradient(#e8c877, #b98d3f);
+}
+
+/* En-tête : bandeau sombre gravé, filet doré en bas */
+body[data-theme="carte"] .barre {
+  background: linear-gradient(#2a2c31f2, #1f2125f2);
+  border-bottom: 1px solid #0008;
+  box-shadow: inset 0 -2px 0 #7d6a3c, 0 4px 14px #0007;
+}
+body[data-theme="carte"] .titre span:last-child { font-variant: small-caps; letter-spacing: .08em; font-weight: 600; color: var(--or-clair); }
+body[data-theme="carte"] .blason { background: linear-gradient(135deg, #c0463a, #7e231c); }
+body[data-theme="carte"] .date strong { font-variant: small-caps; letter-spacing: .03em; }
+body[data-theme="carte"] .ressource b { color: var(--or-clair); }
+body[data-theme="carte"] .zones button { background: #1b1d21; border-color: #5a4c2c; }
+
+/* Boutons ronds : médaillons sombres cerclés d'or */
+body[data-theme="carte"] .rond {
+  background: radial-gradient(circle at 35% 30%, #3a3c42, #1c1d21 70%);
+  border: 2px solid var(--accent); color: var(--or-clair);
+  box-shadow: 0 0 0 1px #000a, 0 3px 10px #000a, inset 0 1px 0 #ffffff22;
+}
+body[data-theme="carte"] .rond:active { transform: scale(.94); }
+body[data-theme="carte"] .temps .lecture {
+  background: radial-gradient(circle at 35% 30%, #f3d488, #b98d3f 75%);
+  color: #2a2110; border: 2px solid #f6e3ae; box-shadow: 0 0 0 1px #000a, 0 4px 14px #000b;
+}
+body[data-theme="carte"] .bouton-or { background: var(--or-degrade); box-shadow: inset 0 1px 0 #fff6, 0 2px 6px #0007; }
+
+/* Panneaux et fiches : double filet doré */
+body[data-theme="carte"] :is(.panneau, .info) {
+  background: linear-gradient(#2a2c31, #222428);
+  border: 1px solid var(--accent); box-shadow: inset 0 0 0 3px #222428, inset 0 0 0 4px #7d6a3c88, 0 10px 30px #000c;
+}
+body[data-theme="carte"] :is(.panneau h2, .info h2) { font-variant: small-caps; letter-spacing: .04em; color: var(--or-clair); }
+body[data-theme="carte"] .panneau h3 { color: var(--accent); border-bottom: 1px solid #7d6a3c66; padding-bottom: 4px; }
+
+/* Journal : cartes sombres à liseré rouge, date en petites capitales */
+body[data-theme="carte"] .journal li {
+  background: linear-gradient(90deg, #2a2224f2, #232428eb 40%);
+  border: 1px solid #5a4c2c; border-left: 4px solid var(--rouge); border-radius: 6px;
+  box-shadow: 0 3px 10px #0008; padding: 8px 12px;
+}
+body[data-theme="carte"] .journal li:first-child { border-color: #7d6a3c; border-left-color: var(--rouge); }
+body[data-theme="carte"] .journal li:nth-child(2) { opacity: .85; }
+body[data-theme="carte"] .journal li:nth-child(3) { opacity: .7; }
+body[data-theme="carte"] .journal time { font-variant: small-caps; color: var(--accent); }
+body[data-theme="carte"] .journal .evt-bonne { border-left-color: #6f9a52; }
+body[data-theme="carte"] .journal .evt-alerte { border-left-color: #d0662e; }
+
+@media (max-width: 600px) {
+  body[data-theme="carte"] .journal li:nth-child(n+2) { display: none; }
+}

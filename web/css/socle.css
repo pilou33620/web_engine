@@ -1,1 +1,26 @@
-/* Styles du module socle */
+/* Styles du module socle : vues de données et minicarte */
+
+/* Choix de la vue dans les réglages : plusieurs lignes si les libellés sont longs */
+.vues { flex-wrap: wrap; }
+
+/* Légende de la vue active, en haut au centre sous la barre ; ✕ pour l'enlever */
+.legende-vue { position: fixed; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top) + 124px); z-index: 4;
+  display: flex; align-items: center; gap: 10px; padding: 4px 4px 4px 14px; max-width: calc(100vw - 24px);
+  background: color-mix(in srgb, var(--fond) 92%, transparent); border: 1px solid var(--bord); border-radius: 999px; box-shadow: 0 2px 8px #0006; font-size: .85rem; }
+.legende-vue b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.legende-vue .echelle { display: flex; align-items: center; gap: 6px; color: var(--doux); white-space: nowrap; }
+.legende-vue i { width: 64px; height: 10px; border-radius: 5px; background: linear-gradient(90deg, #d73027, #fee08b, #1a9850); }
+.legende-vue button { width: 30px; height: 30px; border-radius: 50%; background: var(--fond2); flex: none; }
+
+/* Minicarte : en bas à gauche, au-dessus du journal */
+.minicarte { position: fixed; left: 12px; bottom: calc(env(safe-area-inset-bottom) + 70px); z-index: 3; width: 160px;
+  border: 2px solid var(--fond2); border-radius: var(--rayon); overflow: hidden; box-shadow: 0 2px 8px #0006; background: var(--fond); }
+body[data-theme="carte"] .minicarte { border-color: var(--bord); }
+.minicarte canvas { display: block; width: 100%; touch-action: none; cursor: crosshair; }
+.minicarte .replier { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; background: color-mix(in srgb, var(--fond) 80%, transparent); font-size: .8rem; line-height: 1; }
+.minicarte .replier::before { content: "–"; }
+.minicarte.repliee { width: 46px; height: 46px; border-radius: 50%; }
+.minicarte.repliee canvas { display: none; }
+.minicarte.repliee .replier { inset: 0; width: 100%; height: 100%; background: var(--fond2); font-size: 1.2rem; }
+.minicarte.repliee .replier::before { content: "🗺"; }
+@media (max-width: 600px) { .minicarte { width: 120px; } }

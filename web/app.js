@@ -30,8 +30,11 @@ const nombre = new Intl.NumberFormat("fr-FR");
 const dateLongue = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 const jour = (iso) => new Date(iso + "T12:00:00");
 
-// Styles et images propres au jeu (jeux/<nom>/web/styles.js), s'il en a
-try { fusionnerStyles((await import("/jeu/styles.js")).default); } catch { /* pas de styles propres */ }
+// Fichiers propres au jeu (jeux/<nom>/web/), chargés seulement s'ils existent : styles.js et module.js
+const fichiersDuJeu = (await (await fetch("/api/jeu")).json()).fichiers;
+const fichierDuJeu = (nom) => (fichiersDuJeu.includes(nom) ? import(`/jeu/${nom}`) : null);
+fusionnerStyles((await fichierDuJeu("styles.js"))?.default);
+const moduleDuJeu = await fichierDuJeu("module.js");
 
 const app = new PIXI.Application();
 await app.init({ resizeTo: window, antialias: true, resolution: Math.min(devicePixelRatio, 2), autoDensity: true });
@@ -76,6 +79,7 @@ async function rafraichir() {
     const carte = await api("/api/carte");
     versionCarte = carte.version;
     rendu.dessinerCarte(carte);
+    $("titre-jeu").textContent = document.title = carte.titre || "web_engine";
     for (const f of abonnes.carte) f(carte);
     if (selection?.id) afficherInfo(carte.entites.find((e) => e.id === selection.id) ?? null);
   }
@@ -247,4 +251,5 @@ $("calques").onchange = (e) => rendu.afficherCalque(e.target.dataset.calque, e.t
 
 changerTheme(memo.lire("theme", "aerienne"));
 for (const m of MODULES) m.installer(ctx);
+moduleDuJeu?.installer(ctx);
 boucle();

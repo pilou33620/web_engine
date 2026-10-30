@@ -1,1 +1,31 @@
 /* Styles du module construction */
+/* Barre d'outils : colonne à gauche sous l'en-tête, au-dessus de la future minicarte (≈160 px en bas) */
+.outils { position: fixed; left: 12px; top: calc(env(safe-area-inset-top) + 132px); z-index: 4;
+  display: flex; flex-direction: column; gap: 6px; max-height: calc(100vh - 132px - 190px - env(safe-area-inset-top)); overflow-y: auto; scrollbar-width: none; }
+.outils:empty { display: none; }
+.outils button { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px 12px 6px 8px; background: var(--fond2);
+  border: 1px solid var(--bord); border-radius: var(--rayon); box-shadow: 0 2px 8px #0006; text-align: left; white-space: nowrap; }
+.outils .icone { font-size: 1.3rem; width: 28px; text-align: center; }
+.outils .libelle { font-size: .9rem; }
+.outils button.actif { background: var(--accent); color: var(--accent-texte); }
+.outils button[data-id="demolir"] { margin-top: 6px; }
+@media (max-width: 700px) {
+  .outils button { padding: 0; width: 46px; height: 46px; justify-content: center; }
+  .outils .libelle { display: none; }
+}
+
+/* Barre flottante du tracé : en haut, entre la colonne d'outils et les boutons de zoom */
+.construction-barre { position: fixed; z-index: 6; top: calc(env(safe-area-inset-top) + 132px); left: max(190px, calc(50% - 300px)); right: max(72px, calc(50% - 300px));
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; background: color-mix(in srgb, var(--fond) 94%, transparent);
+  border: 1px solid var(--bord); border-radius: var(--rayon); box-shadow: 0 6px 20px #0008; font-variant-numeric: tabular-nums; }
+.construction-barre .infos { flex: 1 1 220px; line-height: 1.3; }
+.construction-barre .manque { color: #f2a090; }
+.construction-barre .boutons { display: flex; gap: 6px; flex-wrap: wrap; }
+.construction-barre button { min-height: 40px; padding: 6px 12px; border-radius: var(--rayon); background: var(--fond2); border: 1px solid var(--bord); }
+.construction-barre button.principal { background: var(--accent); color: var(--accent-texte); font-weight: 600; }
+.construction-barre button:disabled { opacity: .4; }
+.construction-barre.occupe { cursor: progress; opacity: .85; }
+@media (max-width: 700px) {
+  .construction-barre { left: 68px; right: 66px; font-size: .9rem; }
+  .construction-barre .infos { flex-basis: 100%; }
+}

@@ -54,6 +54,9 @@ def servir(regles, nom_jeu, port=8080, hote="0.0.0.0"):
                         return self._json(monde.info(id) if url.path == "/api/info" else monde.vue(id))
                 except ValueError as e:
                     return self._json({"erreur": str(e)}, 400)
+            if url.path == "/api/jeu":  # fichiers web propres au jeu (styles.js, module.js…)
+                dossier = RACINE / "jeux" / nom_jeu / "web"
+                return self._json({"nom": nom_jeu, "fichiers": sorted(p.name for p in dossier.glob("*.js")) if dossier.is_dir() else []})
             if url.path.startswith("/jeu/"):
                 return self._fichier_du_jeu(url.path[len("/jeu/"):])
             if self.path == "/api/etat":
