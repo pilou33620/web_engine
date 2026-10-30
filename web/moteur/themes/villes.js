@@ -62,8 +62,9 @@ const RUE = { celte: "#b9a67a", romaine: "#d2c6a6", classique: "#c9b58e", indust
 const aire = (P) => { let s = 0; for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length]; s += a[0] * b[1] - b[0] * a[1]; } return s / 2; };
 const centre = (P) => [P.reduce((s, p) => s + p[0], 0) / P.length, P.reduce((s, p) => s + p[1], 0) / P.length];
 const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+let tSeg = 0;  // position du dernier point projeté sur le segment (0 à 1)
 const distSeg = (x, y, a, b) => {
-  const dx = b[0] - a[0], dy = b[1] - a[1], t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy || 1)));
+  const dx = b[0] - a[0], dy = b[1] - a[1], t = (tSeg = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy || 1))));
   const ex = x - a[0] - t * dx, ey = y - a[1] - t * dy;
   return Math.sqrt(ex * ex + ey * ey);
 };
@@ -127,13 +128,13 @@ function ecart(l, x, y) {
   const b = l.boite, hors = Math.max(b[0] - x, x - b[2], b[1] - y, y - b[3]);
   if (hors > 0.5) return hors;  // loin de la ligne : une borne inférieure suffit
   let m = Infinity;
-  for (let k = 1; k < l.pts.length; k++) m = Math.min(m, distSeg(x, y, l.pts[k - 1], l.pts[k]) - (l.ws ? Math.max(l.ws[k - 1], l.ws[k]) : l.demi));
+  for (let k = 1; k < l.pts.length; k++) m = Math.min(m, distSeg(x, y, l.pts[k - 1], l.pts[k]) - (l.ws ? l.ws[k - 1] + (l.ws[k] - l.ws[k - 1]) * tSeg : l.demi));
   return m;
 }
 function demiEn(l, x, y) {
   if (!l.ws) return l.demi;
   let m = Infinity, w = 0;
-  for (let k = 1; k < l.pts.length; k++) { const d = distSeg(x, y, l.pts[k - 1], l.pts[k]); if (d < m) { m = d; w = (l.ws[k - 1] + l.ws[k]) / 2; } }
+  for (let k = 1; k < l.pts.length; k++) { const d = distSeg(x, y, l.pts[k - 1], l.pts[k]); if (d < m) { m = d; w = l.ws[k - 1] + (l.ws[k] - l.ws[k - 1]) * tSeg; } }
   return w;
 }
 
@@ -172,8 +173,8 @@ const QUARTIERS = {
   place: [0.0035, "#ddd0ae", null, 0], eglise: [0.0032, "#d6c8a6", "#7d8794", 0.014], jardin: [0.004, "#78a453", null, 0],
   insula: [0.003, "#dccdaa", "#bd6e4c", 0.013], horti: [0.0025, "#88a65c", null, 0], forum: [0.0045, "#e5d9bb", "#c07a55", 0.006], thermes: [0.004, "#dccfae", "#b97250", 0.01],
   ouvrier: [0.004, "#7f9d55", "#a85940", 0.011], immeubles: [0.006, "#c9bfa8", "#8b8f93", 0.018], usine: [0.006, "#a39a86", "#85827c", 0.03], gare: [0.006, "#b2a78f", "#9aaab3", 0.03],
-  pavillons: [0.0045, "#88ac5e", null, 0], grandEnsemble: [0.007, "#80a65b", null, 0], zone: [0.008, "#a2a3a1", "#d6d6d2", 0.03], parc: [0.004, "#6f9f4f", null, 0],
-  tours: [0.008, "#d2d6d0", "#8299ab", 0.02], dense: [0.006, "#80ae5e", "#9fb08f", 0.016], eco: [0.004, "#86b15e", null, 0],
+  pavillons: [0.0045, "#88ac5e", "#b49a80", 0.016], grandEnsemble: [0.007, "#80a65b", null, 0], zone: [0.008, "#a2a3a1", "#d6d6d2", 0.03], parc: [0.004, "#6f9f4f", null, 0],
+  tours: [0.008, "#d2d6d0", "#8299ab", 0.02], dense: [0.006, "#80ae5e", "#9fb08f", 0.016], eco: [0.004, "#86b15e", "#7f95a0", 0.016],
   enclos: [0, "#b7a578", null, 0], sanctuaire: [0, "#c8b689", null, 0], villa: [0, "#8aa85c", null, 0], amphi: [0, "#cdb68b", null, 0],
 };
 
@@ -192,7 +193,8 @@ function tissu(P, v, eau, urbain) {
     ? (x, y) => { const u = (x - cx) * co + (y - cy) * si, w = -(x - cx) * si + (y - cy) * co; return 1 - Math.max(Math.abs(u), Math.abs(w) * 1.2) / (R * 0.9 * (0.9 + 0.2 * bruit(x, y, 0.4, g % 97))); }
     : (x, y) => {
       const d = D(x, y), b = 1 - d / (R * forme(x, y));
-      return (ere === "moderne" || ere === "futur") && b <= 0 && d < 1.6 * R && urbain(x, y) ? 0.15 * (1 - d / (1.6 * R)) : b;
+      const lu = 2 * R * forme(x, y);  // banlieues : là où le sol est urbain, jusqu'à une limite irrégulière
+      return (ere === "moderne" || ere === "futur") && b <= 0 && d < lu && urbain(x, y) ? 0.15 * (1 - d / lu) : b;
     };
   const fa = (x, y) => { let m = 0; for (const a of axes) m = Math.max(m, 1 - ecart(a, x, y) / 0.1); return m * (1 - D(x, y) / B); };
   if (v.murs && !romaine) {  // enceinte : courtines droites entre des angles irréguliers
@@ -207,14 +209,14 @@ function tissu(P, v, eau, urbain) {
     lignes.push({ pts, demi: kind === "mur" ? 0.011 : 0.015, kind });
   }
   const s0 = romaine ? 0.075 : 0.05;
-  const lim = R * (ere === "moderne" || ere === "futur" ? 1.6 : 1.3) + 0.1;
+  const lim = R * (ere === "moderne" || ere === "futur" ? 2.5 : 1.3) + 0.1;
   const esp = (d, fin = false) => {
     if (!fin && d > lim) return 0.25;  // hors de la ville : graines lâches, qui ne servent que de voisines
     if (romaine) return 0.075;
     if (d < Rh || ere === "classique") return Math.min(0.09, 0.05 + (0.035 * d) / Math.max(Rh, 0.1));
     if (ere === "industrielle") return 0.08;
-    if (ere === "moderne") return d < Ri ? 0.085 : 0.13;
-    return d < 0.5 * R ? 0.1 : 0.12;
+    if (ere === "moderne") return d < Ri ? 0.085 : d < 1.2 * R ? 0.13 : 0.17;
+    return d < 0.5 * R ? 0.1 : d < 1.2 * R ? 0.12 : 0.17;
   };
   const deform = (d) => (romaine ? 0 : d < Rh || ere === "classique" ? 0.45 : ere === "moderne" && d > Ri ? 0.35 : 0.12);
 
@@ -490,6 +492,17 @@ const palVieux = (ere, r) => {
   return pal(k < 0.55 ? "canal" : k < 0.8 ? "tuile" : k < 0.92 ? "ardoise" : "zinc", r);
 };
 
+// Jardins en lanières (potagers, vergers) et haies sur les côtés qui donnent sur la campagne
+function jardins(x, poly) {
+  const { o, r, il } = x, cd = cadre(poly), n = Math.max(1, Math.min(4, Math.round(cd.a / 0.012)));
+  for (let k = 0; k < n; k++) {
+    const t = ((k + 0.5) / n - 0.5) * 2 * cd.a, c = [cd.c[0] + cd.u[0] * t, cd.c[1] + cd.u[1] * t], q = r();
+    if (q < 0.55) potager(o, c, [-cd.u[1], cd.u[0]], cd.b * 0.75, (cd.a / n) * 0.4, r);
+    else if (q < 0.8) for (let j = -2; j <= 2; j++) o.push(["a", c[0] - cd.u[1] * j * cd.b * 0.3, c[1] + cd.u[0] * j * cd.b * 0.3, 0.0032, BOIS[4]]);  // verger
+  }
+  il.bloc.forEach((a, i) => { if (il.kinds[i] === "bord") o.push(["l", "#4f7a3a", 0.0018, [a, il.bloc[(i + 1) % il.bloc.length]], false]); });
+}
+
 const REMPLIR = {
   vieux(x) {
     x.o.push(["s", QUARTIERS.vieux[1], x.il.bloc]);
@@ -497,17 +510,14 @@ const REMPLIR = {
   },
   faubourg(x) {
     x.o.push(["s", QUARTIERS.faubourg[1], x.il.bloc]);
-    const inn = perimetre(x, { D: 0.013, w: [0.011, 0.02], vide: 0.35, prof: [0.7, 1], pal: (r) => pal(r() < 0.8 ? "canal" : "tuile", r), h: 0.007, cotes: RUES });
-    const cd = cadre(inn ?? x.il.bloc);
-    if (cd.a > 0.012 && cd.b > 0.008) potager(x.o, cd.c, cd.u, cd.a * 0.55, cd.b * 0.5, x.r);
-    arbres(x.o, inn ?? x.il.bloc, x.r, 3);
+    const inn = perimetre(x, { D: 0.013, w: [0.01, 0.017], vide: 0.18, prof: [0.7, 1], pal: (r) => pal(r() < 0.8 ? "canal" : "tuile", r), h: 0.007, cotes: RUES });
+    jardins(x, inn ?? x.il.bloc);
   },
   maraichers(x) {
     const { o, r } = x, cd = cadre(x.il.bloc);
     o.push(["s", QUARTIERS.maraichers[1], x.il.bloc]);
-    for (let k = -1; k <= 1; k += 2) if (r() < 0.8) potager(o, [cd.c[0] + cd.u[0] * k * cd.a * 0.4, cd.c[1] + cd.u[1] * k * cd.a * 0.4], cd.u, cd.a * 0.32, cd.b * 0.55, r);
-    if (r() < 0.6) maison(o, [cd.c[0] - cd.u[1] * cd.b * 0.7, cd.c[1] + cd.u[0] * cd.b * 0.7], cd.u, 0.006, 0.004, pal("canal", r), 0.005);
-    arbres(o, x.il.bloc, r, 3);
+    if (r() < 0.6) maison(o, [cd.c[0] - cd.u[1] * cd.b * 0.6, cd.c[1] + cd.u[0] * cd.b * 0.6], cd.u, 0.007, 0.005, pal("canal", r), 0.006);
+    jardins(x, interieur(x.il.bloc, 0.004) ?? x.il.bloc);
   },
   place(x) {
     const { o, il, r, P } = x, cd = cadre(il.bloc);
@@ -961,8 +971,9 @@ if (typeof process !== "undefined" && process.argv[1]?.endsWith("villes.js")) {
   verifier("industrielle", 143000);
   verifier("moderne", 221000); verifier("moderne", 300);
   verifier("futur", 299000);
-  const t = Date.now(), paris = { x: 0, y: 0, pop: 2.4e6, ere: "futur", r: rayon(2.4e6, "futur"), rh: rayon(630000, "classique"), ri: rayon(1.2e6, "industrielle"), graine: 7, axes, rivieres: [riviere], murs: true };
-  const pl = genererPlan(paris, eau);
-  console.log(`Paris 2100 : ${pl.ilots.length} îlots en ${Date.now() - t} ms`);
-  console.assert(Date.now() - t < 1500, "génération trop lente");
+  // pire cas : Paris en 2100, tout le sol alentour urbain (temps processeur, la machine peut être chargée)
+  const t = process.cpuUsage(), paris = { x: 0, y: 0, pop: 2.4e6, ere: "futur", r: rayon(2.4e6, "futur"), rh: rayon(630000, "classique"), ri: rayon(1.2e6, "industrielle"), graine: 7, axes, rivieres: [riviere], murs: true };
+  const pl = genererPlan(paris, eau, () => true), ms = process.cpuUsage(t).user / 1000;
+  console.log(`Paris 2100 : ${pl.ilots.length} îlots en ${Math.round(ms)} ms de calcul`);
+  console.assert(ms < 1500, "génération trop lente");
 }

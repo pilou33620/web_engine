@@ -3,6 +3,7 @@
 relier(villes, est_terre, echelle) → entités « ligne » de style "route" (grands axes) ou "chemin" (dessertes).
 Chaque ville est reliée à ses voisines naturelles (graphe des voisins relatifs, sur les 7 plus proches), sans
 traverser la mer ; le tracé ondule un peu, comme une vraie route qui suit le terrain.
+reseaux(villes, est_terre, echelle, pole=…) → voies datées des époques : voie_romaine, voie_ferree, lgv, autoroute.
 """
 import math
 import random

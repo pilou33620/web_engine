@@ -3,6 +3,7 @@
 import { alea, trait, traitVariable, pointilles, lelong, forme, boite, semis, etiquette, nomLieu, vue, largeur } from "./outils.js";
 import { decor, terrain } from "./decor.js";
 import { routeDe, rayures, parallele, voieDePres, alignement } from "./epoque.js";
+import * as epoques from "./epoque.js";
 
 const decorAerien = decor("aerienne", { force: 0.18 });
 let avecSol = false;
@@ -72,7 +73,7 @@ function autorouteAerienne(g, e) {
 
 // Voie romaine : dalles de pierre claire, rectiligne
 function voieRomaineAerienne(g, e) {
-  const z = vue.zoom, w = largeur(8 / vue.echelle, 1.6);
+  const z = vue.zoom, w = largeur(8 / vue.echelle, 2.2);
   trait(g, e.points, { width: w + 1.2 / z, color: 0x6e6450, alpha: 0.7 });
   trait(g, e.points, { width: w, color: 0xc4b89c });
   if (w * z > 5) rayures(g, e.points, "paves", w / 2, 0x8a7e66, { width: w, alpha: 0.6 });
@@ -83,6 +84,19 @@ function libelle(e, sous = "") {
   lab.position.set(e.x, e.y + (e.taille ?? 40) * 0.8 + 14);
   return lab;
 }
+
+// Pictogrammes des villes vus du dessus (aplats, à l'échelle de l'écran) selon l'ère ; taille 0 à 2 selon la population
+const toitsVus = (g, liste, c) => { for (const [x, y, w, h] of liste) g.rect(x + 1, y + 1.5, w, h).fill({ color: 0x000000, alpha: 0.3 }).rect(x, y, w, h).fill(c).rect(x, y + h / 2 - 0.5, w, 1).fill({ color: 0x000000, alpha: 0.25 }); };
+const hutteVue = (g, x, y, r) => g.circle(x + 1, y + 1.5, r).fill({ color: 0x000000, alpha: 0.3 }).circle(x, y, r).fill(0xb4954f).circle(x - r * 0.25, y - r * 0.3, r * 0.6).fill(0xd2b56e).circle(x, y, r * 0.18).fill(0x5e4a2c);
+const platsVus = (g, liste) => { for (const [x, y, w, h, c] of liste) g.rect(x + 1.5, y + 2, w, h).fill({ color: 0x000000, alpha: 0.3 }).rect(x, y, w, h).fill(c).rect(x, y, w, h).stroke({ width: 1, color: 0xffffff, alpha: 0.35 }); };
+const ICONES_VILLE = {
+  celte: (g, n) => { if (n) g.circle(0, 0, 9 + 4 * n).stroke({ width: 2, color: 0x6e5636 }); hutteVue(g, 0, 0, 5); if (n) { hutteVue(g, -6, 4, 3.5); hutteVue(g, 6, -3, 3.5); } if (n > 1) hutteVue(g, 5, 7, 3); },
+  romaine: (g, n) => { const s = 8 + 3 * n; g.rect(-s + 1, -s + 1.5, 2 * s, 2 * s).fill({ color: 0x000000, alpha: 0.3 }).rect(-s, -s, 2 * s, 2 * s).fill(0xc0704c).rect(-s / 2, -s / 2, s, s).fill(0xe2d5b2).rect(-s / 4, -s / 4, s / 2, s / 2).fill(0x7fa55a); },
+  classique: (g, n) => { toitsVus(g, [[-9, -6, 9, 6], [1, -8, 7, 9], [-7, 2, 12, 5], ...(n ? [[6, 3, 7, 7], [-14, -3, 5, 8]] : [])], 0xb5553f); g.circle(-1, -1, 2.5 + n * 0.5).fill(0x6f7f8f); },
+  industrielle: (g, n) => { toitsVus(g, [[-10, -7, 8, 6], [-12, 1, 10, 5], [-1, 4, 7, 5]], 0xa8473a); platsVus(g, [[0, -9, 12, 11, 0x8f8b84]]); g.circle(10, 6, 2 + n * 0.5).fill(0x8c4a36).circle(10, 6, 1).fill(0x2c2622); },
+  moderne: (g, n) => platsVus(g, [[-11, -8, 8, 15, 0xd8d6d0], [-1, -10, 12, 6, 0xc8ccd0], [-1, -2, 6, 10, 0xb9bfc4], ...(n ? [[7, -2, 6, 6, 0xdedbd2]] : [])]),
+  futur: (g, n) => { platsVus(g, [[-11, -9, 9, 9, 0x86b862], [0, -11, 10, 10, 0x2f4a6a], [-9, 2, 10, 8, 0x7f9bb3], ...(n ? [[3, 1, 8, 8, 0x86b862]] : [])]); g.circle(-12, 9, 3).fill(0x5f9a48); },
+};
 
 export const aerienne = {
   nom: "Vue aérienne", css: "aerienne", fond: 0x55703f, base: 0xa89668, unitesTailleFixe: false,
@@ -155,8 +169,9 @@ export const aerienne = {
   // Un bâtiment rend { dessin, etiquette?, animer?(dt, contexte) }
   batiment: {
     ville(e) {
-      // Emprise bâtie (taille = diamètre en unités) ; vieux bourg de tuiles ou ville moderne de béton et de rues
-      const t = e.taille ?? 60, R = t / 2, r = alea(e.id), moderne = vue.epoque === "moderne";
+      // Emprise bâtie (taille = diamètre en unités, selon l'année) ; vieux bourg de tuiles ou ville moderne de béton et de rues
+      const er = epoques.ere(), f = epoques.facteurPopulation(), moderne = er === "moderne" || er === "futur";
+      const t = (e.taille ?? 60) * Math.sqrt(f), R = t / 2, r = alea(e.id);
       const g = new P.Graphics().ellipse(e.x, e.y, R * 1.05, R * 0.85).fill({ color: moderne ? 0x9a9a96 : 0xb9ad8c, alpha: 0.9 });
       const toits = moderne ? [0x6f7378, 0x8a8e94, 0xc8c6c0, 0x5f6a74, 0xb0aaa0] : [0xa8473a, 0x9a5a3a, 0xb5653f, 0x6f7f8f, 0x8c4a34];
       const nb = Math.round(8 + 4 * Math.sqrt(t)), b = R / (moderne ? 4 : 5);
@@ -173,7 +188,13 @@ export const aerienne = {
         g.stroke({ width: Math.max(R / 40, 0.6 / vue.zoom), color: 0x4a4a4a, alpha: 0.6 });
       }
       if (avecSol) g.clear();  // la ville est peinte dans l'occupation du sol (cases « u »)
-      return { dessin: g, etiquette: libelle(e) };
+      // à l'écran : pictogramme de l'ère et nom dessous
+      const lab = new P.Container(), icone = new P.Graphics(), nom = libelle(e), pop = (e.population ?? 2000) * f;
+      ICONES_VILLE[er](icone, pop > 50000 ? 2 : pop > 5000 ? 1 : 0);
+      nom.position.set(0, 24);
+      lab.addChild(icone, nom);
+      lab.position.set(e.x, e.y);
+      return { dessin: g, etiquette: lab };
     },
     eolienne(e) {
       const c = new P.Container();

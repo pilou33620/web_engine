@@ -3,6 +3,7 @@
 import { alea, trait, traitVariable, pointilles, lelong, forme, boite, etiquette, nomLieu, vue, largeur } from "./outils.js";
 import { decor, terrain, MER_LARGE } from "./decor.js";
 import { routeDe, rayures, voieDePres, alignement } from "./epoque.js";
+import * as epoques from "./epoque.js";
 
 const P = window.PIXI;
 export const SERIF = "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif";
@@ -288,7 +289,7 @@ function routeCarte(g, e, metres, px) {
   const w = largeur(metres / vue.echelle, px), grand = metres > 10, z = vue.zoom;
   let aspect = routeDe();
   if (aspect === "empierree" && !grand) aspect = "terre";  // seules les routes royales sont empierrées
-  if (aspect === "sentier") return rayures(g, e.points, "moitie", 7 / z, 0x5a3c22, { width: w, alpha: grand ? 0.9 : 0.7 });
+  if (aspect === "sentier") return rayures(g, e.points, "moitie", 9 / z, 0xe6d3a0, { width: w * 1.2, alpha: grand ? 0.95 : 0.75 });
   if (aspect === "terre") return trait(g, e.points, { width: w, color: 0xe9dcb4, alpha: grand ? 0.85 : 0.6 });
   const [bord, fort, faible] = { empierree: [0x4a3624, 0xf3e6c2], goudron: [0x3a3030, 0xe8b850, 0xf2ead6],
     moderne: [0x3a3030, 0xd0503a, 0xf2ead6], verte: [0x2c4424, 0xc9d68a, 0xd8e6b4] }[aspect];
@@ -319,14 +320,14 @@ function autorouteCarte(g, e) {
 
 // Voie romaine : chaussée pavée ocre, rectiligne, bordée d'encre ; de près, les dalles
 function voieRomaineCarte(g, e) {
-  const z = vue.zoom, w = largeur(8 / vue.echelle, 1.8);
+  const z = vue.zoom, w = largeur(8 / vue.echelle, 2.4);
   trait(g, e.points, { width: w + 1.4 / z, color: 0x4a3020, alpha: 0.85 });
   trait(g, e.points, { width: w, color: 0xcfa86c });
   if (w * z > 5) rayures(g, e.points, "paves", w / 2, 0x7a5a3a, { width: w, alpha: 0.6 });
 }
 
-// Icônes de lieux habités, à l'échelle de l'écran, selon l'époque (vue.epoque) et le rang de la ville.
-// Ancien : 0 hameau, 1 bourg à clocher, 2 ville à château
+// Icônes de lieux habités, à l'échelle de l'écran, selon l'ère (epoque.js) et le rang de la ville.
+// Classique : 0 hameau, 1 bourg à clocher, 2 ville à château
 const ICONES = [
   (g) => g.rect(-6, -3, 12, 8).fill(CREME).stroke({ width: 1.3, color: ENCRE })
     .poly([-8, -3, 0, -10, 8, -3]).fill(ROUGE).stroke({ width: 1.3, color: ENCRE }),
@@ -358,6 +359,54 @@ const ICONES_MODERNES = [
   (g) => { immeuble(g, -12, 7, 8, 11); immeuble(g, -3, 7, 8, 17); immeuble(g, 6, 7, 7, 9); },
   (g) => { immeuble(g, -16, 7, 7, 13); immeuble(g, -8, 7, 8, 24); immeuble(g, 1, 7, 7, 30); immeuble(g, 9, 7, 7, 17); },
 ];
+// Celte : hutte ronde au toit de chaume ; village palissadé ; oppidum sur sa levée de terre
+const CHAUME = 0xc9a85a, TRAIT = { width: 1.2, color: ENCRE };
+const hutte = (g, x, y, s = 1) => g.rect(x - 5 * s, y - 3 * s, 10 * s, 7 * s).fill(0xb89a6a).stroke(TRAIT)
+  .poly([x - 7.5 * s, y - 2 * s, x, y - 12 * s, x + 7.5 * s, y - 2 * s]).fill(CHAUME).stroke(TRAIT).rect(x - 1.3 * s, y, 2.6 * s, 4 * s).fill(ENCRE);
+const palissade = (g, x0, x1, y) => { for (let x = x0; x <= x1; x += 2.5) g.moveTo(x, y).lineTo(x, y - 5); g.stroke({ width: 1.4, color: 0x5a4630 }); };
+// Romaine : temple à fronton et colonnes
+const temple = (g, x, s) => {
+  g.rect(x - 11 * s, 4 * s, 22 * s, 4 * s).fill(CREME).stroke(TRAIT);
+  for (let k = -8; k <= 8; k += 4) g.rect(x + (k - 1) * s, -6 * s, 2 * s, 10 * s).fill(CREME).stroke({ width: 1, color: ENCRE });
+  g.rect(x - 11 * s, -8 * s, 22 * s, 2.5 * s).fill(CREME).stroke(TRAIT).poly([x - 12 * s, -8 * s, x, -15 * s, x + 12 * s, -8 * s]).fill(ROUGE).stroke(TRAIT);
+};
+// Industrielle : usine à sheds et cheminée qui fume
+const usine = (g, x, y) => {
+  g.poly([x - 9, y, x - 9, y - 7, x - 4, y - 11, x - 4, y - 7, x + 1, y - 11, x + 1, y - 7, x + 6, y - 11, x + 6, y]).fill(0x9a8a78).stroke(TRAIT);
+  g.rect(x + 7, y - 20, 4, 20).fill(0x9a4a36).stroke(TRAIT).circle(x + 10, y - 24, 3).circle(x + 14, y - 28, 4).fill({ color: 0x8a8a8a, alpha: 0.6 });
+};
+// Futur : tours vertes (terrasses plantées, toit végétal)
+const tourVerte = (g, x, y, w, h) => {
+  g.roundRect(x, y - h, w, h, 2).fill(0xe2ebe6).stroke(TRAIT);
+  for (let yy = y - h + 4; yy < y - 2; yy += 4) g.rect(x + 1.5, yy, w - 3, 1.4).fill(0x5d8aa8);
+  for (let yy = y - h + 7; yy < y - 4; yy += 9) g.ellipse(x + (yy % 2 ? w : 0), yy, 2.6, 1.8).fill(0x5f9a48);
+  g.ellipse(x + w / 2, y - h, w / 2 + 1, 2.4).fill(0x6fae52).stroke({ width: 1, color: ENCRE });
+};
+const ICONES_ERES = {
+  celte: [
+    (g) => hutte(g, 0, 2),
+    (g) => { hutte(g, -6, 3, 0.85); hutte(g, 6, 2); palissade(g, -14, 14, 9); },
+    (g) => { g.poly([-19, 9, -15, 2, 15, 2, 19, 9]).fill(0x8f7a52).stroke(TRAIT); palissade(g, -15, 15, 3); hutte(g, -8, -3, 0.8); hutte(g, 7, -4); hutte(g, 0, -9, 0.7); },
+  ],
+  romaine: [
+    (g) => g.rect(-8, -2, 16, 8).fill(CREME).stroke(TRAIT).poly([-10, -2, 0, -7, 10, -2]).fill(ROUGE).stroke(TRAIT)
+      .moveTo(-4, 6).lineTo(-4, 0).moveTo(0, 6).lineTo(0, 0).moveTo(4, 6).lineTo(4, 0).stroke({ width: 1, color: ENCRE }),
+    (g) => temple(g, 0, 0.85),
+    (g) => { temple(g, 4, 1); g.rect(-20, -9, 10, 17).fill(CREME).stroke(TRAIT).roundRect(-17.5, -3, 5, 11, 2.5).fill(ENCRE); },
+  ],
+  classique: ICONES,
+  industrielle: [
+    ICONES[1],
+    (g) => { ICONES[1](g); usine(g, -14, 7); },
+    (g) => { usine(g, -6, 7); usine(g, 9, 7); g.rect(-17, -8, 6, 15).fill(CREME).stroke(TRAIT).poly([-18, -8, -14, -20, -10, -8]).fill(0x5a4632).stroke(TRAIT); },
+  ],
+  moderne: ICONES_MODERNES,
+  futur: [
+    (g) => g.rect(-8, -2, 13, 8).fill(0xefe9de).stroke(TRAIT).poly([-9, -2, -4, -8, 6, -8, 6, -2]).fill(0x2f4a6a).stroke(TRAIT).circle(10, 0, 4.5).fill(0x5f9a48).stroke({ width: 1, color: ENCRE }),
+    (g) => { tourVerte(g, -10, 7, 8, 18); tourVerte(g, 0, 7, 9, 26); },
+    (g) => { tourVerte(g, -17, 7, 7, 16); tourVerte(g, -8, 7, 8, 30); tourVerte(g, 2, 7, 8, 36); tourVerte(g, 12, 7, 7, 20); },
+  ],
+};
 
 const compact = new Intl.NumberFormat("fr-FR", { notation: "compact", maximumFractionDigits: 1 });
 const habitants = (n) => (n >= 10000 ? compact.format(n) : n.toLocaleString("fr-FR"));
@@ -428,8 +477,9 @@ export const carte = {
 
   batiment: {
     ville(e) {
-      // Au sol : la tache bâtie (emprise réelle) ; à l'écran : icône de l'époque, nom et population
-      const g = new P.Graphics(), r = alea(e.id), t = e.taille ?? 60, n = rangs(e), moderne = vue.epoque === "moderne";
+      // Au sol : la tache bâtie (emprise de l'année) ; à l'écran : icône de l'ère, nom et population de l'année
+      const er = epoques.ere(), f = epoques.facteurPopulation(), moderne = er === "moderne" || er === "futur";
+      const g = new P.Graphics(), r = alea(e.id), t = (e.taille ?? 60) * Math.sqrt(f), n = rangs(e);
       const ilots = Math.round(6 + 3 * Math.sqrt(t)), b = t / 7;
       for (let i = 0; i < ilots; i++) {
         const a = r() * Math.PI * 2, d = Math.sqrt(r()) * t * 0.42;
@@ -439,12 +489,12 @@ export const carte = {
       if (avecSol) g.clear();  // la ville est peinte dans l'occupation du sol (cases « u »)
       const lab = new P.Container();
       const icone = new P.Graphics();
-      (moderne ? ICONES_MODERNES : ICONES)[n](icone);
+      ICONES_ERES[er][n](icone);
       const nom = n === 2 || e.prefecture ? cartouche(e.nom, n === 2 ? 14 : 12, e.prefecture) : nomVillage(e.nom, n);
       nom.y = n === 2 || e.prefecture ? 22 : 16;
       lab.addChild(icone, nom);
       if (e.population != null && n === 2) {
-        const pop = pastille(habitants(e.population));
+        const pop = pastille(habitants(Math.round((e.population * f) / 100) * 100));
         pop.position.set(nom.width / 2 + pop.width / 2 - 2, 22 - nom.height / 2 - 2);
         lab.addChild(pop);
       }

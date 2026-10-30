@@ -232,7 +232,7 @@ export class Details {
         const eau = (x, y) => code(x, y) === "." || v.rivieres.some(({ pts, ws }) => pts.some((p, k) => {
           if (!k) return false;
           const a = pts[k - 1], dx = p[0] - a[0], dy = p[1] - a[1], t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy || 1)));
-          return Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy) < Math.max(ws[k - 1], ws[k]) + 0.006;
+          return Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy) < ws[k - 1] + (ws[k] - ws[k - 1]) * t + 0.006;
         }));
         this.plans.set(v, (plan = genererPlan(v, eau, (x, y) => code(x, y) === "u")));
       }

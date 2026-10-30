@@ -1,3 +1,4 @@
+import { facteurPopulation } from "./themes/epoque.js";
 // Rendu du climat : lumière du soleil, couleurs des saisons, neige au sol, crues, ombres de nuages
 // poussées par le vent, pluie / neige / orage, brouillard, éclairs, éclairage des villes la nuit.
 // Toutes les valeurs viennent de la physique du serveur (moteur/climat.py).
@@ -57,7 +58,7 @@ export class ClimatRendu {
     for (const v of carte.entites.filter((e) => e.lumiere)) {  // entités qui s'éclairent la nuit
       const g = new P.Graphics();
       // halo à la taille de la ville (et non fixe, sinon il couvre l'écran au fort zoom)
-      const R = 0.8 * (v.taille ?? 0.5 * Math.sqrt(v.population ?? 2000));
+      const R = 0.5 * Math.sqrt(facteurPopulation()) * (v.taille ?? 0.5 * Math.sqrt(v.population ?? 2000));
       for (const k of [1, 0.68, 0.41, 0.2]) g.circle(v.x, v.y, R * k).fill({ color: 0xffb25a, alpha: 0.13 });
       this.lumieres.addChild(g);
     }
