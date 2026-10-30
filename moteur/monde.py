@@ -45,6 +45,8 @@ class Monde:
         self.entites, self.ressources, self.evenements = {}, {}, []
         self.version_carte, self._compteur = 0, 0
         self.decisions, self.relief, self.occupation = {}, None, None
+        # Année du rendu : Regles.ANNEE, ou l'ancien réglage EPOQUE ("ancien" = 1790, "moderne" = 2000)
+        self.annee = getattr(regles, "ANNEE", {"ancien": 1790, "moderne": 2000}.get(getattr(regles, "EPOQUE", ""), 1790))
         # Un jeu règle son climat avec un dict CLIMAT (latitude, normales, zones), voir moteur/climat.py
         self.climat = Climat(self.rng, self.horloge.date, **getattr(regles, "CLIMAT", {}))
         self.climat.avancer(self.horloge.date, self.horloge.heure - 1, 1)  # météo de l'heure de départ
@@ -158,7 +160,7 @@ class Monde:
     def carte(self):
         r = self.regles
         return {"version": self.version_carte, "taille": self.taille, "echelle": self.echelle, "titre": getattr(r, "TITRE", ""),
-                "epoque": getattr(r, "EPOQUE", "ancien"),  # "ancien" ou "moderne" : dessin des villes et des routes
+                "annee": self.annee,  # année du rendu (époque) : villes, routes, réseaux, véhicules
                 "entites": [e for e in self.entites.values() if not e["mobile"]],
                 "constructions": getattr(r, "CONSTRUCTIONS", []), "vues": getattr(r, "VUES", []),
                 "tutoriel": getattr(r, "TUTORIEL", []), "relief": self.relief,

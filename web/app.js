@@ -8,8 +8,9 @@ import * as minicarte from "./moteur/minicarte.js";
 import * as construction from "./moteur/construction.js";
 import * as decisions from "./moteur/decisions.js";
 import * as tutoriel from "./moteur/tutoriel.js";
+import * as trafic from "./moteur/trafic.js";
 
-const MODULES = [vues, minicarte, construction, decisions, tutoriel];
+const MODULES = [vues, minicarte, construction, decisions, tutoriel, trafic];
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const memo = {

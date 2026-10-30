@@ -1,7 +1,10 @@
 // Module de l'Atlas : choisir une carte toute faite ou en générer une avec des réglages.
 // Branché par app.js comme les modules du moteur (installer(ctx)).
 
+import { ANNEES } from "/moteur/themes/epoque.js";
+
 const NOMS = { france: "France", aquitaine: "Aquitaine" };
+const libelleAnnee = (a) => (a < 0 ? `${-a} av. J.-C.` : String(a));
 
 export async function installer(ctx) {
   const { esc } = ctx;
@@ -12,8 +15,9 @@ export async function installer(ctx) {
   section.className = "atlas";
   section.innerHTML = `<h3>Carte</h3>
     <div class="choix">${res.cartes.map((c) => `<button data-carte="${esc(c)}">${esc(NOMS[c] ?? c)}</button>`).join("")}</div>
-    <h3>Époque</h3>
-    <div class="choix"><button data-epoque="ancien">Ancienne</button><button data-epoque="moderne">Moderne</button></div>
+    <h3>Époque : <output id="atlas-annee">${ctx.carte?.annee ?? 1790}</output></h3>
+    <input type="range" id="atlas-curseur" min="0" max="${ANNEES.length - 1}" step="1"
+      value="${Math.max(0, ANNEES.indexOf(ctx.carte?.annee ?? 1790))}" style="width:100%;accent-color:var(--accent)">
     ${res.reglages.length ? `<details><summary>Générer une carte</summary>
       ${[...groupes].map(([groupe, liste]) => `<fieldset><legend>${esc(groupe ?? "")}</legend>${liste.map(champ).join("")}</fieldset>`).join("")}
       <div class="choix"><button data-generer="hasard">🎲 Au hasard</button><button data-generer="oui">Générer</button></div>
@@ -38,7 +42,20 @@ export async function installer(ctx) {
       <input id="${id}" type="range" data-reglage="${esc(r.id)}" min="${r.min}" max="${r.max}" step="${r.pas ?? 1}" value="${r.defaut}"></label>`;
   }
 
+  // Curseur d'année (sans Moyen Âge) : affichage en direct, envoi au serveur quand on lâche
+  const curseur = section.querySelector("#atlas-curseur"), sortieAnnee = section.querySelector("#atlas-annee");
+  sortieAnnee.textContent = libelleAnnee(ANNEES[curseur.value]);
+  curseur.addEventListener("input", () => (sortieAnnee.textContent = libelleAnnee(ANNEES[curseur.value])));
+  curseur.addEventListener("change", () => ctx.action("annee", { valeur: ANNEES[curseur.value] }));
+
+  ctx.surCarte((carte) => {
+    const i = ANNEES.indexOf(carte.annee);
+    if (i >= 0) curseur.value = i;
+    sortieAnnee.textContent = libelleAnnee(carte.annee);
+  });
+
   section.addEventListener("input", (e) => {
+    if (e.target === curseur) return;
     const sortie = e.target.parentElement.querySelector("output");
     if (sortie) sortie.textContent = e.target.value;
   });
@@ -59,7 +76,6 @@ export async function installer(ctx) {
     const b = e.target.closest("button");
     if (!b) return;
     if (b.dataset.carte) return changer(b.dataset.carte);
-    if (b.dataset.epoque) return ctx.action("epoque", { valeur: b.dataset.epoque });
     if (b.dataset.generer === "hasard") {
       const graine = section.querySelector('[data-reglage="graine"]');
       if (graine) graine.value = Math.floor(Math.random() * Number(graine.max || 99999));

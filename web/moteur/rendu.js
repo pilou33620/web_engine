@@ -3,6 +3,7 @@
 import { ClimatRendu } from "./climat.js";
 import { centre, vue } from "./themes/outils.js";
 import { Details } from "./themes/details.js";
+import { existe } from "./themes/epoque.js";
 import { Effets } from "./effets.js";
 
 const P = window.PIXI;
@@ -107,7 +108,8 @@ export class Rendu {
       for (const enfant of this.calques[nom].removeChildren()) enfant.destroy({ children: true });
     }
     this.animations = [];
-    Object.assign(vue, { zoom: this.zoom, echelle: carte.echelle ?? 1, epoque: carte.epoque ?? "ancien" });
+    const annee = carte.annee ?? 1790;
+    Object.assign(vue, { zoom: this.zoom, echelle: carte.echelle ?? 1, annee, epoque: annee >= 1945 ? "moderne" : "ancien" });
     this.lignes = [];  // [graphique, entité, dessin] : retracées quand le zoom change (épaisseur à l'écran)
     const [L, H] = carte.taille;
     this.calques.base.addChild(new P.Graphics().rect(0, 0, L, H).fill(t.base));
@@ -129,6 +131,7 @@ export class Rendu {
     const graphiqueLigne = (nom, e) => graphique(`${nom}|ligne`, e, nom);
     const objets = [];  // bâtiments et étiquettes, masqués eux aussi hors de l'écran
     for (const e of carte.entites) {
+      if (!existe(e, annee)) continue;  // pas encore construite, ou déjà disparue, à cette année
       const calque = this.calques[e.calque] ? e.calque : CALQUE_PAR_DEFAUT[e.type] ?? "sol";
       const dessin = dessinateur(t, e);
       if (!dessin) continue;

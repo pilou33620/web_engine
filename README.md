@@ -44,7 +44,7 @@ Créer `jeux/mon_jeu/regles.py` avec une classe `Regles` :
 | `vue(monde, id)` + `VUES` | optionnel : cartes de données `{id_entite: 0..1}` coloriées sur la carte |
 | `CONSTRUCTIONS`, `peut_construire`, `construit` | optionnel : ce que le joueur peut construire (voir moteur/construction.py) |
 | `TITRE`, `CLIMAT`, `TUTORIEL` | optionnels : nom du jeu, climat, étapes du tutoriel guidé |
-| `EPOQUE` | optionnel : `"ancien"` (défaut : bourgs, châteaux, chemins de terre) ou `"moderne"` (immeubles, tours, routes goudronnées) |
+| `ANNEE` | optionnel : année du rendu (défaut 1790), de l'Antiquité (-100) à 2100, sans Moyen Âge : villes, routes, réseaux, véhicules et campagne suivent l'époque (voir `web/moteur/themes/epoque.js`) |
 
 ### Entités universelles
 

@@ -14,7 +14,8 @@ export function alea(id) {
 }
 
 // Ce que les thèmes savent de la vue au moment du dessin (rendu.js le tient à jour)
-export const vue = { zoom: 1, echelle: 1, epoque: "ancien" };
+// annee : l'année du rendu (voir epoque.js) ; epoque : raccourci "ancien" (avant 1945) ou "moderne"
+export const vue = { zoom: 1, echelle: 1, annee: 1790, epoque: "ancien" };
 // Largeur d'un trait : sa vraie largeur (unités du monde), mais jamais moins de px pixels à l'écran
 export const largeur = (unites, px) => Math.max(unites, px / vue.zoom);
 
