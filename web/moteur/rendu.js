@@ -317,8 +317,8 @@ export class Rendu {
 
   zoomer(facteur, cx, cy) {
     const avant = this.versMonde(cx, cy);
-    // Zoom maximal : ~130 px/km sur les grandes cartes (arbres et champs détaillés), au moins ×6
-    this.zoom = Math.min(Math.max(6, 0.13 * (this.carte?.echelle ?? 1)), Math.max(0.15, this.zoom * facteur));
+    // Zoom maximal : ~500 px/km sur les grandes cartes (maisons visibles), au moins ×6
+    this.zoom = Math.min(Math.max(6, 0.5 * (this.carte?.echelle ?? 1)), Math.max(0.15, this.zoom * facteur));
     this.monde.scale.set(this.zoom);
     const apres = this.monde.toGlobal(avant);
     this.monde.x += cx - apres.x;

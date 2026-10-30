@@ -4,6 +4,7 @@
 // Tout vient d'une grille absolue en km : deux tuiles voisines se raccordent sans couture.
 import { paysage, bruit, SOLS, hash, parcelles, culture } from "./decor.js";
 import { vue } from "./outils.js";
+import { genererPlan, dessinerPlan } from "./villes.js";
 
 const P = window.PIXI;
 const TUILE = 256, CACHE = 96, SEUIL = 14;
@@ -19,11 +20,28 @@ export class Details {
     this.horloge = 0;
     // villes dessinées en plan : centre et rayon en km
     // rayon du plan (km) : villes serrées d'autrefois, agglomérations étalées d'aujourd'hui
-    const moderne = vue.epoque === "moderne";
+    const moderne = vue.epoque === "moderne", km = this.km;
+    this.epoque = moderne ? "moderne" : "ancien";
+    this.plans = new Map();
+    // rivières (km) pour garder l'eau libre de maisons : segments et demi-largeur
+    this.rivieres = carte.entites.filter((e) => e.style === "riviere").map((e) => {
+      const l = Array.isArray(e.largeur) ? Math.max(...e.largeur) : e.largeur ?? 2;
+      const pts = e.points.map(([x, y]) => [x * km, y * km]);
+      const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+      return { pts, w: Math.max(0.03, (l * km) / 2), boite: [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)] };
+    });
+    // les routes qui arrivent à chaque ville donnent ses axes
+    const bouts = [];
+    for (const r of carte.entites) {
+      if (r.style !== "route" && r.style !== "chemin") continue;
+      const p = r.points;
+      bouts.push([p[0], p[1]], [p.at(-1), p.at(-2)]);
+    }
     this.villes = carte.entites.filter((e) => e.style === "ville").map((e) => ({
-      x: e.x * this.km, y: e.y * this.km,
-      r: moderne ? ((e.taille ?? 0) * this.km) / 2.2 : 0.12 * Math.sqrt((e.population ?? 2000) / 1000),
-      murs: e.prefecture || e.population > 15000, graine: e.x * 7 + e.y }));
+      x: e.x * km, y: e.y * km,
+      r: moderne ? ((e.taille ?? 0) * km) / 2.2 : 0.12 * Math.sqrt((e.population ?? 2000) / 1000),
+      axes: bouts.filter(([a]) => Math.hypot(a[0] - e.x, a[1] - e.y) < 1.5).map(([a, b]) => Math.atan2(b[1] - a[1], b[0] - a[0])),
+      murs: e.prefecture || e.population > 15000, graine: Math.round(e.x * 7 + e.y) }));
   }
 
   // Code d'occupation en un point exprimé en km
@@ -36,7 +54,7 @@ export class Details {
     const r = this.rendu, pxKm = (r.zoom * devicePixelRatio) / this.km;
     if (pxKm < SEUIL) return (this.conteneur.visible = false);
     this.conteneur.visible = true;
-    const L = 2 ** Math.min(7, Math.max(4, Math.round(Math.log2(pxKm)))), span = TUILE / L;  // px/km de la tuile, km de côté
+    const L = 2 ** Math.min(9, Math.max(4, Math.round(Math.log2(pxKm)))), span = TUILE / L;  // px/km de la tuile, km de côté
     const { width: w, height: h } = r.app.screen, a = r.versMonde(0, 0), b = r.versMonde(w, h);
     const tx0 = Math.floor((a.x * this.km) / span), tx1 = Math.floor((b.x * this.km) / span);
     const ty0 = Math.floor((a.y * this.km) / span), ty1 = Math.floor((b.y * this.km) / span);
@@ -125,115 +143,48 @@ export class Details {
     }
   }
 
-  // Villes en plan, comme web_conquete : autrefois des îlots de maisons rouges en anneaux autour de la place, coupés
-  // de rues rayonnantes, dans leurs remparts ; aujourd'hui des îlots carrés d'immeubles entre des rues en grille.
-  // Hors du plan, dans les abords bâtis (cases « u »), quelques maisons éparses.
+  // Eau pour les plans de ville : mer et lacs de l'occupation du sol, rivières (avec une marge de berge)
+  eau(x, y) {
+    if (this.P.codeA(x / this.km, y / this.km) === ".") return true;
+    for (const r of this.rivieres) {
+      const [a, b, c, d] = r.boite;
+      if (x < a - r.w || x > c + r.w || y < b - r.w || y > d + r.w) continue;
+      for (let i = 1; i < r.pts.length; i++) {
+        const [x1, y1] = r.pts[i - 1], [x2, y2] = r.pts[i], dx = x2 - x1, dy = y2 - y1;
+        const t = Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy || 1)));
+        if (Math.hypot(x - x1 - t * dx, y - y1 - t * dy) < r.w + 0.006) return true;
+      }
+    }
+    return false;
+  }
+
+  // Villes : plans organiques (villes.js), générés une fois par ville quand une tuile les montre
   batiments(g, L, x0, y0, span) {
-    const moderne = vue.epoque === "moderne";
+    const eau = (x, y) => this.eau(x, y);
     for (const v of this.villes) {
-      if (v.x + v.r < x0 - 0.2 || v.x - v.r > x0 + span + 0.2 || v.y + v.r < y0 - 0.2 || v.y - v.r > y0 + span + 0.2) continue;
-      if (moderne) this.planModerne(g, v);
-      else this.planAncien(g, v);
+      const m = v.r * 2.2;
+      if (v.x + m < x0 || v.x - m > x0 + span || v.y + m < y0 || v.y - m > y0 + span) continue;
+      let plan = this.plans.get(v);
+      if (!plan) this.plans.set(v, (plan = genererPlan(v, eau, this.epoque)));
+      dessinerPlan(g, plan, x0, y0, x0 + span, y0 + span, 1 / L, eau);
     }
-  }
-
-  planAncien(g, v) {
-    const R = Math.max(0.12, v.r), rue = 0.016, toits = ["#b5553f", "#a8473a", "#c0664a", "#9a4632"];
-    const blocs = toits.map(() => new Path2D()), ombre = new Path2D();
-    const nRues = Math.max(6, Math.round(R * 16)), pasA = 0.065;
-    for (let r0 = 0.05; r0 < R; r0 += pasA) {
-      const r1 = Math.min(R, r0 + pasA - rue), tours = Math.max(nRues, Math.round((TAU * r0) / 0.15));
-      for (let k = 0; k < tours; k++) {
-        if (hash(Math.round(r0 * 100), k, v.graine | 0) < 0.12 + 0.25 * (r0 / R) ** 2) continue;  // jardins, plus nombreux au bord
-        const a0 = (k / tours) * TAU + rue / Math.max(r0, 0.05), a1 = ((k + 1) / tours) * TAU - rue / Math.max(r0, 0.05);
-        const p = new Path2D();
-        p.arc(v.x, v.y, r1, a0, a1);
-        p.arc(v.x, v.y, r0, a1, a0, true);
-        p.closePath();
-        blocs[Math.floor(hash(k, Math.round(r0 * 100), 7) * blocs.length)].addPath(p);
-        const o = new DOMMatrix().translate(0.006, 0.008);
-        ombre.addPath(p, o);
-      }
-    }
-    g.fillStyle = "#d8c8a4";  // terre battue des rues et de la place
-    g.beginPath();
-    g.arc(v.x, v.y, R + 0.02, 0, TAU);
-    g.fill();
-    g.fillStyle = "rgba(30,20,10,.35)";
-    g.fill(ombre);
-    blocs.forEach((p, i) => { g.fillStyle = toits[i]; g.fill(p); });
-    g.fillStyle = "#e6dcc0";  // la place, l'église
-    g.beginPath();
-    g.arc(v.x, v.y, 0.045, 0, TAU);
-    g.fill();
-    g.fillStyle = "#8a5a44";
-    g.fillRect(v.x - 0.012, v.y - 0.025, 0.024, 0.05);
-    if (v.murs) {  // remparts et tours
-      g.strokeStyle = "#ece4d0";
-      g.lineWidth = 0.014;
-      g.beginPath();
-      g.arc(v.x, v.y, R + 0.03, 0, TAU);
-      g.stroke();
-      g.fillStyle = "#f0e8d4";
-      const n = Math.max(6, Math.round(R * 14));
-      g.beginPath();
-      for (let k = 0; k < n; k++) {
-        const a = (k / n) * TAU, x = v.x + Math.cos(a) * (R + 0.03), y = v.y + Math.sin(a) * (R + 0.03);
-        g.moveTo(x + 0.02, y);
-        g.arc(x, y, 0.02, 0, TAU);
-      }
-      g.fill();
-      g.strokeStyle = "#7a6a52";
-      g.lineWidth = 0.006;
-      g.stroke();
-    }
-  }
-
-  planModerne(g, v) {
-    const R = Math.max(0.25, v.r), pas = 0.16, rue = 0.035, toits = ["#8d9196", "#a9adb0", "#c9c6bd", "#767d86", "#b7afa3"];
-    const bord = (cx, cy) => Math.hypot(cx - v.x, cy - v.y) / R + 0.18 * (bruit(cx, cy, 0.4, v.graine % 97) - 0.5);  // bords irréguliers
-    const ombre = new Path2D(), lots = toits.map(() => new Path2D());
-    for (let x = v.x - R; x < v.x + R; x += pas) {
-      for (let y = v.y - R; y < v.y + R; y += pas) {
-        const cx = x + pas / 2, cy = y + pas / 2;
-        if (bord(cx, cy) > 1) continue;
-        g.fillStyle = "#6a6b6d";  // bitume de l'îlot et de sa moitié de rue
-        g.fillRect(x, y, pas, pas);
-        const i = Math.round(x / pas), j = Math.round(y / pas);
-        if (hash(i, j, 31) < 0.08) {  // un square
-          g.fillStyle = "#6f9a52";
-          g.fillRect(x + rue / 2, y + rue / 2, pas - rue, pas - rue);
-          continue;
-        }
-        // un îlot : deux à quatre immeubles
-        const n = 2 + Math.floor(hash(i, j, 32) * 3), w = (pas - rue) / (n === 4 ? 2 : 1), h = (pas - rue) / (n >= 3 ? 2 : n);
-        for (let k = 0; k < n; k++) {
-          const bx = x + rue / 2 + (n === 4 ? (k % 2) * w : 0), by = y + rue / 2 + (n === 4 ? Math.floor(k / 2) * h : k * h);
-          const m = 0.012;
-          lots[Math.floor(hash(i * 5 + k, j, 33) * lots.length)].rect(bx + m, by + m, (n === 4 ? w : pas - rue) - 2 * m, h - 2 * m);
-          ombre.rect(bx + m + 0.01, by + m + 0.012, (n === 4 ? w : pas - rue) - 2 * m, h - 2 * m);
-        }
-      }
-    }
-    g.fillStyle = "rgba(20,20,20,.35)";
-    g.fill(ombre);
-    lots.forEach((p, i) => { g.fillStyle = toits[i]; g.fill(p); });
   }
 
   // Bois : houppiers ronds là où le fond dit forêt (et quelques arbres isolés ailleurs) ; ombre, feuillage, reflet
   arbres(g, L, x0, y0, span) {
-    const pas = 3 / L, M = Math.ceil(0.13 / pas) + 1, a2 = pas * pas;
+    // de très près, des arbres à leur vraie taille (plus petits et plus nombreux) au lieu de houppiers géants
+    const reduc = Math.max(0.15, Math.min(1, 64 / L)), pas = 3 / L, M = Math.ceil((0.13 * reduc) / pas) + 1, a2 = pas * pas;
     const gi0 = Math.floor(x0 / pas) - M, gj0 = Math.floor(y0 / pas) - M, n = Math.ceil(span / pas) + 2 * M + 1;
     const pts = [];
     for (let j = 0; j < n; j++) {
       for (let i = 0; i < n; i++) {
         const gi = gi0 + i, gj = gj0 + j, x = (gi + 0.5) * pas, y = (gj + 0.5) * pas, t = this.code(x, y);
         const densite = t === "f" ? 190 : t === "l" ? 14 : t === "p" ? 3 : t === "c" ? 0.6 : t === "v" ? 0.3 : 0;  // arbres par km²
-        if (!densite || hash(gi, gj, L) >= densite * a2) continue;
+        if (!densite || hash(gi, gj, L) >= (densite / (reduc * reduc)) * a2) continue;
         const ax = x + (hash(gj, gi, 3) - 0.5) * pas, ay = y + (hash(gi, gj, 4) - 0.5) * pas;
         // grands massifs de pins (une dizaine de km), lisières mêlées de feuillus
         const pin = t === "l" || (t === "f" && bruit(x, y, 12, 30) * 0.8 + bruit(x, y, 0.6, 31) * 0.35 < 0.5);
-        const r = (pin ? 0.055 : 0.085) * (0.75 + hash(gi, gj, 5) * 0.6);
+        const r = (pin ? 0.055 : 0.085) * (0.75 + hash(gi, gj, 5) * 0.6) * reduc;
         pts.push([ax, ay, r, pin ? PIN : BOIS[Math.floor(hash(gi, gj, 6) * BOIS.length)]]);
       }
     }
@@ -250,8 +201,8 @@ export class Details {
     g.fillStyle = OMBRE;
     g.beginPath();
     for (const [x, y, r] of pts) {
-      g.moveTo(x + 0.025 + r, y + 0.033);
-      g.arc(x + 0.025, y + 0.033, r, 0, TAU);
+      g.moveTo(x + 0.3 * r + r, y + 0.4 * r);
+      g.arc(x + 0.3 * r, y + 0.4 * r, r, 0, TAU);
     }
     g.fill();
     const parCouleur = new Map();
