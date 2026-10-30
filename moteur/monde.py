@@ -44,7 +44,7 @@ class Monde:
         self.echelle = 1.0  # mètres par unité de la carte (1 sur une carte locale, 250 sur la France)
         self.entites, self.ressources, self.evenements = {}, {}, []
         self.version_carte, self._compteur = 0, 0
-        self.decisions, self.relief = {}, None
+        self.decisions, self.relief, self.occupation = {}, None, None
         # Un jeu règle son climat avec un dict CLIMAT (latitude, normales, zones), voir moteur/climat.py
         self.climat = Climat(self.rng, self.horloge.date, **getattr(regles, "CLIMAT", {}))
         self.climat.avancer(self.horloge.date, self.horloge.heure - 1, 1)  # météo de l'heure de départ
@@ -68,7 +68,7 @@ class Monde:
 
     def vider(self):
         """Efface la carte (avant d'en charger ou d'en générer une autre). Les ressources restent."""
-        self.entites, self.decisions, self.relief = {}, {}, None
+        self.entites, self.decisions, self.relief, self.occupation = {}, {}, None, None
         self.version_carte += 1
 
     def supprimer(self, id):
@@ -160,7 +160,8 @@ class Monde:
         return {"version": self.version_carte, "taille": self.taille, "echelle": self.echelle, "titre": getattr(r, "TITRE", ""),
                 "entites": [e for e in self.entites.values() if not e["mobile"]],
                 "constructions": getattr(r, "CONSTRUCTIONS", []), "vues": getattr(r, "VUES", []),
-                "tutoriel": getattr(r, "TUTORIEL", []), "relief": self.relief}
+                "tutoriel": getattr(r, "TUTORIEL", []), "relief": self.relief,
+                "occupation": self.occupation}
 
     def info(self, id):
         """Fiche d'une entité : {titre, lignes, actions:[{libelle, nom, params}]}, fournie par les règles."""
@@ -190,7 +191,7 @@ class Monde:
     def sauver(self, chemin):
         h = self.horloge
         data = {"horloge": {"date": h.date.isoformat(), "heure": h.heure, "mode": h.mode, "vitesse": h.vitesse},
-                "taille": self.taille, "echelle": self.echelle, "relief": self.relief,
+                "taille": self.taille, "echelle": self.echelle, "relief": self.relief, "occupation": self.occupation,
                 "climat": self.climat.sauver(), "entites": self.entites,
                 "ressources": self.ressources, "evenements": self.evenements, "compteur": self._compteur,
                 "decisions": self.decisions}
@@ -204,6 +205,7 @@ class Monde:
         self.horloge = Horloge(dt.date.fromisoformat(hd["date"]), hd["heure"], hd["mode"])
         self.horloge.vitesse = hd["vitesse"]
         self.taille, self.echelle, self.relief = data["taille"], data.get("echelle", 1.0), data.get("relief")
+        self.occupation = data.get("occupation")
         self.climat.charger(data["climat"])
         self.entites, self.ressources = data["entites"], data["ressources"]
         self.evenements, self._compteur = data["evenements"], data["compteur"]

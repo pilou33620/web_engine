@@ -512,8 +512,8 @@ def generer(reglages=None):
             e["nom"], e["ancre"] = noms_reg[i], list(g.xy(ancres[i])) if i in ancres else p[0]
         entites.append(e)
 
-    # Forêts, cultures et prairies (un seul tracé : frontières communes identiques)
-    entites += _vegetation(g, r, rng, xs, ys, terre, lac, rempli, d_mer, villes, altmax, len(terres))
+    # Forêts, cultures et prairies : grille d'occupation du sol (dessinée en texture par les thèmes)
+    occupation = _vegetation(g, r, rng, xs, ys, terre, lac, rempli, d_mer, villes, altmax, len(terres))
 
     for p in g.contours([0 if lac[k] else -1 for k in range(n)]).get(0, []):
         entites.append({"type": "zone", "style": "lac", "calque": "eau", "points": p})
@@ -545,7 +545,7 @@ def generer(reglages=None):
     valeurs = [[round(rempli[j * g.nc + i]) if terre[j * g.nc + i] else 0 for i in range(g.nc)] for j in range(g.nl)]
     capitale = max(villes, key=lambda v: v["population"])["nom"] if villes else noms_reg[0]
     return {"nom": f"Pays de {capitale}", "taille": [L, H], "echelle": round(echelle, 2), "latitude": r["latitude"],
-            "relief": {"pas": pas, "valeurs": valeurs}, "zones_climat": _climat(g, terre, rempli, altmax),
+            "relief": {"pas": pas, "valeurs": valeurs}, "occupation": occupation, "zones_climat": _climat(g, terre, rempli, altmax),
             "entites": entites, "reglages": r}
 
 
@@ -716,9 +716,19 @@ def _vegetation(g, r, rng, xs, ys, terre, lac, alt, d_mer, villes, altmax, nterr
             if len(comp) < 6:
                 for k in comp:
                     lab[k] = -1
-    styles = {0: "foret", 1: "culture", 2: "prairie"}
-    polys = g.contours(lab)
-    return [{"type": "zone", "style": styles[e], "calque": "sol", "points": p} for e in (0, 1, 2) for p in polys.get(e, [])]
+    # Format de moteur/cartes.py : une chaîne par ligne ; le reste des terres selon l'altitude
+    def code(k):
+        if not terre[k] or lac[k]:
+            return "."
+        if lab[k] >= 0:
+            return "fcp"[lab[k]]
+        if alt[k] >= limite:
+            return "r"
+        if alt[k] > 0.6 * limite:
+            return "l"
+        return "c" if champ3[k] > 0.45 else "p"
+    return {"pas": g.pas, "decalage": -0.5,
+            "lignes": ["".join(code(j * g.nc + i) for i in range(g.nc)) for j in range(g.nl)]}
 
 
 def _climat(g, terre, alt, altmax):

@@ -76,6 +76,8 @@ Deux cartes réelles toutes faites et un générateur, au même format (voir `mo
 | `aquitaine` | Gironde, Dordogne, Landes, Lot-et-Garonne, Pyrénées-Atlantiques ; départements voisins et Espagne grisés | 1 unité = 100 m |
 
 Les contours sont simplifiés (reconnaissables, pas exacts au mètre) et projetés en Lambert conique, comme les cartes IGN.
+L'occupation du sol (forêts, cultures, prairies, vignes, landes, roche) est plausible, pas exacte : grands terroirs connus
+(forêt des Landes, Vosges, bocage breton, vignobles…) + altitude + bruit. Les thèmes la peignent en texture (calque « occupation »).
 Sources : départements IGN/INSEE via github.com/gregoiredavid/france-geojson (Licence Ouverte), fleuves, lacs et pays
 Natural Earth (domaine public). Pour les refabriquer : `python3 outils/creer_cartes_reelles.py`.
 

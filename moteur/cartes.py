@@ -2,6 +2,9 @@
 
   {"nom", "taille": [L, H] (unités), "echelle": mètres par unité, "latitude": degrés,
    "relief": {"pas", "valeurs"} | None, "zones_climat": [...] | None,
+   "occupation": {"pas", "lignes": [chaîne par ligne], "decalage"?} | None  — occupation du sol, une lettre par case :
+       "." eau / hors terre, c cultures, p prairies, f forêts, v vignes, l landes, r roche ; case (i, j) centrée en
+       ((i + 0.5 + decalage) × pas, (j + 0.5 + decalage) × pas), decalage 0 par défaut,
    "entites": [{"type", "style", "calque", ...}]}
 
 Un jeu s'en sert dans ses règles :  cartes.charger(monde, "france")  ou  cartes.generer(monde, mer=0.4, …)
@@ -32,6 +35,7 @@ def appliquer(m, carte):
     """Remplace la carte du monde : entités, taille, échelle, relief et climat (latitude, zones)."""
     m.vider()
     m.taille, m.echelle, m.relief = list(carte["taille"]), carte.get("echelle", 1.0), carte.get("relief")
+    m.occupation = carte.get("occupation")
     for e in carte["entites"]:
         e = dict(e)
         m.ajouter(e.pop("type"), e.pop("style"), **e)

@@ -1,12 +1,15 @@
 // Thème « Carte » : carte stratégique ancienne (couleurs passées, relief ombré, noms en lettres à empattements).
 // Même structure que aerienne.js : tables de styles par type, « _ » par défaut.
 import { alea, trait, traitVariable, pointilles, lelong, forme, boite, etiquette, nomLieu } from "./outils.js";
-import { decor } from "./decor.js";
+import { decor, terrain } from "./decor.js";
 
 const P = window.PIXI;
 export const SERIF = "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif";
 const TERRES = { chaume: 0xd2c08e, culture: 0xaeb07a, prairie: 0xbdb985, labour: 0xc4a77a, colza: 0xbcb76e, foret: 0x76814e };
 const ENCRE = 0x2a2018, CREME = 0xefe3c4, ROUGE = 0xa8322a, OR = 0xd9b25e, MER = 0x2b4656, ECUME = 0x9fb9c0;
+// Occupation du sol, tons sourds de carte ancienne (comme une gravure aquarellée)
+const SOL = { c: [222, 204, 152], p: [190, 192, 134], f: [104, 118, 76], v: [176, 136, 116], l: [204, 186, 142], r: [214, 208, 194] };
+let avecSol = false;  // la carte a une occupation du sol : les aplats administratifs restent dessous
 // Teintes passées des départements (aquarelle sur papier)
 const PASTELS = [0xdcc9a0, 0xcdc69b, 0xd8bca2, 0xc6c7a2, 0xdfcfae, 0xcbbf98, 0xd3c3a8, 0xc2bf98];
 
@@ -171,14 +174,27 @@ function departement(g, e) {
   const c = e.couleur ? P.Color.shared.setValue(e.couleur).toNumber() : PASTELS[Math.floor(alea(e.id)() * PASTELS.length)];
   if (!e.points) return terre(g, e);
   forme(g, e).fill(c);
-  contours(g, e, 0x5a3a24, 1.1);
 }
 
 function pays(g, e) {
   if (!e.points) return g.rect(e.x, e.y, e.w, e.h).fill(0xbdb6a6);
   forme(g, e).fill(0xbdb6a6 - Math.floor(alea(e.id)() * 3) * 0x060606);
-  contours(g, e, 0x6e675c, 0.9);
 }
+
+// Au-dessus de l'occupation du sol : limites à l'encre, pays voisins voilés de gris
+const bordure = {
+  departement(g, e) {
+    if (!e.points) return;
+    // Sur l'occupation du sol, un trait continu sous les tirets garde les limites lisibles (forêts sombres)
+    if (avecSol) trait(g, [...e.points, e.points[0]], { width: 2.4 * ech, color: CREME, alpha: 0.35 });
+    contours(g, e, 0x5a3a24, 1.1);
+  },
+  pays(g, e) {
+    if (!e.points) return;
+    if (avecSol) forme(g, e).fill({ color: 0xbdb6a6, alpha: 0.72 });
+    contours(g, e, 0x6e675c, 0.9);
+  },
+};
 
 // Contour décalé de d vers l'intérieur d'un polygone (lignes de vagues parallèles à la côte)
 function decale(points, d) {
@@ -292,15 +308,17 @@ function medaillon(e, dessinInterieur) {
   return c;
 }
 
-const decorCarte = decor("carte", { force: 0.45, teinte: true, vignette: 0.55, papier: true });
+const decorCarte = decor("carte", { force: 0.45, teinte: true, vignette: 0.4, papier: true });
 
 export const carte = {
   nom: "Carte", css: "carte", fond: 0x22343f, base: 0xcbb98a, unitesTailleFixe: true,
   orientation: () => 0,
   decor(rendu, carte) {
     preparer(carte);
-    return decorCarte(rendu, carte);
+    avecSol = Boolean(carte.occupation?.lignes?.length);
+    return { ...decorCarte(rendu, carte), terrain: terrain("carte", carte, SOL) };
   },
+  bordure,
 
   zone: {
     ...Object.fromEntries(Object.keys(TERRES).map((k) => [k, terre])),

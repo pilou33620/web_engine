@@ -87,6 +87,121 @@ MASSIFS = [
     ([(3.6, 44.3)], 1200, 45), ([(2.3, 43.45)], 900, 25), ([(4.0, 47.15)], 700, 30),                   # Cévennes, Montagne Noire, Morvan
     ([(-3.5, 48.3)], 300, 80), ([(4.8, 49.9)], 450, 35), ([(0.8, 45.2)], 250, 70),                     # Armorique, Ardennes, Périgord
 ]
+# Occupation du sol connue : (lon, lat, rayon en km, classe, poids). Classes : c cultures, p prairies et bocage,
+# f forêts, v vignes, l landes / garrigue / maquis. Gaussiennes qui s'additionnent, puis bruit : taches naturelles.
+TERROIRS = [
+    # Forêts
+    (-0.62, 44.55, 55, "f", 1.6), (-1.0, 44.15, 45, "f", 1.6), (-0.9, 45.15, 25, "f", 1.2), (-0.2, 44.15, 30, "f", 1.0),
+    (0.15, 45.15, 22, "f", 1.0), (1.05, 44.78, 28, "f", 0.9), (0.75, 45.45, 30, "f", 0.6), (1.9, 47.5, 40, "f", 1.2),
+    (2.1, 47.95, 18, "f", 1.1), (2.65, 48.4, 12, "f", 1.3), (1.85, 48.65, 12, "f", 1.2), (2.85, 49.35, 12, "f", 1.2),
+    (2.75, 46.65, 14, "f", 1.0), (7.0, 48.2, 45, "f", 1.4), (6.0, 46.7, 50, "f", 1.1), (4.7, 49.85, 28, "f", 1.2),
+    (5.0, 49.1, 22, "f", 0.9), (4.0, 47.15, 32, "f", 1.1), (3.7, 44.2, 40, "f", 1.0), (3.4, 44.8, 35, "f", 0.7),
+    (2.3, 43.45, 22, "f", 1.0), (6.4, 48.7, 70, "f", 0.6), (6.35, 43.3, 25, "f", 0.9), (5.8, 47.8, 50, "f", 0.6),
+    (2.5, 47.0, 60, "f", 0.4), (-0.5, 48.4, 40, "f", 0.4), (0.4, 47.6, 45, "f", 0.4), (6.1, 45.1, 60, "f", 0.5),
+    # Prairies et bocage
+    (-3.0, 48.1, 170, "p", 1.0), (-0.6, 48.9, 110, "p", 1.1), (-1.0, 47.2, 90, "p", 0.6), (1.6, 45.6, 75, "p", 1.0),
+    (2.9, 45.4, 90, "p", 1.1), (4.3, 46.5, 60, "p", 1.1), (3.9, 49.9, 30, "p", 0.9), (-1.1, 43.3, 40, "p", 1.0),
+    (-0.4, 43.25, 30, "p", 0.8), (0.75, 45.5, 35, "p", 0.7), (6.3, 46.0, 50, "p", 0.7), (5.9, 47.0, 40, "p", 0.5),
+    (-1.55, 46.7, 40, "p", 0.7),
+    # Grandes cultures
+    (1.7, 48.2, 60, "c", 1.3), (2.5, 49.7, 90, "c", 1.1), (4.2, 48.9, 60, "c", 1.1), (3.0, 48.6, 50, "c", 1.0),
+    (2.2, 46.95, 50, "c", 0.8), (0.1, 46.4, 60, "c", 0.9), (1.4, 43.5, 60, "c", 0.9), (0.4, 43.7, 70, "c", 0.6),
+    (7.5, 48.3, 25, "c", 0.9), (3.2, 45.9, 25, "c", 1.1), (0.45, 44.35, 35, "c", 1.0), (-0.1, 43.65, 30, "c", 0.6),
+    # Vignes
+    (-0.78, 45.07, 8, "v", 2.6), (-0.88, 45.25, 8, "v", 2.4), (-0.38, 44.56, 9, "v", 2.2), (-0.62, 44.76, 5, "v", 1.6),
+    (-0.18, 44.9, 10, "v", 2.6), (-0.3, 44.74, 16, "v", 1.6), (-0.55, 45.1, 9, "v", 2.0), (0.45, 44.82, 14, "v", 2.0),
+    (1.25, 44.47, 10, "v", 1.6), (0.3, 44.15, 7, "v", 1.3), (-0.42, 43.25, 7, "v", 1.2), (-0.05, 43.55, 7, "v", 1.2),
+    (-0.25, 45.65, 25, "v", 2.0), (4.0, 49.05, 22, "v", 2.2), (3.8, 47.8, 9, "v", 1.8), (4.85, 47.1, 18, "v", 2.0),
+    (4.6, 46.1, 16, "v", 2.2), (4.85, 44.3, 28, "v", 2.0), (3.3, 43.35, 55, "v", 1.8), (2.75, 42.65, 22, "v", 2.0),
+    (6.0, 43.45, 35, "v", 1.2), (7.35, 48.35, 6, "v", 2.0), (7.25, 48.05, 6, "v", 2.0), (-0.4, 47.3, 16, "v", 1.2),
+    (0.6, 47.3, 18, "v", 0.9), (2.85, 47.3, 7, "v", 1.6), (-1.4, 47.15, 11, "v", 1.4), (5.65, 46.8, 9, "v", 1.3),
+    (1.9, 43.9, 11, "v", 1.4),
+    # Landes, garrigue, maquis
+    (9.1, 42.1, 90, "l", 1.6), (5.6, 43.6, 80, "l", 1.0), (3.7, 43.8, 55, "l", 0.8), (3.2, 44.3, 35, "l", 1.2),
+    (-1.15, 44.8, 6, "l", 0.8), (-1.25, 44.2, 6, "l", 0.8),
+]
+CODES = "cpfvl"  # dans cet ordre dans les scores ; "r" = roche et pelouses d'altitude, "." = hors terre
+
+
+def remplir(polygones, nc, nl, pas):
+    """Grille de booléens (nl × nc) : centre de la case dans un des polygones (balayage par lignes)."""
+    grille = [bytearray(nc) for _ in range(nl)]
+    for pts in polygones:
+        for j in range(nl):
+            y = (j + 0.5) * pas
+            xs = sorted(x1 + (y - y1) * (x2 - x1) / (y2 - y1)
+                        for (x1, y1), (x2, y2) in zip(pts, pts[1:] + pts[:1]) if (y1 > y) != (y2 > y))
+            for a, b in zip(xs[::2], xs[1::2]):
+                for i in range(max(0, math.ceil(a / pas - 0.5)), min(nc, math.floor(b / pas - 0.5) + 1)):
+                    grille[j][i] = 1
+    return grille
+
+
+def bruit_valeur(rng, nc, nl, taille):
+    """Bruit de valeur lissé (0..1) sur une grille nl × nc, cellules de `taille` cases."""
+    gw, gh = nc // taille + 2, nl // taille + 2
+    r = [[rng.random() for _ in range(gw)] for _ in range(gh)]
+    lisse = lambda t: t * t * (3 - 2 * t)
+    sortie = []
+    for j in range(nl):
+        gy, fy = divmod(j / taille, 1)
+        gy, fy = int(gy), lisse(fy)
+        ligne = []
+        for i in range(nc):
+            gx, fx = divmod(i / taille, 1)
+            gx, fx = int(gx), lisse(fx)
+            h = r[gy][gx] + (r[gy][gx + 1] - r[gy][gx]) * fx
+            b = r[gy + 1][gx] + (r[gy + 1][gx + 1] - r[gy + 1][gx]) * fx
+            ligne.append(h + (b - h) * fy)
+        sortie.append(ligne)
+    return sortie
+
+
+def occupation(proj, L, H, ech, terres, relief, pas):
+    """Occupation du sol plausible (pas exacte) : terroirs connus + altitude + bruit. Une chaîne par ligne de cases."""
+    nc, nl = L // pas + 1, H // pas + 1
+    terre = remplir(terres, nc, nl, pas)
+    rng = random.Random(11)
+    bruits = {c: [bruit_valeur(rng, nc, nl, t) for t in (max(2, round(8000 / ech / pas)), max(2, round(2500 / ech / pas)))]
+              for c in CODES}
+    taches = [(proj(lo, la), r * 1000 / ech, CODES.index(c), w) for lo, la, r, c, w in TERROIRS]
+    base = [0.7, 0.45, 0.55, -0.6, -0.4]
+    rp, rv = relief["pas"], relief["valeurs"]
+    lignes = []
+    for j in range(nl):
+        y = (j + 0.5) * pas
+        proches = [t for t in taches if abs(t[0][1] - y) < 2.2 * t[1]]
+        ligne = []
+        for i in range(nc):
+            if not terre[j][i]:
+                ligne.append(".")
+                continue
+            x = (i + 0.5) * pas
+            alt = rv[min(len(rv) - 1, round(y / rp))][min(len(rv[0]) - 1, round(x / rp))]
+            if alt + 700 * (bruits["l"][0][j][i] - 0.5) > 2650:  # crêtes irrégulières
+                ligne.append("r")
+                continue
+            s = base[:]
+            for (cx, cy), r, k, w in proches:
+                d2 = ((x - cx) ** 2 + (y - cy) ** 2) / (r * r)
+                if d2 < 4.8:
+                    s[k] += 0.8 * w * math.exp(-d2)
+            if alt > 500:  # en montagne : forêts et estives, pas de grandes cultures ni de vignes
+                m = min(1, (alt - 500) / 900)
+                s[0] -= 1.2 * m
+                s[3] -= 2 * m
+                s[2] += 0.7 * m
+                s[1] += 0.5 * m
+            if alt > 1800:
+                s[4] += 1.5 * (alt - 1800) / 600
+            for k, c in enumerate(CODES):
+                b1, b2 = bruits[c]
+                s[k] += 0.8 * b1[j][i] + 0.65 * b2[j][i]
+            ligne.append(CODES[max(range(5), key=s.__getitem__)])
+        lignes.append("".join(ligne))
+    return {"pas": pas, "lignes": lignes}
+
+
 CARTES = {
     "france": {"nom": "France", "echelle": 250, "bornes": (-5.6, 41.1, 10.0, 51.4), "latitude": 46.5, "region": None,
                "voisins": ["Belgium", "Luxembourg", "Germany", "Switzerland", "Italy", "Spain", "Andorra", "Monaco",
@@ -354,8 +469,10 @@ def fabriquer(cle, donnees):
         zones = [{"nom": "Pyrénées", "rect": [-1e9, proj(0, 43.35)[1], 1e9, 1e9], "dt": -3.0, "pluie": 1.4},
                  {"nom": "Côte", "rect": [-1e9, -1e9, proj(-0.95, 44.5)[0], 1e9], "pluie": 1.15, "vent": 1.5},
                  {"nom": "Intérieur", "rect": [-1e9, -1e9, 1e9, 1e9]}]
-    return {"nom": cfg["nom"], "taille": [L, H], "echelle": ech, "latitude": cfg["latitude"],
-            "relief": {"pas": pas, "valeurs": valeurs}, "zones_climat": zones, "entites": entites}
+    relief = {"pas": pas, "valeurs": valeurs}
+    return {"nom": cfg["nom"], "taille": [L, H], "echelle": ech, "latitude": cfg["latitude"], "relief": relief,
+            "occupation": occupation(proj, L, H, ech, terres, relief, max(round(1200 / ech), round(max(L, H) / 320))),
+            "zones_climat": zones, "entites": entites}
 
 
 def dist_segment(px, py, a, b):

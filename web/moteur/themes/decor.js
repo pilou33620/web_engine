@@ -132,3 +132,109 @@ export function decor(nom, options) {
     return { sur };
   };
 }
+
+// --- Occupation du sol (forêts, cultures, prairies, vignes, landes, roche) ---
+// Une texture par carte, peinte pixel par pixel : bords déformés par du bruit (taches naturelles), cimes fines pour
+// les forêts, mosaïque de parcelles pour les cultures, rangs pour les vignes ; découpée net sur les côtes.
+const BRUIT = (() => {
+  const n = 256, t = new Float32Array(n * n);
+  let s = 12345;
+  for (let i = 0; i < t.length; i++) t[i] = ((s = (Math.imul(s, 1103515245) + 12345) | 0) >>> 8) / 16777216;
+  return t;
+})();
+
+// Bruit de valeur lissé, période 256 cases ; f = taille d'une case en pixels
+function bruit(x, y, f, decal = 0) {
+  x = x / f + decal;
+  y = y / f + decal * 1.7;
+  const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j;
+  const a = (ii, jj) => BRUIT[((jj & 255) << 8) | (ii & 255)];
+  const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+  const h = a(i, j) + (a(i + 1, j) - a(i, j)) * sx, b = a(i, j + 1) + (a(i + 1, j + 1) - a(i, j + 1)) * sx;
+  return h + (b - h) * sy;
+}
+
+const hachage = (i, j) => BRUIT[(((j * 31 + i * 17) & 255) << 8) | ((i * 13 + j * 7) & 255)];
+
+// Couleur d'un pixel selon la classe : palette = { c, p, f, v, l, r: [r, g, b] }
+function teinte(code, px, py, palette) {
+  const [r, g, b] = palette[code];
+  let k = 0.94 + 0.12 * bruit(px, py, 90, 3);  // variations douces à grande échelle
+  if (code === "f") {
+    const cime = bruit(px, py, 2.2, 5) * 0.6 + bruit(px, py, 5, 7) * 0.4;  // houppiers serrés
+    k *= 0.72 + 0.45 * cime;
+  } else if (code === "c") {
+    // Parcelles irrégulières : chaque case d'une grille déformée a sa nuance
+    const wx = px + 6 * bruit(px, py, 24, 9), wy = py + 6 * bruit(px, py, 24, 11);
+    k *= 0.9 + 0.2 * hachage(Math.floor(wx / 7), Math.floor(wy / 5));
+  } else if (code === "p") {
+    k *= 0.9 + 0.16 * bruit(px, py, 4, 13);
+  } else if (code === "v") {
+    k *= (px + py) % 4 < 1.5 ? 0.8 : 1.02;
+  } else if (code === "l") {
+    k *= bruit(px, py, 2.5, 15) > 0.72 ? 0.78 : 0.97 + 0.06 * bruit(px, py, 6, 17);
+  } else {
+    k *= 0.9 + 0.2 * bruit(px, py, 3, 19);
+  }
+  return [r * k, g * k, b * k];
+}
+
+const terrains = {};  // nom du thème → { cle, texture }
+
+export function terrain(nom, carte, palette) {
+  const o = carte.occupation;
+  if (!o?.lignes?.length) return null;
+  const [L, H] = carte.taille, cle = JSON.stringify([carte.taille, o.pas, o.lignes.length, o.lignes[0], o.lignes.at(-1)]);
+  if (terrains[nom]?.cle !== cle) {
+    terrains[nom]?.texture.destroy(true);
+    terrains[nom] = { cle, texture: P.Texture.from(peindre(carte, o, palette)) };
+  }
+  const s = new P.Sprite(terrains[nom].texture);
+  s.setSize(L, H);
+  return s;
+}
+
+function peindre(carte, o, palette) {
+  const [L, H] = carte.taille, nl = o.lignes.length, nc = o.lignes[0].length, d = o.decalage ?? 0;
+  // shortcut: 2048 px au plus de côté (limite sûre des textures sur iPad) ; au-delà, le détail se perd en zoomant
+  const k = Math.min(2048 / Math.max(L, H), 5 / o.pas), w = Math.ceil(L * k), h = Math.ceil(H * k);
+  const [c, ctx] = toile(w, h), img = ctx.createImageData(w, h), px = img.data;
+  const classe = (i, j) => o.lignes[Math.min(nl - 1, Math.max(0, j))][Math.min(nc - 1, Math.max(0, i))];
+  const deform = 1.4;  // en cases : les limites entre classes ondulent au lieu de suivre la grille
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      // Deux échelles de déformation : grandes ondulations + franges fines (lisières naturelles)
+      const cx = x / k / o.pas - 0.5 - d + deform * ((bruit(x, y, 22, 1) - 0.5) * 2 + (bruit(x, y, 5, 3) - 0.5) * 0.8);
+      const cy = y / k / o.pas - 0.5 - d + deform * ((bruit(x, y, 22, 2) - 0.5) * 2 + (bruit(x, y, 5, 4) - 0.5) * 0.8);
+      let code = classe(Math.round(cx), Math.round(cy));
+      // Le long des côtes, on prolonge la terre voisine ; le découpage par les polygones donne le trait net
+      for (let r = 1; code === "." && r <= 2; r++) {
+        for (const [di, dj] of [[r, 0], [-r, 0], [0, r], [0, -r], [r, r], [-r, -r], [r, -r], [-r, r]]) {
+          const v = classe(Math.round(cx) + di, Math.round(cy) + dj);
+          if (v !== ".") { code = v; break; }
+        }
+      }
+      if (code === "." || !palette[code]) continue;
+      const [r, g, b] = teinte(code, x, y, palette), i = (y * w + x) * 4;
+      px[i] = r;
+      px[i + 1] = g;
+      px[i + 2] = b;
+      px[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  // Découpe par les terres (départements, pays, zones dessinées) : côtes nettes et lisses
+  const terres = carte.entites.filter((e) => e.type === "zone" && e.points && e.style !== "mer" && e.style !== "lac");
+  if (!terres.length) return c;
+  const [c2, ctx2] = toile(w, h);
+  ctx2.beginPath();
+  for (const e of terres) {
+    e.points.forEach(([x, y], i) => (i ? ctx2.lineTo(x * k, y * k) : ctx2.moveTo(x * k, y * k)));
+    ctx2.closePath();
+  }
+  ctx2.save();
+  ctx2.clip("nonzero");
+  ctx2.drawImage(c, 0, 0);
+  ctx2.restore();
+  return c2;
+}

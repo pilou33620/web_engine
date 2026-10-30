@@ -6,7 +6,7 @@ import { Effets } from "./effets.js";
 
 const P = window.PIXI;
 // Ordre d'empilement, du sol vers le ciel. Le « calque » d'une entité choisit sa place.
-export const CALQUES = ["sol", "eau", "vegetation", "relief", "routes", "reseaux", "frontieres", "batiments", "etiquettes", "unites"];
+export const CALQUES = ["sol", "occupation", "eau", "vegetation", "relief", "routes", "reseaux", "frontieres", "batiments", "etiquettes", "unites"];
 const CALQUE_PAR_DEFAUT = { zone: "sol", ligne: "routes", batiment: "batiments", unite: "unites" };
 const TUILE = 512;  // m : zones et lignes sont regroupées par tuile selon leur point de départ, pour masquer le hors-écran
 
@@ -110,6 +110,7 @@ export class Rendu {
     const decor = t.decor?.(this, carte) ?? {};
     if (decor.sous) this.calques.base.addChild(decor.sous);
     if (decor.sur) this.calques.relief.addChild(decor.sur);
+    if (decor.terrain) this.calques.occupation.addChild(decor.terrain);
 
     const graphiques = {};
     const graphique = (nom, e) => {
@@ -123,11 +124,14 @@ export class Rendu {
       if (!dessin) continue;
       if (e.type === "zone" || e.type === "ligne") {
         dessin(graphique(calque, e), e);
+        // Bordure : tracée au-dessus de l'occupation du sol (limites administratives, pays grisés)
+        t.bordure?.[e.style]?.(graphique("frontieres", e), e);
         const nom = e.nom && t.nomLieu?.(e);
         if (nom) {
           const c = centre(e);
           nom.position.set(c.x, c.y);
           nom.priorite = priorite(e);
+          if (e.type === "zone") nom.origine = { x: c.x, y: c.y };  // nom de région : peut se décaler s'il gêne
           objets.push([this.calques.etiquettes.addChild(nom), 150]);
         }
       } else if (e.type === "batiment") {
@@ -173,11 +177,19 @@ export class Rendu {
     const places = [];
     const etiquettes = this.calques.etiquettes.children.filter((e) => e.visible)
       .sort((a, b) => (b.priorite ?? 0) - (a.priorite ?? 0));
+    const occupe = (r) => places.some((p) => r.minX < p.maxX && r.maxX > p.minX && r.minY < p.maxY && r.maxY > p.minY);
     for (const e of etiquettes) {
-      const r = e.getBounds();
-      const libre = !places.some((p) => r.minX < p.maxX && r.maxX > p.minX && r.minY < p.maxY && r.maxY > p.minY);
-      e.visible = libre;
-      if (libre) places.push({ minX: r.minX - 4, minY: r.minY - 2, maxX: r.maxX + 4, maxY: r.maxY + 2 });
+      let r = e.getBounds();
+      if (e.origine) {
+        // Essaie la place prévue, puis au-dessus et en dessous (décalage en pixels écran ramené au monde)
+        for (const pas of [0, -1, 1, -2, 2]) {
+          e.position.set(e.origine.x, e.origine.y + (pas * (r.height + 6)) / this.zoom);
+          r = e.getBounds();
+          if (!occupe(r)) break;
+        }
+      }
+      e.visible = !occupe(r);
+      if (e.visible) places.push({ minX: r.minX - 4, minY: r.minY - 2, maxX: r.maxX + 4, maxY: r.maxY + 2 });
     }
   }
 

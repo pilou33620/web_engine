@@ -16,7 +16,7 @@ const memo = {
   lire(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
   ecrire(k, v) { try { localStorage.setItem(k, v); } catch { /* stockage indisponible */ } },
 };
-const NOMS_CALQUES = { sol: "Sols", eau: "Eaux", vegetation: "Végétation", relief: "Relief", routes: "Routes", reseaux: "Réseaux",
+const NOMS_CALQUES = { sol: "Sols", occupation: "Occupation du sol", eau: "Eaux", vegetation: "Végétation", relief: "Relief", routes: "Routes", reseaux: "Réseaux",
   frontieres: "Frontières", batiments: "Bâtiments", unites: "Unités", etiquettes: "Noms" };
 const RESSOURCES = { argent: ["€", "Trésorerie"], ble: ["🌾", "Blé"], bois: ["🪵", "Bois"], population: ["👥", "Population"],
   energie: ["⚡", "Énergie (MWh)"] };

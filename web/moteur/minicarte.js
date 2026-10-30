@@ -1,6 +1,6 @@
 // Module « minicarte » : vue d'ensemble de la carte, rectangle de la vue courante, toucher pour s'y rendre.
 const LARGEUR = 160;  // px CSS (le CSS la réduit sur téléphone)
-const CALQUES = ["base", "sol", "eau", "routes"];
+const CALQUES = ["base", "sol", "occupation", "eau", "routes"];
 
 export function installer(ctx) {
   const { rendu, app } = ctx;
