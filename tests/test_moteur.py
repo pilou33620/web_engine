@@ -38,4 +38,6 @@ with tempfile.TemporaryDirectory() as d:
     m2 = Monde(Regles(), graine=99)
     m2.charger(chemin)
     assert m2.horloge.date == m.horloge.date and m2.entites == m.entites and m2.ressources == m.ressources
+    assert [z.sol for z in m2.climat.zones] == [z.sol for z in m.climat.zones], "climat sauvegardé"
+assert [z["nom"] for z in m.etat()["climat"]["zones"]] == ["Côte", "Intérieur", "Coteaux"]
 print("OK — moteur vérifié")

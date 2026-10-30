@@ -31,6 +31,11 @@ body[data-theme="ferme"] .titre { display: none; }
 .ressource .plus { color: #7fc77f; } .ressource .moins { color: #e07a6a; }
 body[data-theme="ferme"] .ressource:first-child b { color: var(--accent); }
 
+.zones { display: flex; gap: 6px; overflow-x: auto; padding-top: 6px; scrollbar-width: none; }
+.zones button { white-space: nowrap; background: var(--fond2); border: 1px solid var(--bord); border-radius: 999px; padding: 3px 10px; font-size: .85rem; }
+.climat { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 4px; font-size: .92rem; }
+.climat li { display: flex; gap: 8px; }
+.climat .alerte { color: #f0a070; }
 .rond { width: 46px; height: 46px; border-radius: 50%; background: var(--fond2); border: 1px solid var(--bord); font-size: 1.3rem; display: grid; place-items: center; box-shadow: 0 2px 8px #0006; }
 .bouton-or { background: var(--accent); color: var(--accent-texte); border-radius: var(--rayon); padding: 6px 16px; font-size: 1.1rem; display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
 .bouton-or small { font-size: .75rem; opacity: .8; }
@@ -67,13 +72,13 @@ body[data-theme="carte"] .temps { bottom: calc(env(safe-area-inset-bottom) + 12p
 .calques { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .calques label { display: flex; align-items: center; gap: 8px; background: var(--fond2); padding: 8px 10px; border-radius: 8px; }
 .calques input { accent-color: var(--accent); width: 18px; height: 18px; }
-.info { left: 12px; top: calc(env(safe-area-inset-top) + 110px); width: min(300px, calc(100vw - 84px)); }
+.info { left: 12px; top: calc(env(safe-area-inset-top) + 150px); width: min(300px, calc(100vw - 84px)); }
 .info h2 { margin: 0 0 6px; font-size: 1.15rem; }
 .info p { margin: 4px 0; color: var(--doux); }
 .info .actions { display: flex; gap: 8px; margin-top: 12px; }
 .info .actions button { flex: 1; padding: 10px; border-radius: var(--rayon); background: var(--fond2); }
 .info .actions .bouton-or { display: block; }
 
-.toast { position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 120px); transform: translateX(-50%); background: var(--fond2); border: 1px solid var(--bord); padding: 10px 16px; border-radius: var(--rayon); z-index: 20; opacity: 0; transition: opacity .25s; pointer-events: none; max-width: 90vw; }
+.toast { position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 150px); transform: translateX(-50%); background: var(--fond2); border: 1px solid var(--bord); padding: 10px 16px; border-radius: var(--rayon); z-index: 20; opacity: 0; transition: opacity .25s; pointer-events: none; max-width: 90vw; }
 .toast.visible { opacity: 1; }
 .toast.erreur { border-color: #e07a6a; color: #f2b0a5; }

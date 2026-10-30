@@ -11,7 +11,11 @@ const memo = {
 const NOMS_CALQUES = { sol: "Sols", haies: "Haies", eau: "Rivières", routes: "Routes", frontieres: "Frontières", villes: "Villes", unites: "Unités", etiquettes: "Noms" };
 const RESSOURCES = { argent: ["€", "Trésorerie"], ble: ["🌾", "Blé"], bois: ["🪵", "Bois"], population: ["👥", "Population"] };
 const SOLS = { chaume: "Chaume", culture: "Blé en herbe", prairie: "Prairie", labour: "Labour", colza: "Colza", foret: "Forêt" };
-const METEO = { soleil: "☀️", nuages: "☁️", pluie: "🌧️" };
+const METEO = { soleil: "☀️", nuages: "☁️", pluie: "🌧️", neige: "❄️", orage: "⛈️", brouillard: "🌫️" };
+const VENTS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"];
+const virgule = (v, d = 1) => v.toFixed(d).replace(".", ",");
+const ciel = (z) => (z.meteo === "soleil" && etat.climat.soleil.elevation < 0 ? "🌙" : METEO[z.meteo] ?? "");
+const horaire = (h) => `${Math.floor(h)}h${String(Math.floor((h % 1) * 60)).padStart(2, "0")}`;
 const VITESSES = [1, 2, 5, 20];
 const nombre = new Intl.NumberFormat("fr-FR");
 const dateLongue = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", year: "numeric" });
@@ -21,7 +25,7 @@ const app = new PIXI.Application();
 await app.init({ resizeTo: window, antialias: true, resolution: Math.min(devicePixelRatio, 2), autoDensity: true });
 $("scene").appendChild(app.canvas);
 const rendu = new Rendu(app);
-let etat = null, versionCarte = -1, dernierJournal = "", selection = null;
+let etat = null, versionCarte = -1, dernierJournal = "", dernieresZones = "", selection = null;
 
 // --- Serveur ---
 async function api(chemin, corps) {
@@ -58,8 +62,12 @@ async function boucle() {
 function majInterface() {
   const h = etat.horloge, tour = h.mode === "tour";
   $("date").textContent = dateLongue.format(jour(h.date));
-  const hh = Math.floor(h.heure), mm = Math.floor((h.heure - hh) * 60);
-  $("heure").textContent = `${tour ? "" : `${hh}h${String(mm).padStart(2, "0")} · `}${h.saison} ${METEO[etat.meteo] ?? ""}`;
+  $("heure").textContent = `${tour ? "" : `${horaire(h.heure)} · `}${h.saison}`;
+  const zones = etat.climat.zones.map((z, i) =>
+    `<button data-zone="${i}">${esc(z.nom)} ${ciel(z)} ${Math.round(z.temperature)}°</button>`).join("");
+  if (zones !== dernieresZones) $("zones").innerHTML = dernieresZones = zones;  // ne pas recréer les boutons sous le doigt
+  const bloc = $("info-climat");
+  if (bloc && selection) bloc.innerHTML = climatDe(selection);
   $("ressources").innerHTML = Object.entries(etat.ressources).map(([nom, r]) => {
     const [icone, libelle] = RESSOURCES[nom] ?? ["•", nom];
     const d = r.delta ? `<small class="${r.delta > 0 ? "plus" : "moins"}"> ${r.delta > 0 ? "+" : ""}${nombre.format(r.delta)}</small>` : "";
@@ -92,20 +100,45 @@ function toast(texte, erreur = false) {
   minuterieToast = setTimeout(() => t.classList.remove("visible"), 2500);
 }
 
+// Météo locale d'une sélection (parcelle, ville ou zone), mise à jour en direct
+function climatDe(sel) {
+  const z = sel.type === "zone" ? etat.climat.zones[sel.index]
+    : rendu.climat.zoneDe(sel.x + (sel.w ?? 0) / 2, sel.y + (sel.h ?? 0) / 2);
+  const s = etat.climat.soleil, alerte = (v, t) => (v ? ` <b class="alerte">${t}</b>` : "");
+  return `<ul class="climat">
+    <li>${ciel(z)} <span>${esc(z.nom)}</span></li>
+    <li>🌡️ <span>${virgule(z.temperature)} °C${alerte(z.gel, "gel")}</span></li>
+    <li>☀️ <span>${horaire(s.lever)} → ${horaire(s.coucher)} · ${Math.round(z.ensoleillement)} W/m²</span></li>
+    <li>☁️ <span>${Math.round(z.nebulosite * 100)} % · ${virgule(z.pluie)} mm/h${alerte(z.orage, "orage")}</span></li>
+    <li>💨 <span>${Math.round(z.vent * 3.6)} km/h de ${VENTS[Math.round(z.direction / 22.5) % 16]}, rafales ${Math.round(z.rafales * 3.6)}</span></li>
+    <li>💧 <span>sol humide à ${Math.round(z.humidite_sol * 100)} %${alerte(z.secheresse, "sécheresse")}</span></li>
+    <li>🌊 <span>débit des rivières ×${virgule(z.debit)}${alerte(z.crue, "crue")}</span></li>
+    ${z.neige_cm >= 0.5 ? `<li>❄️ <span>${Math.round(z.neige_cm)} cm de neige</span></li>` : ""}
+  </ul>`;
+}
+
 function afficherInfo(e) {
   selection = e;
   const info = $("info");
   if (!e) return (info.hidden = true);
-  if (e.type === "ville") {
-    info.innerHTML = `<h2>${esc(e.nom)}</h2><p>Population : ${nombre.format(e.population)}</p>`;
+  if (e.type === "zone") {
+    info.innerHTML = `<h2>Climat</h2><div id="info-climat">${climatDe(e)}</div>
+      <div class="actions"><button data-action="fermer">Fermer</button></div>`;
+  } else if (e.type === "ville") {
+    info.innerHTML = `<h2>${esc(e.nom)}</h2><p>Population : ${nombre.format(e.population)}</p><div id="info-climat">${climatDe(e)}</div>
+      <div class="actions"><button data-action="fermer">Fermer</button></div>`;
   } else {
     const ha = ((e.w * e.h) / 10000).toFixed(1).replace(".", ",");
-    info.innerHTML = `<h2>${esc(SOLS[e.sol] ?? e.sol)}</h2><p>Parcelle de ${ha} ha</p>
+    info.innerHTML = `<h2>${esc(SOLS[e.sol] ?? e.sol)}</h2><p>Parcelle de ${ha} ha</p><div id="info-climat">${climatDe(e)}</div>
       <div class="actions">${e.sol === "labour" ? `<button class="bouton-or" data-action="semer">Semer du colza (800 €)</button>` : ""}
       <button data-action="fermer">Fermer</button></div>`;
   }
   info.hidden = false;
 }
+$("zones").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button");
+  if (b) afficherInfo({ type: "zone", index: Number(b.dataset.zone) });
+});
 $("info").addEventListener("click", (ev) => {
   const a = ev.target.closest("button")?.dataset.action;
   if (a === "semer") action("semer", { id: selection.id });

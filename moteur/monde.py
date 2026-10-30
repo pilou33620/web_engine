@@ -7,11 +7,10 @@ import datetime as dt
 import json
 import random
 
+from .climat import Climat
+
 SAISONS = ["Hiver", "Hiver", "Printemps", "Printemps", "Printemps", "Été",
            "Été", "Été", "Automne", "Automne", "Automne", "Hiver"]
-# Probabilités de météo par saison : (soleil, nuages, pluie)
-METEO = {"Hiver": (0.3, 0.35, 0.35), "Printemps": (0.45, 0.3, 0.25),
-         "Été": (0.7, 0.2, 0.1), "Automne": (0.35, 0.35, 0.3)}
 VITESSES = (1, 2, 5, 20)
 
 
@@ -38,9 +37,10 @@ class Monde:
         self.rng = random.Random(graine)
         self.horloge = Horloge(dt.date(1790, 9, 1))
         self.taille = [2000, 1400]
-        self.meteo = "soleil"
         self.entites, self.ressources, self.evenements = {}, {}, []
         self.version_carte, self._compteur = 0, 0
+        # Un jeu règle son climat avec un dict CLIMAT (latitude, normales, zones), voir moteur/climat.py
+        self.climat = Climat(self.rng, self.horloge.date, **getattr(regles, "CLIMAT", {}))
         regles.initialiser(self)
 
     # --- API pour les règles du jeu ---
@@ -73,8 +73,10 @@ class Monde:
 
     # --- Temps ---
     def avancer(self, heures):
-        self.regles.tick(self, heures)
         h = self.horloge
+        for texte, importance in self.climat.avancer(h.date, h.heure, heures):
+            self.annoncer(texte, importance)
+        self.regles.tick(self, heures)
         h.heure += heures
         while h.heure >= 24:
             h.heure -= 24
@@ -86,11 +88,6 @@ class Monde:
         if h.mode == "temps_reel":  # en tour par tour, le delta couvre tout le tour
             for r in self.ressources.values():
                 r["delta"] = 0
-        if self.rng.random() < 0.3:
-            ancien = self.meteo
-            self.meteo = self.rng.choices(("soleil", "nuages", "pluie"), METEO[h.saison])[0]
-            if self.meteo != ancien and self.meteo == "pluie":
-                self.annoncer("La pluie arrive sur la région.")
         self.regles.nouveau_jour(self)
 
     def tour_suivant(self):
@@ -124,7 +121,7 @@ class Monde:
                 "entites": [e for e in self.entites.values() if not e["mobile"]]}
 
     def etat(self):
-        return {"horloge": self.horloge.etat(), "meteo": self.meteo, "ressources": self.ressources,
+        return {"horloge": self.horloge.etat(), "climat": self.climat.etat(), "ressources": self.ressources,
                 "evenements": self.evenements[:8], "version_carte": self.version_carte,
                 "mobiles": [e for e in self.entites.values() if e["mobile"]]}
 
@@ -132,7 +129,7 @@ class Monde:
     def sauver(self, chemin):
         h = self.horloge
         data = {"horloge": {"date": h.date.isoformat(), "heure": h.heure, "mode": h.mode, "vitesse": h.vitesse},
-                "taille": self.taille, "meteo": self.meteo, "entites": self.entites,
+                "taille": self.taille, "climat": self.climat.sauver(), "entites": self.entites,
                 "ressources": self.ressources, "evenements": self.evenements, "compteur": self._compteur}
         with open(chemin, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False)
@@ -143,7 +140,8 @@ class Monde:
         hd = data["horloge"]
         self.horloge = Horloge(dt.date.fromisoformat(hd["date"]), hd["heure"], hd["mode"])
         self.horloge.vitesse = hd["vitesse"]
-        self.taille, self.meteo = data["taille"], data["meteo"]
+        self.taille = data["taille"]
+        self.climat.charger(data["climat"])
         self.entites, self.ressources = data["entites"], data["ressources"]
         self.evenements, self._compteur = data["evenements"], data["compteur"]
         self.version_carte += 1

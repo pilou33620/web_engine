@@ -10,6 +10,11 @@ VITESSE_TRACTEUR = 300   # m/h de jeu (ralentie pour rester lisible)
 VITESSE_REGIMENT = 400   # m/h de jeu
 ECART_PASSES = 30        # m entre deux passes de tracteur
 POSTE = (-70, -50)       # où un régiment stationne par rapport au centre d'une ville
+# Trois zones climatiques sur les normales de Bordeaux : côte venteuse, intérieur, coteaux plus frais et arrosés
+CLIMAT = {"latitude": 44.8, "zones": [
+    {"nom": "Côte", "rect": [-1e9, -1e9, 600, 1e9], "pluie": 1.15, "vent": 1.5},
+    {"nom": "Intérieur", "rect": [600, -1e9, 1400, 1e9]},
+    {"nom": "Coteaux", "rect": [1400, -1e9, 1e9, 1e9], "dt": -1.5, "pluie": 1.25, "vent": 1.1}]}
 
 
 def position_tracteur(p, distance):
@@ -23,7 +28,15 @@ def position_tracteur(p, distance):
     return x, y, 0.0 if aller else math.pi
 
 
+def pousse(m, p):
+    """Croissance du jour (0 à 1) : manque d'eau, gel ou neige la freinent."""
+    z = m.climat.zone_de(p["x"] + p["w"] / 2, p["y"] + p["h"] / 2)
+    return 0.0 if z.drapeaux["gel"] or z.neige > 1 else min(1.0, z.sol / 40)
+
+
 class Regles:
+    CLIMAT = CLIMAT
+
     def initialiser(self, m):
         rng = m.rng
         m.ressource("argent", 95000)
@@ -92,9 +105,9 @@ class Regles:
 
     def nouveau_jour(self, m):
         parcelles = m.de_type("parcelle")
-        m.ressource("ble", 2 * sum(p["sol"] in ("culture", "colza") for p in parcelles))
+        m.ressource("ble", round(2 * sum(pousse(m, p) for p in parcelles if p["sol"] in ("culture", "colza"))))
         m.ressource("bois", sum(p["sol"] == "foret" for p in parcelles))
-        m.ressource("argent", 40 * sum(p["sol"] == "prairie" for p in parcelles))
+        m.ressource("argent", round(40 * sum(pousse(m, p) for p in parcelles if p["sol"] == "prairie")))
         if m.rng.random() < 0.08:
             ville = m.rng.choice(VILLES)[0]
             m.ressource("argent", 500)

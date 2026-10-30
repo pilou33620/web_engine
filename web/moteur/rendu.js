@@ -1,21 +1,8 @@
-// Rendu PixiJS : calques, caméra (doigt, stylet, molette), jour/nuit, pluie.
+// Rendu PixiJS : calques, caméra (doigt, stylet, molette). Le climat est rendu par climat.js.
+import { ClimatRendu } from "./climat.js";
+
 const P = window.PIXI;
 export const CALQUES = ["sol", "haies", "eau", "routes", "frontieres", "villes", "etiquettes", "unites"];
-
-// Teinte de la lumière selon l'heure (multipliée sur la scène)
-const LUMIERE = [[0, 0x4a5a8a], [5, 0x4a5a8a], [7, 0xffcfa0], [9, 0xffffff], [18, 0xffffff], [20, 0xffaa70], [21.5, 0x4a5a8a], [24, 0x4a5a8a]];
-const melange = (a, b, t) => {
-  const c = (v, s) => (v >> s) & 255, m = (s) => Math.round(c(a, s) + (c(b, s) - c(a, s)) * t) << s;
-  return m(16) | m(8) | m(0);
-};
-function lumiere(h) {
-  for (let i = 0; i < LUMIERE.length - 1; i++) {
-    const [h1, c1] = LUMIERE[i], [h2, c2] = LUMIERE[i + 1];
-    if (h >= h1 && h <= h2) return melange(c1, c2, (h - h1) / (h2 - h1));
-  }
-  return 0xffffff;
-}
-const multiplier = (a, b) => [16, 8, 0].reduce((r, s) => r | (Math.round((((a >> s) & 255) * ((b >> s) & 255)) / 255) << s), 0);
 
 export class Rendu {
   constructor(app) {
@@ -23,14 +10,9 @@ export class Rendu {
     this.monde = new P.Container();
     this.calques = {};
     for (const nom of ["base", ...CALQUES]) this.monde.addChild((this.calques[nom] = new P.Container()));
-    this.nuit = new P.Graphics();
-    this.nuit.blendMode = "multiply";
-    this.pluie = new P.Graphics();
-    app.stage.addChild(this.monde, this.nuit, this.pluie);
+    app.stage.addChild(this.monde);
+    this.climat = new ClimatRendu(this);
     this.mobiles = new Map();
-    this.gouttes = Array.from({ length: 160 }, () => [Math.random(), Math.random()]);
-    this.heure = 12;
-    this.meteo = "soleil";
     this.zoom = 1;
     app.ticker.add((t) => this.image(t.deltaMS / 1000));
   }
@@ -68,14 +50,14 @@ export class Rendu {
         this.calques.etiquettes.addChild(etiquette);
       }
     }
+    this.climat.carte(carte);
     this.majEtiquettes();
     if (premiere) this.recentrer();
   }
 
   // --- Entités mobiles (positions interpolées entre deux mises à jour) ---
   majEtat(etat) {
-    this.heure = etat.horloge.mode === "tour" ? 12 : etat.horloge.heure;  // pas de nuit au tour par tour
-    this.meteo = etat.meteo;
+    this.climat.maj(etat);
     const vus = new Set();
     for (const e of etat.mobiles) {
       vus.add(e.id);
@@ -108,18 +90,7 @@ export class Rendu {
       else objet.position.set(objet.x + (cible.x - objet.x) * k, objet.y + (cible.y - objet.y) * k);
       objet.rotation = this.theme.orientation(cible);
     }
-    const { width: w, height: h } = this.app.screen;
-    const ciel = { soleil: 0xffffff, nuages: 0xe2e4e8, pluie: 0xbfc6d0 }[this.meteo] ?? 0xffffff;
-    this.nuit.clear().rect(0, 0, w, h).fill(multiplier(lumiere(this.heure), ciel));
-    this.pluie.clear();
-    if (this.meteo === "pluie") {
-      for (const d of this.gouttes) {
-        d[1] = (d[1] + dt * 1.4) % 1;
-        const x = d[0] * (w + 60) - 30, y = d[1] * h;
-        this.pluie.moveTo(x, y).lineTo(x - 4, y + 16);
-      }
-      this.pluie.stroke({ width: 1.5, color: 0xd8e4f0, alpha: 0.55 });
-    }
+    this.climat.image(dt);
   }
 
   // --- Caméra ---
