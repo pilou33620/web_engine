@@ -12,7 +12,7 @@ import random
 from collections import deque
 
 from .cartes import urbaniser
-from .routes import relier
+from .routes import relier, reseaux
 
 FORMES = ["continent", "côte", "îles", "isthme", "presqu'île"]
 
@@ -549,6 +549,7 @@ def generer(reglages=None):
         i, j = round(x / g.pas), round(y / g.pas)
         return 0 <= i < g.nc and 0 <= j < g.nl and terre[j * g.nc + i] and not lac[j * g.nc + i]
     entites += relier(villes, est_terre, echelle, graine=r["graine"], taille=[L, H])
+    entites += reseaux(villes, est_terre, echelle, graine=r["graine"], taille=[L, H])
     urbaniser(occupation, villes)
 
     valeurs = [[round(rempli[j * g.nc + i]) if terre[j * g.nc + i] else 0 for i in range(g.nc)] for j in range(g.nl)]

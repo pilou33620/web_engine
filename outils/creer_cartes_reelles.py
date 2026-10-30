@@ -7,7 +7,8 @@ Sources (téléchargées dans le cache si absentes) :
   - pays, fleuves, lacs : Natural Earth (domaine public)
   - communes (contours et populations) : france-geojson et @etalab/decoupage-administratif (INSEE, Licence Ouverte)
   - fleuves, étangs et estuaire du Sud-Ouest, tracés à la main : github.com/pilou33620/web_conquete (game/data/geo.json)
-Les routes ne sont pas réelles : elles relient les villes voisines (moteur/routes.py), quelle que soit l'époque.
+Les routes ne sont pas réelles : elles relient les villes voisines (moteur/routes.py) ; voies romaines, chemins de fer,
+LGV et autoroutes sont datés (`depuis`, `jusqua`) et partent de Paris (moteur/routes.py reseaux).
 Projection conique conforme de Lambert (paramètres de Lambert-93, sphère). Les contours sont simplifiés :
 la carte est reconnaissable, pas exacte au mètre près. Le relief est approché par les grands massifs.
 """
@@ -22,7 +23,7 @@ import urllib.request
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 from moteur.cartes import urbaniser  # noqa: E402
-from moteur.routes import relier  # noqa: E402
+from moteur.routes import relier, reseaux  # noqa: E402
 
 RACINE = pathlib.Path(__file__).resolve().parent.parent
 CACHE = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else RACINE / ".cache_geo"
@@ -524,6 +525,7 @@ def fabriquer(cle, donnees):
     o, op = occ["lignes"], occ["pas"]
     est_terre = lambda x, y: 0 <= y < H and 0 <= x < L and o[int(y // op)][int(x // op)] != "."
     entites += relier(villes, est_terre, ech, taille=[L, H])
+    entites += reseaux(villes, est_terre, ech, taille=[L, H], pole=proj(2.35, 48.86))  # Paris
     return {"nom": cfg["nom"], "taille": [L, H], "echelle": ech, "latitude": cfg["latitude"], "relief": relief,
             "occupation": occ, "zones_climat": zones, "entites": entites}
 
