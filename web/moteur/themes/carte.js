@@ -2,6 +2,7 @@
 // Même structure que aerienne.js : tables de styles par type, « _ » par défaut.
 import { alea, trait, traitVariable, pointilles, lelong, forme, boite, etiquette, nomLieu, vue, largeur } from "./outils.js";
 import { decor, terrain, MER_LARGE } from "./decor.js";
+import { routeDe, rayures, voieDePres, alignement } from "./epoque.js";
 
 const P = window.PIXI;
 export const SERIF = "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif";
@@ -280,16 +281,48 @@ function cartouche(texte, taille, chefLieu) {
   return c;
 }
 
-// Route : vraie largeur (m) mais au moins px à l'écran. Ancienne : chaussée claire bordée d'encre ;
-// moderne : comme une carte routière, grands axes rouges, petites routes blanches, liseré sombre
+// Voies selon l'année (epoque.js routeDe) : vraie largeur (m) mais au moins px à l'écran. Sentier de terre en tirets,
+// chemin de terre claire (web_conquete), route royale empierrée bordée d'encre, route goudronnée jaune, carte routière
+// moderne (grands axes rouges, petites routes blanches), en 2100 routes vertes bordées d'arbres
 function routeCarte(g, e, metres, px) {
-  // (comme web_conquete : de minces chemins de terre claire, presque un fil vu de loin)
-  const w = largeur(metres / vue.echelle, px), grand = metres > 10;
-  if (vue.epoque === "moderne") {
-    trait(g, e.points, { width: w + 1 / vue.zoom, color: 0x3a3030, alpha: 0.55 });
-    return trait(g, e.points, { width: w, color: grand ? 0xd0503a : 0xf2ead6 });
-  }
-  trait(g, e.points, { width: w, color: 0xe9dcb4, alpha: grand ? 0.85 : 0.6 });
+  const w = largeur(metres / vue.echelle, px), grand = metres > 10, z = vue.zoom;
+  let aspect = routeDe();
+  if (aspect === "empierree" && !grand) aspect = "terre";  // seules les routes royales sont empierrées
+  if (aspect === "sentier") return rayures(g, e.points, "moitie", 7 / z, 0x5a3c22, { width: w, alpha: grand ? 0.9 : 0.7 });
+  if (aspect === "terre") return trait(g, e.points, { width: w, color: 0xe9dcb4, alpha: grand ? 0.85 : 0.6 });
+  const [bord, fort, faible] = { empierree: [0x4a3624, 0xf3e6c2], goudron: [0x3a3030, 0xe8b850, 0xf2ead6],
+    moderne: [0x3a3030, 0xd0503a, 0xf2ead6], verte: [0x2c4424, 0xc9d68a, 0xd8e6b4] }[aspect];
+  if (aspect === "verte" && grand && w * z > 3) alignement(g, e.points, w, Math.max(8 / vue.echelle, 2.4 / z), 0x3d6a2e);
+  trait(g, e.points, { width: w + 1.2 / z, color: bord, alpha: aspect === "empierree" ? 0.75 : 0.55 });
+  trait(g, e.points, { width: w, color: grand ? fort : faible });
+}
+
+// Voie ferrée : de loin, trait d'encre et tirets clairs alternés comme sur une carte (LGV en rouge, plus épaisse) ;
+// de près (largeur exagérée, 22 m), ballast, traverses et rails
+const VOIE = { ballast: 0x8e877a, traverse: 0x5a4430, rail: 0x2a2622 };
+function rail(g, e, metres, px, encre, teintes) {
+  const z = vue.zoom, pm = z / vue.echelle;  // pixels par mètre
+  if (22 * pm >= 6) return voieDePres(g, e.points, 22 / vue.echelle, metres > 8, teintes);
+  const w = largeur(metres / vue.echelle, px);
+  trait(g, e.points, { width: w, color: encre });
+  rayures(g, e.points, "moitie", 10 / z, CREME, { width: w * 0.5 });
+}
+
+// Autoroute : liseré sombre, chaussées rouges (carte routière), terre-plein central jaune entre les deux chaussées
+function autorouteCarte(g, e) {
+  const z = vue.zoom, w = largeur(32 / vue.echelle, 3.2);
+  if (routeDe() === "verte" && w * z > 5) alignement(g, e.points, w, Math.max(8 / vue.echelle, 2.4 / z), 0x3d6a2e);
+  trait(g, e.points, { width: w + 1.6 / z, color: 0x4a1612, alpha: 0.85 });
+  trait(g, e.points, { width: w, color: 0xc8322a });
+  trait(g, e.points, { width: Math.max(w * 0.14, 0.8 / z), color: 0xf6d860 });
+}
+
+// Voie romaine : chaussée pavée ocre, rectiligne, bordée d'encre ; de près, les dalles
+function voieRomaineCarte(g, e) {
+  const z = vue.zoom, w = largeur(8 / vue.echelle, 1.8);
+  trait(g, e.points, { width: w + 1.4 / z, color: 0x4a3020, alpha: 0.85 });
+  trait(g, e.points, { width: w, color: 0xcfa86c });
+  if (w * z > 5) rayures(g, e.points, "paves", w / 2, 0x7a5a3a, { width: w, alpha: 0.6 });
 }
 
 // Icônes de lieux habités, à l'échelle de l'écran, selon l'époque (vue.epoque) et le rang de la ville.
@@ -370,6 +403,10 @@ export const carte = {
     },
     route(g, e) { routeCarte(g, e, 14, 1.6); },
     chemin(g, e) { routeCarte(g, e, 6, 1); },
+    voie_romaine: voieRomaineCarte,
+    voie_ferree(g, e) { rail(g, e, e.rang === 2 ? 6 : 10, e.rang === 2 ? 1.6 : 2.4, ENCRE, VOIE); },
+    lgv(g, e) { rail(g, e, 14, 3, 0x9a1e24, { ...VOIE, traverse: 0xd8d2c4, ballast: 0xb4aea2 }); },
+    autoroute: autorouteCarte,
     ligne_electrique(g, e) {
       const k = ech;
       trait(g, e.points, { width: 1.8 * k, color: ENCRE, alpha: 0.85 });

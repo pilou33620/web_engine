@@ -206,10 +206,14 @@ def reseaux(villes, est_terre, echelle, graine=5, taille=None, pole=None):
         ligne("voie_romaine", [pts[i], pts[j]], i, j, 0.012, 0, depuis=-52, jusqua=499)
 
     # Grandes lignes : étoile depuis la capitale, par les villes du couloir ; les plus proches de la capitale d'abord
-    tronc = sorted(set(range(max(4, n // 20))) | {racine})
-    candidats = list(range(max(4, n // 4)))
+    tronc = sorted(set(range(min(n, max(6, n // 20)))) | {racine})
+    candidats = list(range(n // 4))
     desservies, relies = [], set()
-    for i, p in _arbre_radial(dist, tronc, racine, portee(300 * km)):
+    # vers la capitale hors carte : seulement des villes à moins de 150 km du bord (les autres passent par elles)
+    portee_tronc = lambda i, j: 300 * km if n not in (i, j) else 1e12 if math.dist(pts[i + j - n], point(n, i + j - n)) < 150 * km else -1
+    # (distance à la capitale hors carte comptée depuis le bord, + 200 km : les villes du bord y vont tout droit)
+    dist_tronc = lambda i, j: dist(i, j) if n not in (i, j) or i == j else math.dist(pts[i + j - n], point(n, i + j - n)) + 200 * km
+    for i, p in _arbre_radial(dist_tronc, tronc, racine, portee_tronc):
         a, b = point(p, i), point(i, p)
         gares = [k for k in _gares(pts, a, b, candidats, 0.06) if k not in (i, p)]
         an = round(1842 + 18 * min(1, dist(i, racine) / km / 800) + 2 * _hash(graine, i, p))
@@ -219,8 +223,8 @@ def reseaux(villes, est_terre, echelle, graine=5, taille=None, pole=None):
             relies.add((min(p, i), max(p, i)))
 
     # Lignes secondaires : maillage des villes moyennes, hors des tronçons déjà desservis par une grande ligne
-    second = list(range(max(4, int(n * 0.3))))
-    for i, j in _rng_aretes(dist, second, portee(80 * km), terre_ij):
+    second = list(range(min(n, max(12, int(n * 0.3)))))
+    for i, j in _rng_aretes(dist, second, portee(90 * km), terre_ij):
         if (i, j) in relies or any(i in g and j in g for g in desservies):
             continue
         e = {"rang": 2, "depuis": round(1858 + 27 * _hash(graine, "s", i, j))}
@@ -237,7 +241,7 @@ def reseaux(villes, est_terre, echelle, graine=5, taille=None, pole=None):
             ligne("lgv", [point(p, i), point(i, p)], p, i, 0.03, depuis=round(debut + (2017 - debut) * k / max(1, len(arbre) - 1)))
 
     # Autoroutes : maillage direct des plus grandes villes ; celles qui touchent les plus grandes villes d'abord
-    hautes = sorted(set(range(max(3, int(n * 0.035)))) | {racine})
+    hautes = sorted(set(range(min(n, max(4, int(n * 0.035))))) | {racine})
     for i, j in _rng_aretes(dist, hautes, portee(350 * km), terre_ij):
         rangs = (min(i, n) + min(j, n)) / 2 / len(hautes)
         ligne("autoroute", [point(i, j), point(j, i)], i, j, 0.03, depuis=round(1960 + 29 * min(1, rangs) + 3 * _hash(graine, "a", i, j)))

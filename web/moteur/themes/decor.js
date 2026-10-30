@@ -1,6 +1,7 @@
 // Décor des thèmes : ombrage du relief, teinte d'altitude, papier et vignette.
 // Les textures sont générées une seule fois par carte (puis gardées), jamais à chaque image.
 import { vue } from "./outils.js";
+import { paysageDe } from "./epoque.js";
 
 const P = window.PIXI;
 const LUMIERE = [-0.5, -0.5, 0.707];   // vient du nord-ouest, 45° au-dessus de l'horizon
@@ -161,9 +162,21 @@ export function bruit(x, y, f, decal = 0) {
 export const SOLS = {
   chaume: ["#cfb87e", "#bea86b", 5, 2], ble: ["#d8bf6c", "#c7aa55", 4, 1.7], labour: ["#6f4a31", "#5b3b26", 5, 2.4],
   pre: ["#7aa659", "#72a052", 8, 3.5], colza: ["#418d3e", "#377d35", 4, 2], friche: ["#8e8b4e", "#817e45", 5, 2.2],
+  mais: ["#93a84a", "#748a34", 3, 1.6], solaire: ["#2d3e58", "#a9bad2", 2.4, 0.5],  // maïs (après 1960), ferme solaire (2100)
 };
 // Comme champDe de web_conquete : la culture suit un bruit de quelques km mêlé au tirage de la parcelle
 export const CULTURES = { c: ["chaume", "ble", "labour", "pre", "colza", "friche", "pre", "chaume"], p: ["pre", "pre", "friche", "pre", "chaume", "pre"] };
+// Selon l'époque (epoque.js paysageDe) : céréales et jachères autrefois, maïs et colza après le remembrement
+const CULTURES_EPOQUE = {
+  antique: { c: ["ble", "friche", "chaume", "pre", "friche", "labour", "pre"], p: ["pre", "friche", "pre", "friche", "pre"] },
+  ancien: { c: ["chaume", "ble", "labour", "pre", "friche", "ble", "chaume"], p: CULTURES.p },
+  remembre: { c: ["chaume", "ble", "mais", "labour", "colza", "mais", "pre", "ble"], p: ["pre", "pre", "mais", "pre", "chaume"] },
+  futur: { c: ["ble", "pre", "colza", "chaume", "friche", "pre", "labour", "ble"], p: CULTURES.p },
+};
+// Trame des parcelles (km) : hauteur des rangs, largeur mini et variable, part laissée en friche (fond visible).
+// Antiquité : petits champs épars ; jusqu'en 1959 : lanières étroites ; remembrement : grandes parcelles ; 2100 : moyennes
+const TRAMES = { antique: [0.26, 0.14, 0.16, 0.35], ancien: [0.5, 0.06, 0.12, 0], remembre: [0.78, 0.62, 0.4, 0], futur: [0.5, 0.32, 0.3, 0] };
+export const trame = () => TRAMES[paysageDe()];
 
 export const hash = (i, j, k = 0) => {
   let n = (Math.imul(i | 0, 374761393) + Math.imul(j | 0, 668265263) + Math.imul(k | 0, 1442695041)) | 0;
@@ -173,10 +186,10 @@ export const hash = (i, j, k = 0) => {
 
 // Parcelles en briques de tailles variées (km), sur des rangs qui ne suivent pas la grille de la carte
 export function parcelles(x0, y0, x1, y1, fn) {
-  const hr = 0.78;
+  const [hr, l0, lv] = trame();
   for (let r = Math.floor(y0 / hr) - 1; r * hr < y1 + hr; r++) {
-    const ya = r * hr + (hash(r, 1, 9) - 0.5) * 0.12, yb = (r + 1) * hr + (hash(r + 1, 1, 9) - 0.5) * 0.12;
-    const lx = 0.62 + hash(r, 3, 9) * 0.4, dec = hash(r, 5, 9) * lx;
+    const ya = r * hr + (hash(r, 1, 9) - 0.5) * 0.15 * hr, yb = (r + 1) * hr + (hash(r + 1, 1, 9) - 0.5) * 0.15 * hr;
+    const lx = l0 + hash(r, 3, 9) * lv, dec = hash(r, 5, 9) * lx;
     for (let k = Math.floor((x0 - dec) / lx) - 1; k * lx + dec < x1 + lx; k++) {
       const xa = k * lx + dec + (hash(r, k, 2) - 0.5) * lx * 0.5, xb = (k + 1) * lx + dec + (hash(r, k + 1, 2) - 0.5) * lx * 0.5;
       if (xb < x0 || xa > x1 || yb < y0 || ya > y1) continue;
@@ -187,13 +200,14 @@ export function parcelles(x0, y0, x1, y1, fn) {
 
 // Culture d'une parcelle (comme champDe de web_conquete) : un bruit de quelques km mêlé au tirage de la parcelle
 export function culture(code, xk, yk, tirage) {
-  const liste = CULTURES[code], pays = bruit(xk, yk, 2.5, 40) * 0.8 + tirage * 0.2;
+  const ep = paysageDe(), liste = CULTURES_EPOQUE[ep][code], pays = bruit(xk, yk, 2.5, 40) * 0.8 + tirage * 0.2;
+  if (ep === "futur" && code === "c" && (tirage * 977) % 1 < 0.03) return "solaire";  // fermes solaires ponctuelles
   return liste[Math.min(liste.length - 1, Math.floor(pays * liste.length))];
 }
 
 // Parcelle qui contient un point (km), même découpage que parcelles() ; rend son tirage
 function tirageParcelle(xk, yk) {
-  const r = Math.floor(yk / 0.78), lx = 0.62 + hash(r, 3, 9) * 0.4, dec = hash(r, 5, 9) * lx;
+  const [hr, l0, lv] = trame(), r = Math.floor(yk / hr), lx = l0 + hash(r, 3, 9) * lv, dec = hash(r, 5, 9) * lx;
   return hash(r, Math.floor((xk - dec) / lx), 7);
 }
 const RGB = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
@@ -207,12 +221,17 @@ const COUL = { f: [58, 104, 52], v: [143, 132, 86], l: [163, 158, 104], r: [178,
 export function paysage(carte) {
   const o = carte.occupation, nl = o.lignes.length, nc = o.lignes[0].length, d = o.decalage ?? 0, pas = o.pas;
   const brut = (i, j) => o.lignes[Math.min(nl - 1, Math.max(0, j))][Math.min(nc - 1, Math.max(0, i))];
+  const antique = paysageDe() === "antique", ech = carte.echelle ?? 1;
   // Code d'un point (unités du monde) : les limites ondulent au lieu de suivre la grille ; prolonge la terre d'une case
   const codeA = (x, y) => {
     const cx = x / pas - 0.5 - d, cy = y / pas - 0.5 - d;
     const ox = 1.3 * (bruit(cx, cy, 3.1, 1) - 0.5) * 2 + 0.45 * (bruit(cx, cy, 0.7, 3) - 0.5) * 2;
     const oy = 1.3 * (bruit(cx, cy, 3.1, 2) - 0.5) * 2 + 0.45 * (bruit(cx, cy, 0.7, 4) - 0.5) * 2;
-    return brut(Math.round(cx + ox), Math.round(cy + oy));
+    const c = brut(Math.round(cx + ox), Math.round(cy + oy));
+    if (!antique || (c !== "c" && c !== "p")) return c;
+    // Antiquité : grande forêt gauloise et landes là où l'on cultive aujourd'hui (massifs d'une vingtaine de km)
+    const xk = (x * ech) / 1000, yk = (y * ech) / 1000, n = bruit(xk, yk, 20, 50) * 0.7 + bruit(xk, yk, 4, 51) * 0.3;
+    return n > 0.54 ? "f" : n < 0.3 ? "l" : c;
   };
   // Distances (en cases) par chanfrein en deux passes : à la terre côté mer, à l'eau côté terre
   const distance = (loin) => {
@@ -302,7 +321,7 @@ const fonds = {};  // une texture de fond par carte (partagée par les thèmes)
 export function terrain(carte) {
   const o = carte.occupation;
   if (!o?.lignes?.length) return null;
-  const [L, H] = carte.taille, cle = JSON.stringify([carte.taille, o.pas, o.lignes.length, o.lignes[0], o.lignes.at(-1), vue.epoque]);
+  const [L, H] = carte.taille, cle = JSON.stringify([carte.taille, o.pas, o.lignes.length, o.lignes[0], o.lignes.at(-1), vue.epoque, paysageDe()]);
   if (fonds.cle !== cle) {
     fonds.texture?.destroy(true);
     Object.assign(fonds, { cle, texture: P.Texture.from(peindre(carte)) });

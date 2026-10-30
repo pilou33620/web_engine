@@ -56,7 +56,9 @@ export class ClimatRendu {
     for (const c of [...this.lumieres.removeChildren(), ...this.ombres.removeChildren()]) c.destroy();
     for (const v of carte.entites.filter((e) => e.lumiere)) {  // entités qui s'éclairent la nuit
       const g = new P.Graphics();
-      for (const r of [110, 75, 45, 22]) g.circle(v.x, v.y, r).fill({ color: 0xffb25a, alpha: 0.13 });
+      // halo à la taille de la ville (et non fixe, sinon il couvre l'écran au fort zoom)
+      const R = 0.8 * (v.taille ?? 0.5 * Math.sqrt(v.population ?? 2000));
+      for (const k of [1, 0.68, 0.41, 0.2]) g.circle(v.x, v.y, R * k).fill({ color: 0xffb25a, alpha: 0.13 });
       this.lumieres.addChild(g);
     }
     const [L, H] = this.taille;

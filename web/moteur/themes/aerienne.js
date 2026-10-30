@@ -2,6 +2,7 @@
 // Chaque type (zone, ligne, batiment, unite) a une table de styles ; « _ » est le dessin par défaut.
 import { alea, trait, traitVariable, pointilles, lelong, forme, boite, semis, etiquette, nomLieu, vue, largeur } from "./outils.js";
 import { decor, terrain } from "./decor.js";
+import { routeDe, rayures, parallele, voieDePres, alignement } from "./epoque.js";
 
 const decorAerien = decor("aerienne", { force: 0.18 });
 let avecSol = false;
@@ -32,17 +33,49 @@ function eau(g, e) {
   forme(g, e).stroke({ width: 8, color: 0x8fb8d8, alpha: 0.45 });
 }
 
-// Route vue du ciel : vraie largeur (m) mais au moins px à l'écran. Ancienne : terre battue claire ;
-// moderne : bitume, ligne médiane sur les grands axes quand elle est assez large pour se voir
+// Route vue du ciel selon l'année (epoque.js routeDe) : vraie largeur (m) mais au moins px à l'écran. Sentier de terre
+// ocre, chemin de terre battue claire, route empierrée grise, goudronnée, bitume moderne (ligne médiane quand elle se
+// voit), en 2100 bitume clair bordé d'arbres et voies vertes
 function routeAerienne(g, e, metres, px) {
-  const w = largeur(metres / vue.echelle, px), bord = 1.4 / vue.zoom;
-  if (vue.epoque === "moderne") {
-    trait(g, e.points, { width: w + bord, color: 0x2e2e2e, alpha: 0.7 });
-    trait(g, e.points, { width: w, color: metres > 10 ? 0x55575a : 0x707274 });
-    if (metres > 10 && w * vue.zoom > 7) pointilles(g, e.points, w * 1.5, w * 1.2, { width: w / 10, color: 0xeeeeea });
-    return;
-  }
-  trait(g, e.points, { width: w, color: 0xe9dcb4, alpha: metres > 10 ? 0.85 : 0.6 });  // fin chemin de terre claire
+  const w = largeur(metres / vue.echelle, px), bord = 1.4 / vue.zoom, grand = metres > 10, z = vue.zoom;
+  let aspect = routeDe();
+  if (aspect === "empierree" && !grand) aspect = "terre";
+  if (aspect === "sentier") return trait(g, e.points, { width: w * 0.8, color: 0xb89c6c, alpha: grand ? 0.8 : 0.6 });
+  if (aspect === "terre") return trait(g, e.points, { width: w, color: 0xe9dcb4, alpha: grand ? 0.85 : 0.6 });
+  const [b, fort, faible] = { empierree: [0x7a6a4e, 0xd2c8ac], goudron: [0x2e2e2e, 0x66666a, 0xbfb49a],
+    moderne: [0x2e2e2e, 0x55575a, 0x707274], verte: [0x3e5a34, 0x6e7072, 0xd8cfa8] }[aspect];
+  if (aspect === "verte" && grand && w * z > 3) alignement(g, e.points, w, Math.max(8 / vue.echelle, 2.4 / z), 0x3a7a35);
+  trait(g, e.points, { width: w + bord, color: b, alpha: aspect === "empierree" ? 0.55 : 0.7 });
+  trait(g, e.points, { width: w, color: grand ? fort : faible });
+  if (grand && aspect !== "empierree" && w * z > 7) rayures(g, e.points, "moitie", w * 2.6, 0xeeeeea, { width: w / 10 });
+}
+
+// Voie ferrée vue du ciel : de loin un trait de ballast sombre (LGV claire), de près (22 m exagérés) traverses et rails
+const VOIE = { ballast: 0x8a8378, traverse: 0x5a4632, rail: 0x30302e };
+function railAerien(g, e, metres, px, couleur, teintes) {
+  const z = vue.zoom;
+  if ((22 * z) / vue.echelle >= 6) return voieDePres(g, e.points, 22 / vue.echelle, metres > 8, teintes);
+  const w = largeur(metres / vue.echelle, px);
+  trait(g, e.points, { width: w + 1.2 / z, color: 0x2e2a26, alpha: 0.6 });
+  trait(g, e.points, { width: w, color: couleur });
+}
+
+// Autoroute : deux chaussées de bitume séparées par un terre-plein vert ; de près, lignes de voies blanches
+function autorouteAerienne(g, e) {
+  const z = vue.zoom, w = largeur(32 / vue.echelle, 3), vert = routeDe() === "verte";
+  if (vert && w * z > 5) alignement(g, e.points, w, Math.max(8 / vue.echelle, 2.4 / z), 0x3a7a35);
+  trait(g, e.points, { width: w + 1.4 / z, color: 0x2a2a2a, alpha: 0.75 });
+  trait(g, e.points, { width: w, color: vert ? 0x5c5e60 : 0x505256 });
+  trait(g, e.points, { width: Math.max(w * 0.16, 0.8 / z), color: 0x5d8a46 });
+  if (w * z > 10) for (const d of [-0.3, 0.3]) rayures(g, parallele(e.points, d * w), "moitie", w * 0.8, 0xeeeeea, { width: w * 0.03 });
+}
+
+// Voie romaine : dalles de pierre claire, rectiligne
+function voieRomaineAerienne(g, e) {
+  const z = vue.zoom, w = largeur(8 / vue.echelle, 1.6);
+  trait(g, e.points, { width: w + 1.2 / z, color: 0x6e6450, alpha: 0.7 });
+  trait(g, e.points, { width: w, color: 0xc4b89c });
+  if (w * z > 5) rayures(g, e.points, "paves", w / 2, 0x8a7e66, { width: w, alpha: 0.6 });
 }
 
 function libelle(e, sous = "") {
@@ -103,6 +136,10 @@ export const aerienne = {
     },
     route(g, e) { routeAerienne(g, e, 14, 1.6); },
     chemin(g, e) { routeAerienne(g, e, 6, 1); },
+    voie_romaine: voieRomaineAerienne,
+    voie_ferree(g, e) { railAerien(g, e, e.rang === 2 ? 6 : 10, e.rang === 2 ? 1.3 : 1.8, 0x5a5048, VOIE); },
+    lgv(g, e) { railAerien(g, e, 14, 2.2, 0xc8c2b6, { ...VOIE, ballast: 0xb6b0a6, traverse: 0xd8d4cc }); },
+    autoroute: autorouteAerienne,
     ligne_electrique(g, e) {
       trait(g, e.points, { width: 2, color: 0x2a2a2a, alpha: 0.8 });
       lelong(e.points, 60, (x, y) => g.rect(x - 4, y - 4, 8, 8).fill(0x6a6a6a).stroke({ width: 1.5, color: 0x2a2a2a }));
