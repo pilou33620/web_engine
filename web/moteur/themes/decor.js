@@ -1,5 +1,7 @@
 // Décor des thèmes : ombrage du relief, teinte d'altitude, papier et vignette.
 // Les textures sont générées une seule fois par carte (puis gardées), jamais à chaque image.
+import { vue } from "./outils.js";
+
 const P = window.PIXI;
 const LUMIERE = [-0.5, -0.5, 0.707];   // vient du nord-ouest, 45° au-dessus de l'horizon
 const textures = {};             // nom du décor → { cle, texture }
@@ -229,6 +231,10 @@ function couleur(P, x, y) {
     const a = bruit(cases, lignes, 4, 5) * 0.75 + bruit(cases, lignes, 1.2, 6) * 0.25, b = bruit(cases, lignes, 7, 7) * 0.4;
     const vert = code === "p" ? 0.35 + 0.5 * a : a;
     c = [lerp(lerp(206, 124, vert), 196, b), lerp(lerp(186, 166, vert), 178, b), lerp(lerp(122, 90, vert), 120, b)];
+  } else if (code === "u") {
+    // ville : tuiles et pierre d'autrefois, ou béton et bitume d'aujourd'hui (vue.epoque)
+    const n = bruit(cases, lignes, 0.6, 12);
+    c = vue.epoque === "moderne" ? [lerp(128, 160, n), lerp(126, 156, n), lerp(124, 150, n)] : [lerp(150, 182, n), lerp(102, 130, n), lerp(80, 100, n)];
   } else c = [...COUL[code]];
   if (code === "f") {
     const n = bruit(cases, lignes, 2.5, 8);
@@ -244,7 +250,7 @@ const fonds = {};  // une texture de fond par carte (partagée par les thèmes)
 export function terrain(carte) {
   const o = carte.occupation;
   if (!o?.lignes?.length) return null;
-  const [L, H] = carte.taille, cle = JSON.stringify([carte.taille, o.pas, o.lignes.length, o.lignes[0], o.lignes.at(-1)]);
+  const [L, H] = carte.taille, cle = JSON.stringify([carte.taille, o.pas, o.lignes.length, o.lignes[0], o.lignes.at(-1), vue.epoque]);
   if (fonds.cle !== cle) {
     fonds.texture?.destroy(true);
     Object.assign(fonds, { cle, texture: P.Texture.from(peindre(carte)) });
@@ -270,7 +276,7 @@ function peindre(carte) {
   }
   ctx.putImageData(img, 0, 0);
   // Mer peinte partout, terres par-dessus découpées par les polygones : côtes nettes et lisses
-  const terres = carte.entites.filter((e) => e.type === "zone" && e.points && e.style !== "mer" && e.style !== "lac");
+  const terres = carte.entites.filter((e) => e.type === "zone" && e.points && !["mer", "lac", "estuaire"].includes(e.style));
   if (!terres.length) return c;
   const [c2, ctx2] = toile(w, h);
   const im2 = ctx2.createImageData(w, h), q = im2.data;

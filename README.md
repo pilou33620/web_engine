@@ -44,6 +44,7 @@ Créer `jeux/mon_jeu/regles.py` avec une classe `Regles` :
 | `vue(monde, id)` + `VUES` | optionnel : cartes de données `{id_entite: 0..1}` coloriées sur la carte |
 | `CONSTRUCTIONS`, `peut_construire`, `construit` | optionnel : ce que le joueur peut construire (voir moteur/construction.py) |
 | `TITRE`, `CLIMAT`, `TUTORIEL` | optionnels : nom du jeu, climat, étapes du tutoriel guidé |
+| `EPOQUE` | optionnel : `"ancien"` (défaut : bourgs, châteaux, chemins de terre) ou `"moderne"` (immeubles, tours, routes goudronnées) |
 
 ### Entités universelles
 
@@ -88,6 +89,11 @@ from moteur import cartes
 cartes.charger(monde, "aquitaine")                       # carte toute faite
 cartes.generer(monde, forme="îles", mer=0.5, graine=7)   # carte générée (réglages : moteur/generateur.py, REGLAGES)
 ```
+
+Les villes viennent des communes INSEE (toutes celles de plus de ~900 habitants en Aquitaine, ~4 000 en France,
+espacées), avec leur emprise bâtie peinte dans l'occupation du sol. Les rivières sont raccordées entre elles et à la mer
+(estuaire de la Gironde, bassin d'Arcachon et étangs repris de web_conquete). Les routes relient chaque ville à ses
+voisines naturelles (`moteur/routes.py`) : grands axes et chemins, dessinés selon l'époque.
 
 Le générateur règle : taille et forme des terres (continent, côte, îles, isthme, presqu'île), part de mer, montagnes,
 collines, altitude, rivières, régions, villes, forêts, cultures, latitude et graine. Chaque carte apporte son climat

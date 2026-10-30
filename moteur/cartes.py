@@ -3,7 +3,7 @@
   {"nom", "taille": [L, H] (unités), "echelle": mètres par unité, "latitude": degrés,
    "relief": {"pas", "valeurs"} | None, "zones_climat": [...] | None,
    "occupation": {"pas", "lignes": [chaîne par ligne], "decalage"?} | None  — occupation du sol, une lettre par case :
-       "." eau / hors terre, c cultures, p prairies, f forêts, v vignes, l landes, r roche ; case (i, j) centrée en
+       "." eau / hors terre, c cultures, p prairies, f forêts, v vignes, l landes, r roche, u ville ; case (i, j) centrée en
        ((i + 0.5 + decalage) × pas, (j + 0.5 + decalage) × pas), decalage 0 par défaut,
    "entites": [{"type", "style", "calque", ...}]}
 
@@ -16,6 +16,23 @@ import re
 from .climat import Climat
 
 DOSSIER = pathlib.Path(__file__).resolve().parent.parent / "cartes"
+
+
+def urbaniser(occupation, villes):
+    """Marque « u » les cases bâties autour des villes (taille = diamètre de l'emprise, en unités)."""
+    pas, d, lignes = occupation["pas"], occupation.get("decalage", 0), [list(l) for l in occupation["lignes"]]
+    for v in villes:
+        r = v.get("taille", 0) / 2
+        if r < 0.5 * pas:
+            continue  # village : l'icône suffit
+        for j in range(max(0, int((v["y"] - r) / pas - d) - 1), min(len(lignes), int((v["y"] + r) / pas - d) + 2)):
+            for i in range(max(0, int((v["x"] - r) / pas - d) - 1), min(len(lignes[0]), int((v["x"] + r) / pas - d) + 2)):
+                x, y = (i + 0.5 + d) * pas, (j + 0.5 + d) * pas
+                # bords irréguliers : la ville s'étire le long d'un axe propre à chaque ville
+                k = ((x - v["x"]) * 0.8) ** 2 + (y - v["y"]) ** 2 if sum(map(ord, v.get("nom", ""))) % 2 else (x - v["x"]) ** 2 + ((y - v["y"]) * 0.8) ** 2
+                if lignes[j][i] != "." and k < r * r:
+                    lignes[j][i] = "u"
+    occupation["lignes"] = ["".join(l) for l in lignes]
 
 
 def disponibles():

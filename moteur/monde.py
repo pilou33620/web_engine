@@ -158,6 +158,7 @@ class Monde:
     def carte(self):
         r = self.regles
         return {"version": self.version_carte, "taille": self.taille, "echelle": self.echelle, "titre": getattr(r, "TITRE", ""),
+                "epoque": getattr(r, "EPOQUE", "ancien"),  # "ancien" ou "moderne" : dessin des villes et des routes
                 "entites": [e for e in self.entites.values() if not e["mobile"]],
                 "constructions": getattr(r, "CONSTRUCTIONS", []), "vues": getattr(r, "VUES", []),
                 "tutoriel": getattr(r, "TUTORIEL", []), "relief": self.relief,

@@ -5,6 +5,9 @@
 Sources (téléchargées dans le cache si absentes) :
   - départements : github.com/gregoiredavid/france-geojson (données IGN/INSEE, Licence Ouverte)
   - pays, fleuves, lacs : Natural Earth (domaine public)
+  - communes (contours et populations) : france-geojson et @etalab/decoupage-administratif (INSEE, Licence Ouverte)
+  - fleuves, étangs et estuaire du Sud-Ouest, tracés à la main : github.com/pilou33620/web_conquete (game/data/geo.json)
+Les routes ne sont pas réelles : elles relient les villes voisines (moteur/routes.py), quelle que soit l'époque.
 Projection conique conforme de Lambert (paramètres de Lambert-93, sphère). Les contours sont simplifiés :
 la carte est reconnaissable, pas exacte au mètre près. Le relief est approché par les grands massifs.
 """
@@ -13,7 +16,13 @@ import math
 import pathlib
 import random
 import sys
+import io
+import tarfile
 import urllib.request
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+from moteur.cartes import urbaniser  # noqa: E402
+from moteur.routes import relier  # noqa: E402
 
 RACINE = pathlib.Path(__file__).resolve().parent.parent
 CACHE = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else RACINE / ".cache_geo"
@@ -24,6 +33,10 @@ SOURCES = {
     "fleuves.geojson": NE + "ne_10m_rivers_europe.geojson",
     "fleuves2.geojson": NE + "ne_10m_rivers_lake_centerlines.geojson",
     "lacs.geojson": NE + "ne_10m_lakes_europe.geojson",
+    "communes.geojson": "https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/communes-version-simplifiee.geojson",
+    "conquete.json": "https://raw.githubusercontent.com/pilou33620/web_conquete/main/game/data/geo.json",
+    "communes.json": ("https://registry.npmjs.org/@etalab/decoupage-administratif/-/decoupage-administratif-6.0.0.tgz",
+                      "package/data/communes.json"),
 }
 
 # Préfectures (code : nom, latitude, longitude, population de la commune, arrondie)
@@ -61,20 +74,6 @@ PREFECTURES = {
     "90": ("Belfort", 47.640, 6.863, 46000), "91": ("Évry-Courcouronnes", 48.629, 2.441, 67000), "92": ("Nanterre", 48.892, 2.207, 96000),
     "93": ("Bobigny", 48.908, 2.439, 54000), "94": ("Créteil", 48.790, 2.455, 92000), "95": ("Cergy", 49.036, 2.076, 66000),
 }
-# Autres villes notables (nom, latitude, longitude, population)
-VILLES = [
-    ("Le Havre", 49.494, 0.108, 170000), ("Reims", 49.258, 4.032, 180000), ("Brest", 48.390, -4.486, 140000),
-    ("Mulhouse", 47.750, 7.336, 108000), ("Aix-en-Provence", 43.529, 5.447, 145000), ("Saint-Nazaire", 47.273, -2.213, 72000),
-    ("Béziers", 43.344, 3.216, 79000), ("Cannes", 43.552, 7.017, 74000), ("Calais", 50.951, 1.858, 67000),
-    ("Dunkerque", 51.034, 2.377, 87000), ("Lorient", 47.748, -3.370, 57000), ("Saint-Malo", 48.649, -2.026, 46000),
-    ("Bayonne", 43.493, -1.475, 52000), ("Biarritz", 43.483, -1.559, 25000), ("Arcachon", 44.658, -1.168, 11000),
-    ("Bergerac", 44.853, 0.483, 27000), ("Dax", 43.710, -1.054, 21000), ("Libourne", 44.915, -0.243, 25000),
-    ("Sarlat-la-Canéda", 44.890, 1.216, 9000), ("Villeneuve-sur-Lot", 44.408, 0.705, 22000), ("Marmande", 44.500, 0.165, 18000),
-    ("Oloron-Sainte-Marie", 43.194, -0.607, 10000), ("Langon", 44.553, -0.249, 7500), ("Lesparre-Médoc", 45.307, -0.938, 5700),
-    ("Blaye", 45.128, -0.662, 5000), ("Nontron", 45.529, 0.662, 3000), ("Orthez", 43.488, -0.773, 10500),
-    ("Lacanau", 45.000, -1.198, 5000), ("Biscarrosse", 44.394, -1.164, 15000), ("Coutras", 45.041, -0.128, 8500),
-    ("Nérac", 44.136, 0.339, 7000), ("Ribérac", 45.250, 0.338, 4000),
-]
 # Grands massifs : (tracé en lon/lat, altitude du sommet en m, demi-largeur en km)
 MASSIFS = [
     ([(-1.7, 43.1), (-0.5, 42.85), (0.6, 42.7), (1.7, 42.6), (2.6, 42.5), (3.1, 42.45)], 2700, 32),   # Pyrénées
@@ -157,10 +156,14 @@ def bruit_valeur(rng, nc, nl, taille):
     return sortie
 
 
-def occupation(proj, L, H, ech, terres, relief, pas):
+def occupation(proj, L, H, ech, terres, eaux, relief, pas):
     """Occupation du sol plausible (pas exacte) : terroirs connus + altitude + bruit. Une chaîne par ligne de cases."""
     nc, nl = L // pas + 1, H // pas + 1
     terre = remplir(terres, nc, nl, pas)
+    for j, ligne in enumerate(remplir(eaux, nc, nl, pas)):  # étangs, lacs et estuaire creusent la terre
+        for i, v in enumerate(ligne):
+            if v:
+                terre[j][i] = 0
     rng = random.Random(11)
     bruits = {c: [bruit_valeur(rng, nc, nl, t) for t in (max(2, round(8000 / ech / pas)), max(2, round(2500 / ech / pas)))]
               for c in CODES}
@@ -234,10 +237,28 @@ def lambert(lon, lat):
 def telecharger():
     CACHE.mkdir(exist_ok=True)
     for nom, url in SOURCES.items():
-        if not (CACHE / nom).exists():
-            print("téléchargement", url)
+        if (CACHE / nom).exists():
+            continue
+        print("téléchargement", url if isinstance(url, str) else url[0])
+        if isinstance(url, str):
             urllib.request.urlretrieve(url, CACHE / nom)
-    return {nom: json.loads((CACHE / nom).read_text(encoding="utf-8"))["features"] for nom in SOURCES}
+        else:  # un fichier dans une archive npm
+            with urllib.request.urlopen(url[0]) as r, tarfile.open(fileobj=io.BytesIO(r.read())) as t:
+                (CACHE / nom).write_bytes(t.extractfile(url[1]).read())
+    lire = lambda nom: json.loads((CACHE / nom).read_text(encoding="utf-8"))
+    donnees = {nom: lire(nom)["features"] for nom in SOURCES if nom.endswith(".geojson") and nom != "communes.geojson"}
+    donnees["conquete"] = lire("conquete.json")
+    # Communes : centre approché (moyenne des sommets du plus grand contour) et population
+    pop = {c["code"]: c.get("population", 0) for c in lire("communes.json") if c.get("type") == "commune-actuelle"}
+    donnees["communes"] = []
+    for f in lire("communes.geojson")["features"]:
+        g = f["geometry"]
+        if not g:
+            continue
+        anneau = max(anneaux(g), key=len)
+        lo, la = sum(p[0] for p in anneau) / len(anneau), sum(p[1] for p in anneau) / len(anneau)
+        donnees["communes"].append((f["properties"]["nom"], la, lo, pop.get(f["properties"]["code"], 0)))
+    return donnees
 
 
 def douglas(pts, tol):
@@ -386,58 +407,85 @@ def fabriquer(cle, donnees):
             if dans_region:
                 terres_region.append(c)
 
-    # Lacs
+    # Eaux : étangs, bassin d'Arcachon et estuaire de la Gironde tracés dans web_conquete, lacs de Natural Earth ailleurs
+    cq = donnees["conquete"]
+    cb = cq["bounds"]
+    chez_conquete = lambda lo, la: cb["lon0"] <= lo <= cb["lon1"] and cb["lat0"] <= la <= cb["lat1"]
+    eaux = []
+    for w in cq["waters"]:
+        if (c := contour(w["ring"] + [w["ring"][0]], 0.4)):
+            salee = "Estuaire" in w["name"] or "Bassin" in w["name"]  # eau de mer : même teinte que l'océan
+            entites.append({"type": "zone", "style": "estuaire" if salee else "lac", "calque": "eau", "points": c, "nom": w["name"]})
+            eaux.append(c)
     for f in donnees["lacs.geojson"]:
         for a in anneaux(f["geometry"]):
+            if any(chez_conquete(lo, la) for lo, la in a[:5]):
+                continue
             if all(lo0 <= lo <= lo1 and la0 <= la <= la1 for lo, la in a[:5]) and (c := contour(a, 0.8)):
                 if aire_centre(c)[0] > (40 if cle == "france" else 15):
                     nom = f["properties"].get("name_fr") or f["properties"].get("name")
                     entites.append({"type": "zone", "style": "lac", "calque": "eau", "points": c} | ({"nom": nom} if nom else {}))
+                    eaux.append(c)
 
-    # Fleuves et rivières : un seul nom par cours d'eau (sur son plus long tronçon)
-    troncons = []
+    # Fleuves et rivières : ceux de web_conquete dans le Sud-Ouest, Natural Earth ailleurs ; puis raccordés entre eux
+    troncons = []  # (nom, rang 1 fleuve … 4 ruisseau, points)
+    noms_cq = {r["name"] for r in cq["rivers"]}
+    for r in cq["rivers"]:
+        pts = douglas([tuple(proj(lo, la)) for lo, la in r["pts"]], 0.35)
+        if len(pts) >= 2 and (cle != "france" or r["rank"] <= 2):
+            troncons.append((r["name"], r["rank"], [list(q) for q in pts]))
     for f in donnees["fleuves.geojson"] + donnees["fleuves2.geojson"]:
-        p = f["properties"]
-        rang = p.get("scalerank") or 10  # 2 = très grand fleuve … 12 = petite rivière
-        if cle == "france" and rang > 11:
+        pr = f["properties"]
+        rang_ne = pr.get("scalerank") or 10  # 2 = très grand fleuve … 12 = petite rivière
+        if cle == "france" and rang_ne > 11:
             continue
-        poids = max(0.3, (12 - rang) / 4)
-        nom = p.get("name_fr") or p.get("name") or ""
-        nom = CORRECTIONS.get(nom, nom)
+        nom = CORRECTIONS.get(pr.get("name_fr") or pr.get("name") or "", pr.get("name_fr") or pr.get("name") or "")
         for l in lignes(f["geometry"]):
             if not any(lo0 <= lo <= lo1 and la0 <= la <= la1 for lo, la in l):
                 continue
+            if nom in noms_cq and all(chez_conquete(lo, la) for lo, la in l):
+                continue  # tracé plus fin dans web_conquete
             pts = douglas([tuple(proj(lo, la)) for lo, la in l], 0.8)
-            pts = [[round(x, 1), round(y, 1)] for x, y in pts if -100 <= x <= L + 100 and -100 <= y <= H + 100]
             if len(pts) >= 2:
-                long = sum(math.dist(a, b) for a, b in zip(pts, pts[1:]))
-                troncons.append((nom, long, poids, pts))
-    nomme = {}
-    for nom, long, poids, pts in troncons:
-        if nom and long > nomme.get(nom, (0,))[0]:
-            nomme[nom] = (long, id(pts))
-    for nom, long, poids, pts in troncons:
+                troncons.append((nom, 1 if rang_ne <= 5 else 2 if rang_ne <= 8 else 3, [list(q) for q in pts]))
+    raccorder(troncons, terres, eaux, 6000 / ech)
+    plus_long = {}
+    for k, (nom, rang, pts) in enumerate(troncons):
+        long = sum(math.dist(a, b) for a, b in zip(pts, pts[1:]))
+        if nom and long > plus_long.get(nom, (0, 0))[0]:
+            plus_long[nom] = (long, k)
+    for k, (nom, rang, pts) in enumerate(troncons):
+        pts = [[round(x, 1), round(y, 1)] for x, y in pts]
         e = {"type": "ligne", "style": "riviere", "calque": "eau", "points": pts,
-             "largeur": round(min(14, 2 + poids * 5) * (100 / ech) ** 0.5, 1)}
-        if nom and nomme[nom][1] == id(pts):
+             "largeur": round([0, 320, 160, 90, 60][min(4, rang)] / ech, 2), "rang": rang}  # vraie largeur (m → unités)
+        if nom and plus_long[nom][1] == k:
             e["nom"] = nom
         entites.append(e)
 
-    # Villes
+    # Villes : préfectures, puis les communes les plus peuplées, espacées (les petites ne collent pas aux grandes)
     region = cfg["region"]
-    villes = [(n, la, lo, p, code) for code, (n, la, lo, p) in PREFECTURES.items() if region is None or code in region]
-    villes += [(n, la, lo, p, None) for n, la, lo, p in VILLES]
-    for nom, la, lo, pop, code in villes:
-        x, y = proj(lo, la)
-        if not (0 < x < L and 0 < y < H) or (cle == "france" and code is None and pop < 60000):
-            continue
-        if region and code is None and not any(dans(x, y, c) for c in terres_region):
-            continue
-        e = {"type": "batiment", "style": "ville", "calque": "batiments", "nom": nom, "x": x, "y": y,
-             "population": pop, "taille": round(8 + math.sqrt(pop) / 25 * (100 / ech) ** 0.5), "lumiere": True}
-        if code:
+    seuil, ecart = (4000, 9000) if cle == "france" else (900, 4500)  # habitants, m entre deux villes
+    villes = []
+    def placer(nom, x, y, pop, prefecture=False):
+        if not (0 < x < L and 0 < y < H) or any(math.dist((x, y), (v["x"], v["y"])) * ech < ecart * (1 + (v["population"] > 50000)) for v in villes):
+            return
+        e = {"type": "batiment", "style": "ville", "calque": "batiments", "nom": nom, "x": round(x, 1), "y": round(y, 1),
+             "population": pop, "taille": round(40 * math.sqrt(pop) / ech, 1), "lumiere": True}
+        if prefecture:
             e["prefecture"] = True
-        entites.append(e)
+        villes.append(e)
+    for code, (nom, la, lo, pop) in PREFECTURES.items():
+        if region is None or code in region:
+            placer(nom, *proj(lo, la), pop, True)
+    zones_region = terres_region if region else terres
+    for nom, la, lo, pop in sorted(donnees["communes"], key=lambda c: -c[3]):
+        if pop < seuil:
+            break
+        x, y = proj(lo, la)
+        dedans = any(dans(x, y, c) for c in zones_region)
+        if dedans or pop >= 15000:  # hors de la région, seulement les villes qui comptent
+            placer(nom, x, y, pop)
+    entites += villes
 
     # Relief approché : massifs en crêtes gaussiennes + ondulation, 0 en mer
     rng = random.Random(7)
@@ -470,9 +518,59 @@ def fabriquer(cle, donnees):
                  {"nom": "Côte", "rect": [-1e9, -1e9, proj(-0.95, 44.5)[0], 1e9], "pluie": 1.15, "vent": 1.5},
                  {"nom": "Intérieur", "rect": [-1e9, -1e9, 1e9, 1e9]}]
     relief = {"pas": pas, "valeurs": valeurs}
+    occ = occupation(proj, L, H, ech, terres, eaux, relief, max(round(1200 / ech), round(max(L, H) / 320)))
+    urbaniser(occ, villes)
+    o, op = occ["lignes"], occ["pas"]
+    est_terre = lambda x, y: 0 <= y < H and 0 <= x < L and o[int(y // op)][int(x // op)] != "."
+    entites += relier(villes, est_terre, ech, taille=[L, H])
     return {"nom": cfg["nom"], "taille": [L, H], "echelle": ech, "latitude": cfg["latitude"], "relief": relief,
-            "occupation": occupation(proj, L, H, ech, terres, relief, max(round(1200 / ech), round(max(L, H) / 320))),
-            "zones_climat": zones, "entites": entites}
+            "occupation": occ, "zones_climat": zones, "entites": entites}
+
+
+def raccorder(troncons, terres, eaux, portee):
+    """Prolonge les bouts de rivière qui s'arrêtent à côté d'une autre rivière, de la mer ou d'un lac (données
+    simplifiées) : un affluent touche son fleuve, un fleuve touche l'estuaire. portee : distance maximale (unités)."""
+    boites = [(min(p[0] for p in c), min(p[1] for p in c), max(p[0] for p in c), max(p[1] for p in c), c) for c in terres]
+    sur_terre = lambda x, y: any(b[0] <= x <= b[2] and b[1] <= y <= b[3] and dans(x, y, b[4]) for b in boites) \
+        and not any(dans(x, y, e) for e in eaux)
+    for k, (nom, rang, pts) in enumerate(troncons):
+        for bout in (0, -1):
+            x, y = pts[bout]
+            if not sur_terre(x, y):
+                continue  # déjà dans l'eau
+            meilleur = None
+            for j, (_, _, autre) in enumerate(troncons):
+                if j == k:
+                    continue
+                for a, b in zip(autre, autre[1:]):
+                    q = proche_segment(x, y, a, b)
+                    d = math.dist((x, y), q)
+                    if 0 < d < portee and (meilleur is None or d < meilleur[0]):
+                        meilleur = (d, q)
+            if meilleur and meilleur[0] < 0.3:
+                continue  # déjà raccordé
+            # l'eau libre la plus proche : cercles de plus en plus grands autour du bout
+            for r in range(1, 25):
+                rr = portee * r / 24
+                if meilleur and rr > meilleur[0]:
+                    break
+                eau = [(x + rr * math.cos(a / 16 * math.pi), y + rr * math.sin(a / 16 * math.pi)) for a in range(32)]
+                eau = [q for q in eau if not sur_terre(*q)]
+                if eau:
+                    meilleur = (rr, min(eau, key=lambda q: math.dist(q, (x, y))))
+                    break
+            if meilleur:
+                q = [round(meilleur[1][0], 1), round(meilleur[1][1], 1)]
+                if bout == 0:
+                    pts.insert(0, q)
+                else:
+                    pts.append(q)
+
+
+def proche_segment(px, py, a, b):
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    t = max(0, min(1, ((px - a[0]) * dx + (py - a[1]) * dy) / (dx * dx + dy * dy or 1)))
+    return (a[0] + t * dx, a[1] + t * dy)
 
 
 def dist_segment(px, py, a, b):

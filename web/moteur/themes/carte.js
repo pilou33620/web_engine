@@ -1,6 +1,6 @@
 // Thème « Carte » : carte stratégique ancienne (couleurs passées, relief ombré, noms en lettres à empattements).
 // Même structure que aerienne.js : tables de styles par type, « _ » par défaut.
-import { alea, trait, traitVariable, pointilles, lelong, forme, boite, etiquette, nomLieu } from "./outils.js";
+import { alea, trait, traitVariable, pointilles, lelong, forme, boite, etiquette, nomLieu, vue, largeur } from "./outils.js";
 import { decor, terrain, MER_LARGE } from "./decor.js";
 
 const P = window.PIXI;
@@ -14,7 +14,7 @@ const PASTELS = [0xdcc9a0, 0xcdc69b, 0xd8bca2, 0xc6c7a2, 0xdfcfae, 0xcbbf98, 0xd
 // Préparé une fois par carte (voir decor) : épaisseur de référence, rang des villes, arêtes partagées, côtes
 let ech = 1, rangs = () => 0, aretes = new Map(), traces = new Set(), cotes = [];
 const cle = (a, b) => (a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]) ? a + "|" + b : b + "|" + a);
-const terreFerme = (e) => e.type === "zone" && e.points && e.style !== "mer" && e.style !== "lac";
+const terreFerme = (e) => e.type === "zone" && e.points && !["mer", "lac", "estuaire"].includes(e.style);
 
 function preparer(carte) {
   const [L, H] = carte.taille;
@@ -272,7 +272,20 @@ function cartouche(texte, taille, chefLieu) {
   return c;
 }
 
-// Icônes de lieux habités, à l'échelle de l'écran : 0 hameau, 1 bourg à clocher, 2 ville à château
+// Route : vraie largeur (m) mais au moins px à l'écran. Ancienne : chaussée claire bordée d'encre ;
+// moderne : comme une carte routière, grands axes rouges, petites routes blanches, liseré sombre
+function routeCarte(g, e, metres, px) {
+  const w = largeur(metres / vue.echelle, px), bord = 1.6 / vue.zoom, grand = metres > 10;
+  if (vue.epoque === "moderne") {
+    trait(g, e.points, { width: w + bord, color: 0x3a3030, alpha: 0.8 });
+    return trait(g, e.points, { width: w, color: grand ? 0xc8402e : 0xf6f0e0 });
+  }
+  trait(g, e.points, { width: w + bord, color: 0x5a4030, alpha: grand ? 0.85 : 0.5 });
+  trait(g, e.points, { width: w, color: grand ? 0xe6d6ae : 0xdcc9a0 });
+}
+
+// Icônes de lieux habités, à l'échelle de l'écran, selon l'époque (vue.epoque) et le rang de la ville.
+// Ancien : 0 hameau, 1 bourg à clocher, 2 ville à château
 const ICONES = [
   (g) => g.rect(-6, -3, 12, 8).fill(CREME).stroke({ width: 1.3, color: ENCRE })
     .poly([-8, -3, 0, -10, 8, -3]).fill(ROUGE).stroke({ width: 1.3, color: ENCRE }),
@@ -291,6 +304,18 @@ const ICONES = [
     g.roundRect(-3, 1, 6, 7, 3).fill(ENCRE)
       .moveTo(0, -6).lineTo(0, -20).stroke({ width: 1.2, color: ENCRE }).poly([0, -20, 9, -17, 0, -14]).fill(ROUGE);
   },
+];
+// Moderne : 0 pavillons, 1 petite ville (immeubles), 2 grande ville (tours)
+const BETON = 0xd9dde0, VITRE = 0x5d7a92;
+const immeuble = (g, x, y, w, h) => {
+  g.rect(x, y - h, w, h).fill(BETON).stroke({ width: 1.2, color: ENCRE });
+  for (let yy = y - h + 3; yy < y - 3; yy += 4) for (let xx = x + 2; xx < x + w - 2; xx += 3.5) g.rect(xx, yy, 1.6, 2).fill(VITRE);
+};
+const ICONES_MODERNES = [
+  (g) => g.rect(-8, -2, 7, 7).rect(1, -4, 8, 9).fill(0xefe9de).stroke({ width: 1.2, color: ENCRE })
+    .rect(-8, -4, 7, 2).rect(1, -6, 8, 2).fill(0x8a5a4a),
+  (g) => { immeuble(g, -12, 7, 8, 11); immeuble(g, -3, 7, 8, 17); immeuble(g, 6, 7, 7, 9); },
+  (g) => { immeuble(g, -16, 7, 7, 13); immeuble(g, -8, 7, 8, 24); immeuble(g, 1, 7, 7, 30); immeuble(g, 9, 7, 7, 17); },
 ];
 
 const compact = new Intl.NumberFormat("fr-FR", { notation: "compact", maximumFractionDigits: 1 });
@@ -322,24 +347,21 @@ export const carte = {
 
   zone: {
     ...Object.fromEntries(Object.keys(TERRES).map((k) => [k, terre])),
-    foret, departement, pays, mer: eau([9, 20, 34, 52]), lac: eau([6, 13], 0x4f86a8), _: terre,
+    foret, departement, pays, mer: eau([9, 20, 34, 52]), lac: eau([6, 13], 0x4f86a8), estuaire: eau([], MER), _: terre,
   },
 
   ligne: {
     haie(g, e) { trait(g, e.points, { width: 2 * ech, color: 0x6b7340, alpha: 0.35 }); },
     // Fleuve : `largeur` (unités du monde, nombre ou une par point) si fournie, sinon 8 ; liseré clair et reflet au milieu
+    // Eau bleue entre des berges vertes, reflet clair au fil de l'eau (web_conquete) ; jamais plus fine que px à l'écran
     riviere(g, e) {
-      const l = e.largeur ?? 8;
-      // Eau bleue entre des berges vertes, reflet clair au fil de l'eau (web_conquete)
-      traitVariable(g, e.points, l, { color: 0x4b7438, alpha: 0.85 }, 1, 4 * ech);
-      traitVariable(g, e.points, l, { color: 0x4a78b4 }, 1, 0.8 * ech);
-      traitVariable(g, e.points, l, { color: 0x8fb4dc, alpha: 0.5 }, 0.35, 0.2 * ech);
+      const l = e.largeur ?? 8, px = [1.6, 3.2, 2.1, 1.3, 1.1][e.rang ?? 0], z = vue.zoom;
+      traitVariable(g, e.points, l, { color: 0x4b7438, alpha: 0.85 }, 1, 2.2 / z, (px + 2.2) / z);
+      traitVariable(g, e.points, l, { color: 0x4a78b4 }, 1, 0, px / z);
+      if (z * l > 6) traitVariable(g, e.points, l, { color: 0x8fb4dc, alpha: 0.5 }, 0.3);
     },
-    // Route empierrée : double trait d'encre
-    route(g, e) {
-      trait(g, e.points, { width: 7 * ech, color: 0x5a4030, alpha: 0.85 });
-      trait(g, e.points, { width: 4 * ech, color: 0xe6d6ae });
-    },
+    route(g, e) { routeCarte(g, e, 14, 3); },
+    chemin(g, e) { routeCarte(g, e, 6, 1.6); },
     ligne_electrique(g, e) {
       const k = ech;
       trait(g, e.points, { width: 1.8 * k, color: ENCRE, alpha: 0.85 });
@@ -361,16 +383,18 @@ export const carte = {
 
   batiment: {
     ville(e) {
-      // Au sol : îlots bâtis ; à l'écran : icône, nom et population
-      const g = new P.Graphics(), r = alea(e.id), t = e.taille ?? 60, n = rangs(e), b = t / 8;
-      for (let i = 0; i < 4 + n * 4; i++) {
-        const a = r() * Math.PI * 2, d = r() * t * 0.35;
-        g.rect(e.x + Math.cos(a) * d - b * 0.7, e.y + Math.sin(a) * d * 0.7 - b / 2, b * (1 + r()), b * (0.7 + r() * 0.6));
+      // Au sol : la tache bâtie (emprise réelle) ; à l'écran : icône de l'époque, nom et population
+      const g = new P.Graphics(), r = alea(e.id), t = e.taille ?? 60, n = rangs(e), moderne = vue.epoque === "moderne";
+      const ilots = Math.round(6 + 3 * Math.sqrt(t)), b = t / 7;
+      for (let i = 0; i < ilots; i++) {
+        const a = r() * Math.PI * 2, d = Math.sqrt(r()) * t * 0.42;
+        g.rect(e.x + Math.cos(a) * d - b / 2, e.y + Math.sin(a) * d - b / 2, b * (0.6 + r() * 0.8), b * (0.5 + r() * 0.7));
       }
-      g.fill({ color: 0x7a3a2c, alpha: 0.7 });
+      g.fill({ color: moderne ? 0x6a6670 : 0x7a3a2c, alpha: 0.55 });
+      if (avecSol) g.clear();  // la ville est peinte dans l'occupation du sol (cases « u »)
       const lab = new P.Container();
       const icone = new P.Graphics();
-      ICONES[n](icone);
+      (moderne ? ICONES_MODERNES : ICONES)[n](icone);
       const nom = cartouche(e.nom, [11, 13, 15][n], e.prefecture);
       nom.y = 22;
       lab.addChild(icone, nom);
@@ -450,7 +474,7 @@ export const carte = {
     if (e.style === "mer") {
       t = nomLieu(e.nom.toUpperCase(), { fontFamily: SERIF, fontSize: 34, fontStyle: "italic", fill: 0xb9ced3, letterSpacing: 12 });
       t.alpha = 0.85;
-    } else if (e.style === "lac") {
+    } else if (e.style === "lac" || e.style === "estuaire") {
       t = nomLieu(e.nom, { fontFamily: SERIF, fontSize: 14, fontStyle: "italic", fill: 0xdfe9ea, stroke: { color: MER, width: 3, join: "round" }, letterSpacing: 1 });
     } else if (e.style === "riviere") {
       t = nomLieu(e.nom, { fontFamily: SERIF, fontSize: 13, fontStyle: "italic", fontWeight: "600", fill: 0x24465e, stroke: halo, letterSpacing: 1.5 });

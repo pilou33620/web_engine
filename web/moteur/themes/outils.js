@@ -13,6 +13,11 @@ export function alea(id) {
   };
 }
 
+// Ce que les thèmes savent de la vue au moment du dessin (rendu.js le tient à jour)
+export const vue = { zoom: 1, echelle: 1, epoque: "ancien" };
+// Largeur d'un trait : sa vraie largeur (unités du monde), mais jamais moins de px pixels à l'écran
+export const largeur = (unites, px) => Math.max(unites, px / vue.zoom);
+
 export function trait(g, points, style) {
   g.moveTo(points[0][0], points[0][1]);
   for (const [x, y] of points.slice(1)) g.lineTo(x, y);
@@ -20,10 +25,10 @@ export function trait(g, points, style) {
 }
 
 // Trait dont l'épaisseur varie le long de la ligne : largeurs = un nombre ou une liste (une par point)
-export function traitVariable(g, points, largeurs, style, facteur = 1, ajout = 0) {
-  if (!Array.isArray(largeurs)) return trait(g, points, { ...style, width: largeurs * facteur + ajout });
+export function traitVariable(g, points, largeurs, style, facteur = 1, ajout = 0, mini = 0) {
+  if (!Array.isArray(largeurs)) return trait(g, points, { ...style, width: Math.max(mini, largeurs * facteur + ajout) });
   for (let i = 0; i < points.length - 1; i++) {
-    const w = ((largeurs[i] + largeurs[i + 1]) / 2) * facteur + ajout;
+    const w = Math.max(mini, ((largeurs[i] + largeurs[i + 1]) / 2) * facteur + ajout);
     g.moveTo(points[i][0], points[i][1]).lineTo(points[i + 1][0], points[i + 1][1]).stroke({ cap: "round", join: "round", ...style, width: w });
   }
 }

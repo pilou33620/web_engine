@@ -11,6 +11,9 @@ import math
 import random
 from collections import deque
 
+from .cartes import urbaniser
+from .routes import relier
+
 FORMES = ["continent", "côte", "îles", "isthme", "presqu'île"]
 
 REGLAGES = [
@@ -486,7 +489,7 @@ def generer(reglages=None):
     couleurs = _colorier(g, region, nreg)
 
     # Villes : en plaine, près des rivières et des côtes, espacées ; une préfecture par région
-    villes = _placer_villes(g, r, rng, region, nreg, terre, lac, rempli, d_mer, d_riv, altmax, len(terres))
+    villes = _placer_villes(g, r, rng, region, nreg, terre, lac, rempli, d_mer, d_riv, altmax, len(terres), echelle)
 
     entites = [{"type": "zone", "style": "mer", "calque": "sol", "x": -L, "y": -H, "w": 3 * L, "h": 3 * H}]
     d_terre = g.distances([k for k in terres], [True] * n)
@@ -528,7 +531,7 @@ def generer(reglages=None):
         larg, acc = [], 0.0
         for idx in range(len(pts)):
             acc = max(acc, debit[ch[min(len(ch) - 2, round(idx / max(1, len(pts) - 1) * (len(ch) - 1)))]])
-            larg.append(round(2 + 12 * math.sqrt(acc / dmax), 1))
+            larg.append(round((40 + 360 * math.sqrt(acc / dmax)) / echelle, 2))  # vraie largeur : 40 à 400 m
         entites.append({"type": "ligne", "style": "riviere", "calque": "eau", "nom": nom,
                         "points": [[round(x, 1), round(y, 1)] for x, y in pts], "largeur": larg})
 
@@ -541,6 +544,12 @@ def generer(reglages=None):
         riv = riv_proche.get(k)
         v["nom"] = noms.ville(riv, d_mer[k] <= 2)
         entites.append(v)
+
+    def est_terre(x, y):  # case la plus proche de la grille
+        i, j = round(x / g.pas), round(y / g.pas)
+        return 0 <= i < g.nc and 0 <= j < g.nl and terre[j * g.nc + i] and not lac[j * g.nc + i]
+    entites += relier(villes, est_terre, echelle, graine=r["graine"], taille=[L, H])
+    urbaniser(occupation, villes)
 
     valeurs = [[round(rempli[j * g.nc + i]) if terre[j * g.nc + i] else 0 for i in range(g.nc)] for j in range(g.nl)]
     capitale = max(villes, key=lambda v: v["population"])["nom"] if villes else noms_reg[0]
@@ -655,7 +664,7 @@ def _colorier(g, region, nreg):
     return couleurs
 
 
-def _placer_villes(g, r, rng, region, nreg, terre, lac, alt, d_mer, d_riv, altmax, nterre):
+def _placer_villes(g, r, rng, region, nreg, terre, lac, alt, d_mer, d_riv, altmax, nterre, echelle):
     score = [-1.0] * g.n
     for k in range(g.n):
         if terre[k] and not lac[k] and not any(lac[v] for v in g.v4[k]):
@@ -688,7 +697,7 @@ def _placer_villes(g, r, rng, region, nreg, terre, lac, alt, d_mer, d_riv, altma
         pop = max(200, round(r["taille_villes"] * 120000 / rang ** 1.05 * rng.uniform(0.75, 1.25), -1))
         x, y = g.xy(k)
         v = {"type": "batiment", "style": "ville", "calque": "batiments", "x": x, "y": y, "k": k,
-             "population": pop, "taille": round(20 + 14 * math.log10(pop / 200)), "lumiere": True}
+             "population": pop, "taille": round(40 * math.sqrt(pop) / echelle, 1), "lumiere": True}
         if k in prefs:
             v["prefecture"] = True
         villes.append(v)

@@ -1,6 +1,6 @@
 // Thème « Vue aérienne » : vue du dessus aux couleurs plates, universel (campagne, ville, réseaux…).
 // Chaque type (zone, ligne, batiment, unite) a une table de styles ; « _ » est le dessin par défaut.
-import { alea, trait, traitVariable, pointilles, lelong, forme, boite, semis, etiquette, nomLieu } from "./outils.js";
+import { alea, trait, traitVariable, pointilles, lelong, forme, boite, semis, etiquette, nomLieu, vue, largeur } from "./outils.js";
 import { decor, terrain } from "./decor.js";
 
 const decorAerien = decor("aerienne", { force: 0.18 });
@@ -32,6 +32,20 @@ function eau(g, e) {
   forme(g, e).stroke({ width: 8, color: 0x8fb8d8, alpha: 0.45 });
 }
 
+// Route vue du ciel : vraie largeur (m) mais au moins px à l'écran. Ancienne : terre battue claire ;
+// moderne : bitume, ligne médiane sur les grands axes quand elle est assez large pour se voir
+function routeAerienne(g, e, metres, px) {
+  const w = largeur(metres / vue.echelle, px), bord = 1.4 / vue.zoom;
+  if (vue.epoque === "moderne") {
+    trait(g, e.points, { width: w + bord, color: 0x2e2e2e, alpha: 0.7 });
+    trait(g, e.points, { width: w, color: metres > 10 ? 0x55575a : 0x707274 });
+    if (metres > 10 && w * vue.zoom > 7) pointilles(g, e.points, w * 1.5, w * 1.2, { width: w / 10, color: 0xeeeeea });
+    return;
+  }
+  trait(g, e.points, { width: w + bord, color: 0x8a7550, alpha: 0.6 });
+  trait(g, e.points, { width: w, color: metres > 10 ? 0xd9c79b : 0xcdbb8e });
+}
+
 function libelle(e, sous = "") {
   const lab = etiquette(e.nom + sous, { fontFamily: SANS, fontSize: 13, fontWeight: "600", fill: 0xf5e7c0 }, { color: 0x6b5a2a, alpha: 0.9 });
   lab.position.set(e.x, e.y + (e.taille ?? 40) * 0.8 + 14);
@@ -60,6 +74,7 @@ export const aerienne = {
     },
     mer: eau,
     lac: eau,
+    estuaire: eau,
     // Régions administratives vues du ciel : campagne verte nuancée, limites en tirets clairs
     departement(g, e) {
       const teinte = e.couleur ? P.Color.shared.setValue(e.couleur).toNumber() : 0xd8cc9a;
@@ -76,19 +91,19 @@ export const aerienne = {
       lelong(e.points, 16, (x, y) => g.circle(x, y, 6 + r() * 6).fill(r() < 0.5 ? 0x2f6a2c : 0x3a7a35));
     },
     riviere(g, e) {
-      if (e.largeur !== undefined) {  // carte de région ou de pays : largeur donnée en unités
-        traitVariable(g, e.points, e.largeur, { color: 0x5d8a46 }, 1.6, 2);
-        return traitVariable(g, e.points, e.largeur, { color: 0x3a6ea6 }, 1, 1);
+      if (e.largeur !== undefined) {  // carte de région ou de pays : vraie largeur, mais lisible à l'écran
+        const px = [1.6, 3.2, 2.1, 1.3, 1.1][e.rang ?? 0], z = vue.zoom;
+        traitVariable(g, e.points, e.largeur, { color: 0x4b7438 }, 1, 2.4 / z, (px + 2.4) / z);
+        traitVariable(g, e.points, e.largeur, { color: 0x4a78b4 }, 1, 0, px / z);
+        if (z * e.largeur > 6) traitVariable(g, e.points, e.largeur, { color: 0x8fb4dc, alpha: 0.45 }, 0.3);
+        return;
       }
       trait(g, e.points, { width: 40, color: 0x5d8a46 });
       trait(g, e.points, { width: 24, color: 0x3a6ea6 });
       trait(g, e.points, { width: 5, color: 0x77a6d6, alpha: 0.5 });
     },
-    route(g, e) {
-      trait(g, e.points, { width: 26, color: 0x3a3a3a });
-      trait(g, e.points, { width: 22, color: 0x505050 });
-      pointilles(g, e.points, 14, 12, { width: 2, color: 0xe8e8e0 });
-    },
+    route(g, e) { routeAerienne(g, e, 14, 2.6); },
+    chemin(g, e) { routeAerienne(g, e, 6, 1.4); },
     ligne_electrique(g, e) {
       trait(g, e.points, { width: 2, color: 0x2a2a2a, alpha: 0.8 });
       lelong(e.points, 60, (x, y) => g.rect(x - 4, y - 4, 8, 8).fill(0x6a6a6a).stroke({ width: 1.5, color: 0x2a2a2a }));
@@ -104,13 +119,24 @@ export const aerienne = {
   // Un bâtiment rend { dessin, etiquette?, animer?(dt, contexte) }
   batiment: {
     ville(e) {
-      const g = new P.Graphics().ellipse(e.x, e.y, e.taille * 0.75, e.taille * 0.5).fill(0xb9ad8c);
-      const r = alea(e.id), toits = [0xa8473a, 0x6f7f8f, 0x7d8ea0, 0x9a5a3a];
-      const nb = Math.max(3, Math.round(e.taille / 25));
+      // Emprise bâtie (taille = diamètre en unités) ; vieux bourg de tuiles ou ville moderne de béton et de rues
+      const t = e.taille ?? 60, R = t / 2, r = alea(e.id), moderne = vue.epoque === "moderne";
+      const g = new P.Graphics().ellipse(e.x, e.y, R * 1.05, R * 0.85).fill({ color: moderne ? 0x9a9a96 : 0xb9ad8c, alpha: 0.9 });
+      const toits = moderne ? [0x6f7378, 0x8a8e94, 0xc8c6c0, 0x5f6a74, 0xb0aaa0] : [0xa8473a, 0x9a5a3a, 0xb5653f, 0x6f7f8f, 0x8c4a34];
+      const nb = Math.round(8 + 4 * Math.sqrt(t)), b = R / (moderne ? 4 : 5);
       for (let i = 0; i < nb; i++) {
-        const a = r() * Math.PI * 2, d = r() * e.taille * 0.4;
-        g.rect(e.x + Math.cos(a) * d * 1.3 - 20, e.y + Math.sin(a) * d * 0.8 - 10, 30 + r() * 20, 16 + r() * 8).fill(toits[i % 4]);
+        const a = r() * Math.PI * 2, d = Math.sqrt(r()) * R * 0.9;
+        const x = e.x + Math.cos(a) * d, y = e.y + Math.sin(a) * d * 0.8;
+        const w = b * (0.6 + r() * 0.8), h = b * (0.4 + r() * 0.5);
+        g.rect(x - w / 2, y - h / 2, w, h).fill(toits[Math.floor(r() * toits.length)]);
       }
+      if (moderne) {  // rues en grille
+        for (let k = -2; k <= 2; k++) {
+          g.moveTo(e.x - R, e.y + (k * R) / 3).lineTo(e.x + R, e.y + (k * R) / 3).moveTo(e.x + (k * R) / 2.5, e.y - R * 0.8).lineTo(e.x + (k * R) / 2.5, e.y + R * 0.8);
+        }
+        g.stroke({ width: Math.max(R / 40, 0.6 / vue.zoom), color: 0x4a4a4a, alpha: 0.6 });
+      }
+      if (avecSol) g.clear();  // la ville est peinte dans l'occupation du sol (cases « u »)
       return { dessin: g, etiquette: libelle(e) };
     },
     eolienne(e) {
@@ -171,6 +197,6 @@ export const aerienne = {
         stroke: { color: 0x2c3a22, width: 3 } });
     }
     const style = { fontFamily: SANS, fontSize: 14, fontStyle: "italic", fill: 0xe6f0f8, letterSpacing: 1 };
-    return e.style === "mer" || e.style === "lac" || e.style === "riviere" ? nomLieu(e.nom, style) : null;
+    return ["mer", "lac", "estuaire", "riviere"].includes(e.style) ? nomLieu(e.nom, style) : null;
   },
 };

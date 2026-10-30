@@ -1,7 +1,7 @@
 // Rendu PixiJS universel : calques, dessin par style via le thème, caméra (doigt, stylet, molette).
 // Le climat est rendu par climat.js.
 import { ClimatRendu } from "./climat.js";
-import { centre } from "./themes/outils.js";
+import { centre, vue } from "./themes/outils.js";
 import { Details } from "./themes/details.js";
 import { Effets } from "./effets.js";
 
@@ -107,6 +107,8 @@ export class Rendu {
       for (const enfant of this.calques[nom].removeChildren()) enfant.destroy({ children: true });
     }
     this.animations = [];
+    Object.assign(vue, { zoom: this.zoom, echelle: carte.echelle ?? 1, epoque: carte.epoque ?? "ancien" });
+    this.lignes = [];  // [graphique, entité, dessin] : retracées quand le zoom change (épaisseur à l'écran)
     const [L, H] = carte.taille;
     this.calques.base.addChild(new P.Graphics().rect(0, 0, L, H).fill(t.base));
     // Décor du thème : « sous » le terrain (papier, fond) et « sur » le terrain (ombrage du relief)
@@ -120,17 +122,22 @@ export class Rendu {
     }
 
     const graphiques = {};
-    const graphique = (nom, e) => {
+    const graphique = (nom, e, calque = nom) => {
       const [x, y] = e.points?.[0] ?? [e.x, e.y], cle = `${nom}|${Math.floor(x / TUILE)}|${Math.floor(y / TUILE)}`;
-      return graphiques[cle] ?? (graphiques[cle] = this.calques[nom].addChild(new P.Graphics()));
+      return graphiques[cle] ?? (graphiques[cle] = this.calques[calque].addChild(new P.Graphics()));
     };
+    const graphiqueLigne = (nom, e) => graphique(`${nom}|ligne`, e, nom);
     const objets = [];  // bâtiments et étiquettes, masqués eux aussi hors de l'écran
     for (const e of carte.entites) {
       const calque = this.calques[e.calque] ? e.calque : CALQUE_PAR_DEFAUT[e.type] ?? "sol";
       const dessin = dessinateur(t, e);
       if (!dessin) continue;
       if (e.type === "zone" || e.type === "ligne") {
-        dessin(graphique(calque, e), e);
+        if (e.type === "ligne") {
+          const g = graphiqueLigne(calque, e);
+          this.lignes.push([g, e, dessin]);
+          dessin(g, e);
+        } else dessin(graphique(calque, e), e);
         // Bordure : tracée au-dessus de l'occupation du sol (limites administratives, pays grisés)
         t.bordure?.[e.style]?.(graphique("frontieres", e), e);
         const nom = e.nom && t.nomLieu?.(e);
@@ -264,7 +271,16 @@ export class Rendu {
     }
   }
 
+  // Les lignes (routes, rivières…) gardent une épaisseur lisible : retracées quand le zoom a changé de 40 %
+  retracerLignes() {
+    if (!this.lignes?.length || Math.abs(Math.log(this.zoom / vue.zoom)) < Math.log(1.4)) return;
+    vue.zoom = this.zoom;
+    for (const g of new Set(this.lignes.map((l) => l[0]))) g.clear();
+    for (const [g, e, dessin] of this.lignes) dessin(g, e);
+  }
+
   image(dt) {
+    this.retracerLignes();
     const k = Math.min(1, dt * 6), { width: w, height: h } = this.app.screen;
     const a = this.versMonde(0, 0), b = this.versMonde(w, h), marge = 80 / this.zoom;
     for (const s of this.mobiles.values()) {

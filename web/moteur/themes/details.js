@@ -3,6 +3,7 @@
 // zoom dépasse ~14 px/km, une tuile par image au plus, gardés en cache ; le fond (decor.js terrain) reste dessous.
 // Tout vient d'une grille absolue en km : deux tuiles voisines se raccordent sans couture.
 import { paysage, bruit } from "./decor.js";
+import { vue } from "./outils.js";
 
 const P = window.PIXI;
 const TUILE = 256, CACHE = 96, SEUIL = 14;
@@ -89,6 +90,7 @@ export class Details {
     const g = toile.getContext("2d");
     g.setTransform(L, 0, 0, L, -x0 * L, -y0 * L);  // on dessine en km
     if (L >= 24) this.champs(g, L, x0, y0, x1, y1);
+    this.batiments(g, L, x0, y0, span);
     this.arbres(g, L, x0, y0, span);
     const s = new P.Sprite(P.Texture.from(toile));
     s.position.set(x0 / this.km, y0 / this.km);
@@ -141,6 +143,51 @@ export class Details {
     }
   }
 
+  // Villes : maisons serrées aux toits de tuile (ancien) ou immeubles et rues (moderne), sur une grille absolue en km
+  batiments(g, L, x0, y0, span) {
+    const moderne = vue.epoque === "moderne", pas = moderne ? 0.11 : 0.055, M = 2;
+    const toits = moderne ? ["#7d8186", "#9a9ea2", "#c4c2bb", "#6c7480", "#b3aca0", "#8c8f8a"] : ["#a8473a", "#9a5a3a", "#b5653f", "#8c4a34", "#6f7f8f", "#b9704a"];
+    const i0 = Math.floor(x0 / pas) - M, j0 = Math.floor(y0 / pas) - M, n = Math.ceil(span / pas) + 2 * M;
+    const maisons = [];
+    for (let j = j0; j < j0 + n; j++) {
+      for (let i = i0; i < i0 + n; i++) {
+        const x = (i + 0.5) * pas, y = (j + 0.5) * pas;
+        if (this.code(x, y) !== "u" || hash(i, j, 21) < (moderne ? 0.18 : 0.12)) continue;  // trous : places, jardins, rues
+        const w = pas * (moderne ? 0.55 + 0.35 * hash(i, j, 22) : 0.6 + 0.3 * hash(i, j, 22));
+        const h = pas * (moderne ? 0.45 + 0.4 * hash(i, j, 23) : 0.45 + 0.3 * hash(i, j, 23));
+        const dx = (hash(i, j, 24) - 0.5) * (pas - w) * (moderne ? 0.3 : 1), dy = (hash(i, j, 25) - 0.5) * (pas - h) * (moderne ? 0.3 : 1);
+        maisons.push([x + dx - w / 2, y + dy - h / 2, w, h, toits[Math.floor(hash(i, j, 26) * toits.length)]]);
+      }
+    }
+    if (!maisons.length) return;
+    if (moderne) {  // le bitume des rues sous les immeubles
+      g.fillStyle = "#5c5d5f";
+      g.beginPath();
+      for (const [x, y, w, h] of maisons) g.rect(x - pas * 0.25, y - pas * 0.25, w + pas * 0.5, h + pas * 0.5);
+      g.fill();
+    }
+    g.fillStyle = "rgba(20,18,14,.35)";  // ombre portée au sud-est
+    g.beginPath();
+    for (const [x, y, w, h] of maisons) g.rect(x + pas * 0.12, y + pas * 0.15, w, h);
+    g.fill();
+    const parCouleur = new Map();
+    for (const m of maisons) (parCouleur.get(m[4]) ?? parCouleur.set(m[4], []).get(m[4])).push(m);
+    for (const [c, liste] of parCouleur) {
+      g.fillStyle = c;
+      g.beginPath();
+      for (const [x, y, w, h] of liste) g.rect(x, y, w, h);
+      g.fill();
+    }
+    g.strokeStyle = moderne ? "rgba(255,255,255,.25)" : "rgba(60,25,15,.35)";  // faîtage ou acrotère
+    g.lineWidth = pas * 0.06;
+    g.beginPath();
+    for (const [x, y, w, h] of maisons) {
+      if (moderne) g.rect(x, y, w, h);
+      else w > h ? (g.moveTo(x, y + h / 2), g.lineTo(x + w, y + h / 2)) : (g.moveTo(x + w / 2, y), g.lineTo(x + w / 2, y + h));
+    }
+    g.stroke();
+  }
+
   // Bois : houppiers ronds là où le fond dit forêt (et quelques arbres isolés ailleurs) ; ombre, feuillage, reflet
   arbres(g, L, x0, y0, span) {
     const pas = 3 / L, M = Math.ceil(0.13 / pas) + 1, a2 = pas * pas;
@@ -149,7 +196,7 @@ export class Details {
     for (let j = 0; j < n; j++) {
       for (let i = 0; i < n; i++) {
         const gi = gi0 + i, gj = gj0 + j, x = (gi + 0.5) * pas, y = (gj + 0.5) * pas, t = this.code(x, y);
-        const densite = t === "f" ? 190 : t === "l" ? 14 : t === "p" ? 3 : t === "c" ? 0.6 : t === "v" ? 0.3 : 0;  // arbres par km²
+        const densite = t === "f" ? 190 : t === "l" ? 14 : t === "p" ? 3 : t === "c" ? 0.6 : t === "v" ? 0.3 : t === "u" ? 2 : 0;  // arbres par km²
         if (!densite || hash(gi, gj, L) >= densite * a2) continue;
         const ax = x + (hash(gj, gi, 3) - 0.5) * pas, ay = y + (hash(gi, gj, 4) - 0.5) * pas;
         // grands massifs de pins (une dizaine de km), lisières mêlées de feuillus

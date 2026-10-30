@@ -9,6 +9,7 @@ from moteur import cartes
 
 class Regles:
     TITRE = "Atlas"
+    EPOQUE = os.environ.get("EPOQUE", "ancien")
 
     def initialiser(self, m):
         m.ressource("argent", 100000)
@@ -41,6 +42,12 @@ class Regles:
         if nom == "changer_carte":
             self.changer(m, params.get("source"), params.get("reglages", {}))
             return {"message": "Carte chargée."}
+        if nom == "epoque":
+            if params.get("valeur") not in ("ancien", "moderne"):
+                raise ValueError("Époque inconnue.")
+            self.EPOQUE = params["valeur"]
+            m.version_carte += 1  # le client redessine villes et routes
+            return {"message": f"Époque : {self.EPOQUE}."}
         if nom == "liste_cartes":
             try:
                 from moteur.generateur import REGLAGES

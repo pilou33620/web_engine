@@ -12,6 +12,8 @@ export async function installer(ctx) {
   section.className = "atlas";
   section.innerHTML = `<h3>Carte</h3>
     <div class="choix">${res.cartes.map((c) => `<button data-carte="${esc(c)}">${esc(NOMS[c] ?? c)}</button>`).join("")}</div>
+    <h3>Époque</h3>
+    <div class="choix"><button data-epoque="ancien">Ancienne</button><button data-epoque="moderne">Moderne</button></div>
     ${res.reglages.length ? `<details><summary>Générer une carte</summary>
       ${[...groupes].map(([groupe, liste]) => `<fieldset><legend>${esc(groupe ?? "")}</legend>${liste.map(champ).join("")}</fieldset>`).join("")}
       <div class="choix"><button data-generer="hasard">🎲 Au hasard</button><button data-generer="oui">Générer</button></div>
@@ -57,6 +59,7 @@ export async function installer(ctx) {
     const b = e.target.closest("button");
     if (!b) return;
     if (b.dataset.carte) return changer(b.dataset.carte);
+    if (b.dataset.epoque) return ctx.action("epoque", { valeur: b.dataset.epoque });
     if (b.dataset.generer === "hasard") {
       const graine = section.querySelector('[data-reglage="graine"]');
       if (graine) graine.value = Math.floor(Math.random() * Number(graine.max || 99999));
