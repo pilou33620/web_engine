@@ -3,8 +3,6 @@
 import { alea, trait, traitVariable, pointilles, lelong, forme, boite, semis, etiquette, nomLieu } from "./outils.js";
 import { decor, terrain } from "./decor.js";
 
-// Occupation du sol vue du ciel : blés, prés, bois, vignes, landes, roche
-const SOL = { c: [204, 188, 128], p: [132, 164, 90], f: [50, 86, 46], v: [124, 122, 74], l: [162, 152, 106], r: [170, 168, 160] };
 const decorAerien = decor("aerienne", { force: 0.18 });
 let avecSol = false;
 
@@ -45,7 +43,7 @@ export const aerienne = {
   orientation: (e) => (e.angle ?? -Math.PI / 2) + Math.PI / 2,
   decor(rendu, carte) {
     avecSol = Boolean(carte.occupation?.lignes?.length);
-    return { ...decorAerien(rendu, carte), terrain: terrain("aerienne", carte, SOL) };
+    return { ...decorAerien(rendu, carte), terrain: terrain(carte) };
   },
   // Au-dessus de l'occupation du sol : limites en tirets clairs, pays voisins voilés
   bordure: {

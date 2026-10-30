@@ -1,14 +1,12 @@
 // Thème « Carte » : carte stratégique ancienne (couleurs passées, relief ombré, noms en lettres à empattements).
 // Même structure que aerienne.js : tables de styles par type, « _ » par défaut.
 import { alea, trait, traitVariable, pointilles, lelong, forme, boite, etiquette, nomLieu } from "./outils.js";
-import { decor, terrain } from "./decor.js";
+import { decor, terrain, MER_LARGE } from "./decor.js";
 
 const P = window.PIXI;
 export const SERIF = "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif";
 const TERRES = { chaume: 0xd2c08e, culture: 0xaeb07a, prairie: 0xbdb985, labour: 0xc4a77a, colza: 0xbcb76e, foret: 0x76814e };
-const ENCRE = 0x2a2018, CREME = 0xefe3c4, ROUGE = 0xa8322a, OR = 0xd9b25e, MER = 0x2b4656, ECUME = 0x9fb9c0;
-// Occupation du sol, tons sourds de carte ancienne (comme une gravure aquarellée)
-const SOL = { c: [222, 204, 152], p: [190, 192, 134], f: [104, 118, 76], v: [176, 136, 116], l: [204, 186, 142], r: [214, 208, 194] };
+const ENCRE = 0x2a2018, CREME = 0xefe3c4, ROUGE = 0xa8322a, OR = 0xd9b25e, MER = 0x1c586c, ECUME = 0xbfe0da;  // mer turquoise profonde (web_conquete)
 let avecSol = false;  // la carte a une occupation du sol : les aplats administratifs restent dessous
 // Teintes passées des départements (aquarelle sur papier)
 const PASTELS = [0xdcc9a0, 0xcdc69b, 0xd8bca2, 0xc6c7a2, 0xdfcfae, 0xcbbf98, 0xd3c3a8, 0xc2bf98];
@@ -215,9 +213,9 @@ function decale(points, d) {
   return [...res, res[0]];
 }
 
-function eau(anneaux) {
+function eau(anneaux, couleur = MER) {
   return (g, e) => {
-    forme(g, e).fill(MER);
+    forme(g, e).fill(couleur);
     forme(g, e).fill(echelle("vagues", 1.2 * ech));
     if (!e.points) {
       // Mer de fond (rectangle sous les terres) : anneaux autour des côtes, la moitié côté terre sera recouverte
@@ -309,6 +307,8 @@ function medaillon(e, dessinInterieur) {
 }
 
 const decorCarte = decor("carte", { force: 0.45, teinte: true, vignette: 0.4, papier: true });
+// Sur un fond peint (occupation du sol), il est déjà ombré : relief et papier discrets, pas de teinte orangée
+const decorPeint = decor("carte-peinte", { force: 0.12, teinte: false, vignette: 0.22, papier: false });
 
 export const carte = {
   nom: "Carte", css: "carte", fond: 0x22343f, base: 0xcbb98a, unitesTailleFixe: true,
@@ -316,13 +316,13 @@ export const carte = {
   decor(rendu, carte) {
     preparer(carte);
     avecSol = Boolean(carte.occupation?.lignes?.length);
-    return { ...decorCarte(rendu, carte), terrain: terrain("carte", carte, SOL) };
+    return avecSol ? { ...decorPeint(rendu, carte), terrain: terrain(carte) } : decorCarte(rendu, carte);
   },
   bordure,
 
   zone: {
     ...Object.fromEntries(Object.keys(TERRES).map((k) => [k, terre])),
-    foret, departement, pays, mer: eau([9, 20, 34, 52]), lac: eau([6, 13]), _: terre,
+    foret, departement, pays, mer: eau([9, 20, 34, 52]), lac: eau([6, 13], 0x4f86a8), _: terre,
   },
 
   ligne: {
@@ -330,9 +330,10 @@ export const carte = {
     // Fleuve : `largeur` (unités du monde, nombre ou une par point) si fournie, sinon 8 ; liseré clair et reflet au milieu
     riviere(g, e) {
       const l = e.largeur ?? 8;
-      traitVariable(g, e.points, l, { color: 0xd8cca4, alpha: 0.5 }, 1, 4 * ech);
-      traitVariable(g, e.points, l, { color: 0x2f4f63 }, 1, 0.8 * ech);
-      traitVariable(g, e.points, l, { color: 0x5b86a0 }, 0.55, 0.3 * ech);
+      // Eau bleue entre des berges vertes, reflet clair au fil de l'eau (web_conquete)
+      traitVariable(g, e.points, l, { color: 0x4b7438, alpha: 0.85 }, 1, 4 * ech);
+      traitVariable(g, e.points, l, { color: 0x4a78b4 }, 1, 0.8 * ech);
+      traitVariable(g, e.points, l, { color: 0x8fb4dc, alpha: 0.5 }, 0.35, 0.2 * ech);
     },
     // Route empierrée : double trait d'encre
     route(g, e) {

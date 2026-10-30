@@ -2,6 +2,7 @@
 // Le climat est rendu par climat.js.
 import { ClimatRendu } from "./climat.js";
 import { centre } from "./themes/outils.js";
+import { Details } from "./themes/details.js";
 import { Effets } from "./effets.js";
 
 const P = window.PIXI;
@@ -99,6 +100,8 @@ export class Rendu {
     const premiere = !this.carte;
     this.carte = carte;
     const t = this.theme;
+    this.details?.detruire();
+    this.details = null;
     for (const nom of ["base", ...CALQUES]) {
       if (nom === "unites") continue;
       for (const enfant of this.calques[nom].removeChildren()) enfant.destroy({ children: true });
@@ -110,7 +113,11 @@ export class Rendu {
     const decor = t.decor?.(this, carte) ?? {};
     if (decor.sous) this.calques.base.addChild(decor.sous);
     if (decor.sur) this.calques.relief.addChild(decor.sur);
-    if (decor.terrain) this.calques.occupation.addChild(decor.terrain);
+    if (decor.terrain) {
+      this.calques.occupation.addChild(decor.terrain);
+      this.details = new Details(this, carte);  // arbres et champs de près
+      this.calques.occupation.addChild(this.details.conteneur);
+    }
 
     const graphiques = {};
     const graphique = (nom, e) => {
@@ -285,6 +292,7 @@ export class Rendu {
       if (this.zoom !== this.zoomSurlignage) this.dessinerSurlignage();
       this.surlignage.alpha = 0.65 + 0.35 * Math.sin(performance.now() / 260);
     }
+    this.details?.image();
     this.climat.image(dt);
   }
 
@@ -293,7 +301,8 @@ export class Rendu {
 
   zoomer(facteur, cx, cy) {
     const avant = this.versMonde(cx, cy);
-    this.zoom = Math.min(6, Math.max(0.15, this.zoom * facteur));
+    // Zoom maximal : ~130 px/km sur les grandes cartes (arbres et champs détaillés), au moins ×6
+    this.zoom = Math.min(Math.max(6, 0.13 * (this.carte?.echelle ?? 1)), Math.max(0.15, this.zoom * facteur));
     this.monde.scale.set(this.zoom);
     const apres = this.monde.toGlobal(avant);
     this.monde.x += cx - apres.x;
