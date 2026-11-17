@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Galerie des rendus</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #1b211a; color: #f3f0e6; font: 15px/1.4 system-ui, sans-serif; }
+  body { display: flex; flex-direction: column; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 16px; }
+  h1 { font-size: 18px; margin: 0; }
+  nav { display: flex; gap: 6px; }
+  nav button { font: inherit; padding: 6px 14px; border-radius: 8px; border: 1px solid #5d6b55; background: transparent; color: inherit; cursor: pointer; }
+  nav button[aria-selected="true"] { background: #f3f0e6; color: #1b211a; }
+  header p { margin: 0; font-size: 13px; opacity: .75; }
+  iframe { flex: 1; width: 100%; border: 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Galerie des rendus</h1>
+  <nav role="tablist" aria-label="Source des rendus">
+    <button role="tab" data-src="web_royaumes">web_royaumes</button>
+    <button role="tab" data-src="web_power">web_power</button>
+  </nav>
+  <p id="note"></p>
+</header>
+<iframe id="vue" title="Rendus des bâtiments"></iframe>
+<script>
+// Chaque source garde son propre moteur (versions de three.js différentes) : une visionneuse par source, dans un cadre.
+const NOTES = {
+  web_royaumes: '1700 → 1816 : Ancien Régime, Lumières, Empire, Révolution industrielle. Source retenue pour les époques passées.',
+  web_power: '1900 → 2035 : centrales, réseau, eau, déchets, quartiers. Source retenue pour les époques modernes.',
+};
+const onglets = document.querySelectorAll('nav button');
+function ouvrir(src) {
+  onglets.forEach(b => b.setAttribute('aria-selected', b.dataset.src === src));
+  document.getElementById('vue').src = `${src}/visionneuse.html`;
+  document.getElementById('note').textContent = NOTES[src];
+  history.replaceState(null, '', '#' + src);
+}
+onglets.forEach(b => b.onclick = () => ouvrir(b.dataset.src));
+ouvrir(location.hash.slice(1) in NOTES ? location.hash.slice(1) : 'web_royaumes');
+</script>
+</body>
+</html>

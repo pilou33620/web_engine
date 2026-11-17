@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rendus web_power</title>
+<link rel="stylesheet" href="../visionneuse.css">
+</head>
+<body>
+<div id="zone"><canvas id="scene" aria-label="Bâtiments de web_power"></canvas></div>
+<div id="etiquettes"></div>
+<form class="barre" id="choix">
+  <label>Époque <select name="ere"></select></label>
+  <label>Saison <select name="saison"><option value="0">Hiver</option><option value="3" selected>Printemps</option><option value="6">Été</option><option value="9">Automne</option></select></label>
+  <label><input type="checkbox" name="neige"> Neige au sol</label>
+  <label>Bâtiment <select name="bat"><option value="">Tous</option></select></label>
+</form>
+<p class="aide">Glisser : déplacer · molette : zoom</p>
+
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
+<script type="module">
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+Object.assign(window, { THREE, mergeGeometries });
+</script>
+<!-- scripts du jeu copiés tels quels (js/) : moteur 3D, modèles, catalogue (années de chaque installation), époques -->
+<script defer src="js/01-outils.js"></script>
+<script defer src="js/02-terrain.js"></script>
+<script defer src="js/03-moteur-3d.js"></script>
+<script defer src="js/04-modeles.js"></script>
+<script defer src="js/05-catalogue.js"></script>
+<script defer src="js/06-eau.js"></script>
+<script defer src="js/06b-dechets.js"></script>
+<script defer src="js/07-epoques-rd.js"></script>
+<script defer src="visionneuse.js"></script>
+</body>
+</html>

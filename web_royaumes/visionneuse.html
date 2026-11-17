@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rendus web_royaumes</title>
+<link rel="stylesheet" href="../visionneuse.css">
+</head>
+<body>
+<canvas id="carte" aria-label="Bâtiments de web_royaumes"></canvas>
+<div id="etiquettes"></div>
+<form class="barre" id="choix">
+  <label>Époque <select name="epoque"></select></label>
+  <label>Saison <select name="saison"><option value="0">Hiver</option><option value="1" selected>Printemps</option><option value="2">Été</option><option value="3">Automne</option></select></label>
+  <label><input type="checkbox" name="neige"> Neige au sol</label>
+  <label>Bâtiment <select name="bat"><option value="">Tous</option></select></label>
+</form>
+<p class="aide">Glisser : déplacer · clic droit ou Maj : tourner · molette : zoom</p>
+<script type="module">
+// Les modèles et la scène sont ceux du jeu, copiés tels quels (js/rendu) : seule la mise en vitrine est ici.
+import { THREE, scene, cam, lumiere, apresCamera, camera } from './js/rendu/scene.js';
+import { maillageBatiment } from './js/rendu/modeles.js';
+import { piece, fusion, MAT_LISSE } from './js/rendu/plateau.js';
+
+const regles = await (await fetch('donnees/regles.json')).json();
+const f = document.getElementById('choix');
+for (const e of regles.epoques) f.epoque.add(new Option(`${e.nom} (${e.debut})`, e.cle));
+// l'hôtel de ville change avec son niveau : une entrée par niveau
+const BATS = regles.batiments.flatMap(b => b.cle === 'hotel' ? [1, 2, 3, 4, 5].map(n => ({ ...b, nom: `${b.nom} niv. ${n}`, niveau: n, id: 'hotel' + n })) : [{ ...b, id: b.cle }]);
+for (const b of BATS) f.bat.add(new Option(b.nom, b.id));
+
+// couleurs du sol (plaine) par saison, et neige, reprises de plateau.js
+const SOL = [0xb3c096, 0x8ccf55, 0x7dbb44, 0xa8b14c], NEIGE = 0xeef3f8;
+const COULEUR = '#3b6fd1', PAS = 2.3, groupe = new THREE.Group(), etiq = document.getElementById('etiquettes');
+scene.add(groupe);
+let poses = [];
+
+function afficher() {
+  const epoque = f.epoque.value, saison = +f.saison.value, neige = f.neige.checked ? 1 : 0;
+  const liste = f.bat.value ? BATS.filter(b => b.id === f.bat.value) : BATS;
+  for (const o of groupe.children) if (o.userData.sol) o.geometry.dispose();  // les bâtiments sont en cache dans modeles.js
+  groupe.clear(); etiq.textContent = ''; poses = [];
+  const cols = Math.ceil(Math.sqrt(liste.length));
+  liste.forEach((b, i) => {
+    const x = (i % cols) * PAS + 2, z = Math.floor(i / cols) * PAS + 2;
+    const sol = new THREE.Mesh(fusion([piece(new THREE.CylinderGeometry(1, 1.04, 0.12, 6), neige ? NEIGE : SOL[saison])]), MAT_LISSE);
+    sol.position.set(x, -0.06, z); sol.rotation.y = Math.PI / 6; sol.receiveShadow = true; sol.userData.sol = true;
+    const { mesh } = maillageBatiment({ cle: b.cle, couleur: COULEUR, epoque, saison, neige, niveau: b.niveau || 0 });
+    mesh.position.set(x, 0, z);
+    groupe.add(sol, mesh);
+    const el = document.createElement('span'); el.textContent = b.nom; etiq.append(el);
+    poses.push({ el, p: new THREE.Vector3(x, -0.1, z) });
+  });
+  const l = (cols - 1) * PAS + 4, h = (Math.ceil(liste.length / cols) - 1) * PAS + 4;
+  Object.assign(cam, { l, h, x: l / 2, z: h / 2, cible: Math.max(5, cols * PAS * 1.1) });
+  // lumière de la saison, comme appliquerMeteo (meteo.js) par beau temps
+  lumiere.hauteurSoleil = [0.35, 0.75, 1.0, 0.6][saison];
+  lumiere.couleurSoleil.setHex([0xfff2e2, 0xfff4dc, 0xfff0d0, 0xffe2b8][saison]);
+}
+apresCamera(() => {
+  const w = innerWidth, h = innerHeight, v = new THREE.Vector3(), proche = cam.d < 40;
+  // la caméra tourne : le nom se pose sur le bord de la case tourné vers elle
+  const dx = Math.sin(cam.lacet), dz = Math.cos(cam.lacet);
+  for (const { el, p } of poses) {
+    v.set(p.x + dx * 0.7, p.y, p.z + dz * 0.7).project(camera);
+    el.hidden = !proche || v.z > 1;
+    el.style.transform = `translate(${(v.x + 1) / 2 * w}px, ${(1 - v.y) / 2 * h}px) translate(-50%, -50%)`;
+  }
+});
+f.addEventListener('change', afficher);
+afficher();
+cam.d = cam.cible;
+</script>
+</body>
+</html>
