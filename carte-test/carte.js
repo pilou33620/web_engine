@@ -2,7 +2,7 @@
 // et tous les bâtiments de l'époque choisie sur la frise, de 1700 à 2035 :
 //  - époques de web_royaumes : l'état de partie du moteur Rust, retouché (époque, saison…), passé au pipeline du jeu ;
 //  - époques de web_power : ses quartiers, ses fermes et chacune de ses installations de l'époque, dessinés par ses propres
-//    modèles (lib/power/pont.js) et posés sur le même plateau, avec leurs fumées et leurs éoliennes.
+//    modèles (lib/pont/pont.js) et posés sur le même plateau, avec leurs fumées et leurs éoliennes.
 import { THREE, scene, cam, posCase, voisins, viser, chaqueImage } from '../lib/royaumes/scene.js';
 import * as plateau from '../lib/royaumes/plateau.js';
 import { initMonde, synchroniser } from '../lib/royaumes/monde.js';
@@ -15,7 +15,7 @@ import { appliquerMeteo, forcerHeure, forcerMarche } from '../lib/royaumes/meteo
 import { majRoutes, niveauRoutes } from '../lib/royaumes/routes.js';
 import { TECHS_PALIER } from '../lib/royaumes/modeles.js';
 import { jeter } from '../lib/royaumes/toon.js';
-import { chargerPower, modele } from '../lib/power/pont.js';
+import { chargerPower, modele } from '../lib/pont/pont.js';
 
 // le catalogue de web_power (années, noms, groupes des installations ; époques) est une donnée du jeu : lue dans ses fichiers
 const P = await chargerPower(['02-terrain', '05-catalogue', '06-eau', '06b-dechets', '07-epoques-rd'].map(f => `../sources/web_power/js/${f}.js`));

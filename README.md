@@ -20,7 +20,8 @@ index.html                 accueil : une source, puis Bâtiments / Monde vivant 
 lib/                       LA BIBLIOTHÈQUE GRAPHIQUE (version dans lib/package.json, journal dans lib/CHANGELOG.md)
   three/                   three.js r186 (+ BufferGeometryUtils)
   royaumes/                moteur et rendu de web_royaumes (modules ES) + rendu.css, img/ (illustrations), icons/ (icônes)
-  power/                   graphismes de web_power (scripts classiques) + pont.js (ses modèles dans le moteur royaumes)
+  power/                   graphismes de web_power (scripts classiques)
+  pont/                    pont.js : les modèles de web_power dans le moteur royaumes
 maquettes/                 L'ATELIER : toutes les maquettes (permanentes, jamais supprimées par la synchronisation)
 sources/                   copies intégrales, jamais modifiées à la main (outils/synchroniser.sh les remplace)
   web_royaumes/            tout le dépôt (main) : web/ (rendu, ui, css, images), maquettes/, moteur Rust, tests…
@@ -81,7 +82,7 @@ Un serveur est nécessaire (modules JS et `fetch`). web_power et certaines maque
 - **Une seule scène :** celle du moteur de web_royaumes, avec sa nature (mer, rivières, forêts, champs, montagnes), sa météo, l'heure du jour et ses animations.
 - **Époques de web_royaumes :** les 56 bâtiments autour de la capitale, avec ses remparts, son armée et la vie des quartiers.
 - **Époques de web_power :** les quartiers, les fermes et une installation de chaque type disponible cette année-là. Elles sont dessinées par les modèles de web_power eux-mêmes, avec leurs fumées et leurs éoliennes.
-- **Pourquoi c'est possible :** `lib/power/pont.js` lit les fichiers de `sources/web_power/js` et les évalue avec `lot`, `put`, `fige`… de `toon.js`. Les deux jeux partagent le même vocabulaire de rendu, donc rien n'est recopié ni modifié. C'est le point de départ de la fusion des deux rendus.
+- **Pourquoi c'est possible :** `lib/pont/pont.js` lit les fichiers de `lib/power` (et le catalogue de `sources/web_power/js`) et les évalue avec `lot`, `put`, `fige`… de `toon.js`. Les deux jeux partagent le même vocabulaire de rendu, donc rien n'est recopié ni modifié. C'est le point de départ de la fusion des deux rendus.
 - **Réglages :** saison, temps, neige au sol, heure. Le bouton « Bâtiments » ouvre la liste de l'époque : un clic y amène la caméra et entoure la case.
 
 ## Mettre à jour

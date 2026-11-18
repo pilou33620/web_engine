@@ -8,13 +8,14 @@ La bibliothèque graphique commune des jeux. Elle vit dans `web_engine/lib/`, et
 
 ## Contenu
 
-| Dossier | Contenu | Forme |
-|---|---|---|
-| `three/` | three.js r186 (`three.module.js`, `three.core.js`) et `addons/utils/BufferGeometryUtils.js` | modules ES |
-| `royaumes/` | moteur et rendu de web_royaumes : scène, toon, plateau (terrain, nature), modèles, vie, quartiers, météo, routes, remparts, forts, marine, sièges, espions, brouillard, étiquettes ; `rendu.css` | modules ES |
-| `royaumes/img/`, `royaumes/icons/` | illustrations des événements (SVG) et icônes de l'application (PNG) de web_royaumes | fichiers |
-| `power/` | outils, moteur 3D, modèles, ambiance et ciel de web_power | scripts classiques |
-| `power/pont.js` | les modèles de web_power utilisables dans la scène du moteur royaumes | module ES |
+Chaque dossier est une **partie** : un jeu ne prend que celles qu'il déclare.
+
+| Partie | Contenu | Forme | A besoin de |
+|---|---|---|---|
+| `three/` | three.js r186 (`three.module.js`, `three.core.js`) et `addons/utils/BufferGeometryUtils.js` | modules ES | — |
+| `royaumes/` | moteur et rendu de web_royaumes : scène, toon, plateau (terrain, nature), modèles, vie, quartiers, météo, routes, remparts, forts, marine, sièges, espions, brouillard, étiquettes ; `rendu.css` ; `img/` (illustrations des événements, SVG), `icons/` (icônes de l'application, PNG) | modules ES | `three` |
+| `power/` | outils, moteur 3D, modèles, ambiance et ciel de web_power | scripts classiques | — (three.js arrive par la page) |
+| `pont/` | `pont.js` : les modèles de web_power utilisables dans la scène du moteur royaumes | module ES | `royaumes`, `power` |
 
 ### `royaumes/` : le moteur en modules ES
 
@@ -56,10 +57,10 @@ Dans ce cas, pointez la carte d'import vers le CDN, **à la même version** que 
 `https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js` et `…/three@0.186.1/examples/jsm/`. Les scripts classiques de `power/` se chargent normalement en `file://`.
 C'est ce que fait web_power.
 
-### `power/pont.js` : les modèles de web_power dans le moteur royaumes
+### `pont/pont.js` : les modèles de web_power dans le moteur royaumes
 
 ```js
-import { chargerPower, modele } from './graphismes/power/pont.js';
+import { chargerPower, modele } from './graphismes/pont/pont.js';
 const P = await chargerPower();                  // P.BAT (installations), P.QBAT (quartiers), P.bFerme, P.rotor
 const { groupe, fumees, rotors } = modele(P.BAT.nucleaire, 1);
 scene.add(groupe);                               // à l'échelle du plateau royaumes
@@ -69,18 +70,18 @@ scene.add(groupe);                               // à l'échelle du plateau roy
 
 ## Jeux qui utilisent la bibliothèque
 
-| Jeu | Dossier | Parties utilisées |
+| Jeu | Dossier | `PARTIES` |
 |---|---|---|
-| web_royaumes | `web/graphismes/` | `three/`, `royaumes/` avec ses images et icônes (servi par le serveur Rust) |
-| web_power | `graphismes/` | `power/` (servi par `serveur.py` ; three.js r186 depuis le CDN, pour l'ouverture en `file://`) |
+| web_royaumes | `web/graphismes/` | `three royaumes` (servi par le serveur Rust) |
+| web_power | `graphismes/` | `power` (servi par `serveur.py` ; three.js r186 depuis le CDN, pour l'ouverture en `file://`) |
 
 ## Utiliser la bibliothèque dans un jeu
 
-1. **Copier le script :** placez `web_engine/outils/jeu/maj-graphismes.sh` dans `outils/` du jeu, et changez la ligne `DEST=` si le dossier servi n'est pas la racine (par exemple `DEST=web/graphismes`).
-2. **Installer :** lancez `bash outils/maj-graphismes.sh`. Le dossier est créé, avec `VERSION.json`. Commitez-le.
+1. **Copier le script :** placez `web_engine/outils/jeu/maj-graphismes.sh` dans `outils/` du jeu, puis réglez deux lignes : `PARTIES=`, les parties dont le jeu a besoin (leurs dépendances suivent toutes seules), et `DEST=`, si le dossier servi n'est pas la racine (par exemple `DEST=web/graphismes`).
+2. **Installer :** lancez `bash outils/maj-graphismes.sh`. Le dossier est créé avec ces parties seulement, et `VERSION.json`. Commitez-le.
 3. **Charger :** importez les modules depuis ce dossier (voir plus haut).
 4. **Vérifier en CI :** ajoutez une étape `bash outils/maj-graphismes.sh --verifier`. Elle échoue si quelqu'un modifie les graphismes dans le jeu au lieu de web_engine.
-5. **Recevoir les mises à jour :** copiez `web_engine/outils/jeu/graphismes.yml` dans `.github/workflows/`. Chaque lundi, ou à la demande, il ouvre une demande de fusion avec la dernière version.
+5. **Recevoir les mises à jour :** copiez `web_engine/outils/jeu/graphismes.yml` dans `.github/workflows/`. Chaque lundi, ou à la demande, il ouvre une demande de fusion, **seulement si l'une des parties du jeu a changé**. Une version qui ne touche que les parties d'un autre jeu ne lui propose rien.
 
 ## Faire évoluer la bibliothèque
 
