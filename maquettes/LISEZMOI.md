@@ -11,7 +11,7 @@ puis dans la bibliothèque (`lib/`). Ce dossier appartient à web_engine.
 |---|---|
 | `web_royaumes/` | armées par technologie, guerre et diplomatie, vie des quartiers, rendu façon web_power ; `source/` : leurs fichiers sources et générateurs |
 | `web_power/` | maquette des déchets |
-| `web_engine/` | maquettes faites ici : arbres et montagnes (avant et propositions ; la proposition 1 est retenue, lib 1.3.0) |
+| `web_engine/` | maquettes faites ici : arbres et montagnes (avant et propositions ; la proposition 1 est retenue : plateau royaumes en lib 1.3.0, plateau power en 1.4.0) |
 | `web_power-heliosphere/` | Héliosphère, conquête du système solaire (branche `claude/jolly-meitner-cjshzu` de web_power, non fusionnée) |
 
 **Les générateurs** `web_royaumes/source/*/gen.py` sont gardés tels qu'ils ont été écrits. Ils contiennent les chemins absolus de leur espace de travail d'origine : un ancien dossier temporaire pour `guerre`, `web_royaumes/web/js/rendu` pour `quartiers`, qui correspond aujourd'hui à `lib/royaumes`. Pour régénérer une maquette, il faut d'abord adapter ces chemins.

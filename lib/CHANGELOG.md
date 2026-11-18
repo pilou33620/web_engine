@@ -3,6 +3,12 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 1.4.0 — 2026-11-18
+
+Les mêmes forêts et montagnes dans le plateau de web_power (`power/03-moteur-3d.js`) : sapins à trois étages,
+feuillus en grappes, buissons ; massif de trois pics de roche taillée, éboulis et sapins au pied.
+Version d'été, comme le reste du décor de web_power (la saison et la neige passent par la teinte de MAT_SOL).
+
 ## 1.3.0 — 2026-11-18
 
 Nouveaux arbres et montagnes du plateau (`royaumes/plateau.js`), proposition 1 de `maquettes/web_engine/arbres-montagnes.html` :
