@@ -3,6 +3,20 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.7.0 — 2026-11-18
+
+L'Antiquité entre dans la bibliothèque : `rendu/antiques.js`, dans les conventions de `modernes.js`, assemblé et animé par `modele()` et `animer()` :
+- Gaulois (murs à poteaux de bois et torchis, toits de chaume) : maison ronde, maison longue, maison du chef, greniers sur pilotis, ferme, forge,
+  atelier du potier, sanctuaire (nemeton), porte d'oppidum (murus gallicus), tour de guet ;
+- Romains : domus, insula, temple, forum, thermes, amphithéâtre, aqueduc, villa rustica, moulin à eau, camp (castrum) ;
+- armées : phalange gauloise (chef au casque ailé, carnyx), cavalerie gauloise, char de guerre, archers ; légion (aigle, centurion), tortue,
+  cavalerie romaine, onagre et scorpion ;
+- animations de chacun : fumées, feux et torches, forgeron, tour du potier, druide, gardes, bêtes, eau qui coule dans l'aqueduc et le moulin,
+  roue du moulin, gladiateurs, oriflammes, troupes qui marchent au pas, flèches, onagre qui tire ;
+- `modernes.js` : deux mouvements de plus pour `piece()`, `'marche'` (au pas) et `'coule'` (en boucle) ; `ex.lumiere` éclaire la nuit un dessin d'habitation ;
+  `piece`, `oiseaux`, `fum`, `arbreVent`, `arbre`, `toit`, `sol` sont exportés ;
+- maquette `maquettes/web_engine/batiments-antiques.html` (`#cle` pour un gros plan, par exemple `#legion`).
+
 ## 2.6.0 — 2026-11-18
 
 Plus de vie partout, dans `rendu/modernes.js` : `oiseaux()` (vols qui tournent : mouettes sur la décharge, le compost, le barrage et l'éolien en mer,
