@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bâtiments modernes</title>
+<link rel="stylesheet" href="../../lib/rendu/rendu.css">
+<link rel="stylesheet" href="../../galerie/visionneuse.css">
+<style>
+  #etiquettes span { font-size: 11px; background: rgba(20, 26, 19, .72); }
+  #etiquettes span.titre { font-size: 14px; font-weight: 600; background: rgba(20, 26, 19, .88); }
+  .note { position: fixed; top: 54px; left: 8px; right: 8px; margin: 0; padding: 6px 10px; font-size: 13px; background: rgba(20, 26, 19, .7); border-radius: 8px; }
+</style>
+</head>
+<body>
+<canvas id="carte" aria-label="Tous les bâtiments modernes sur une petite carte"></canvas>
+<div id="etiquettes"></div>
+<div id="eclair"></div>
+<form class="barre" id="choix">
+  <b>Bâtiments modernes</b>
+  <label>Heure <select name="heure"><option value="jour">Jour</option><option value="aube">Aube</option><option value="crepuscule">Crépuscule</option><option value="nuit">Nuit</option><option value="">Cycle</option></select></label>
+  <label><input type="checkbox" name="noms" checked> Noms</label>
+</form>
+<p class="note">Tous les bâtiments de web_power (1900 → 2035) en même temps, une rangée par famille, dessinés par lib/rendu/modernes.js avec leurs animations (fumées, éoliennes, courant, fenêtres la nuit).</p>
+<p class="aide">Glisser : déplacer · clic droit ou Maj : tourner · molette : zoom</p>
+<script type="module">
+import { THREE, scene, cam, camera, apresCamera } from '../../lib/rendu/scene.js';
+import { lot, put, fige, cyl, boite } from '../../lib/rendu/toon.js';
+import { appliquerMeteo, forcerHeure } from '../../lib/rendu/meteo.js';
+import { BAT, QBAT, bFerme, modele, animer, INSTALLATIONS, QUARTIERS } from '../../lib/rendu/modernes.js';
+
+// ------------------------------------------------------------------ le catalogue complet, rangé par famille
+const liste = [
+  ...QUARTIERS.map(q => ({ nom: q.nom, groupe: 'Villes', dessin: QBAT[q.cle] })),
+  { nom: 'Ferme céréalière', groupe: 'Fermes', dessin: L => bFerme(L, false) },
+  { nom: 'Ferme d’élevage', groupe: 'Fermes', dessin: L => bFerme(L, true) },
+  ...INSTALLATIONS.map(t => ({ cle: t.cle, nom: `${t.nom} (${t.an}${t.fin ? '–' + t.fin : ''})`, groupe: t.groupe, dessin: BAT[t.cle] })),
+];
+const MER = ['offshore'], RIVIERE = ['fil', 'barrage', 'prise'];
+const COLS = 8, PAS = 2.3, R = 1, SOL = 0x7fb04f, EAU = 0x4f8fc0;
+
+// ------------------------------------------------------------------ la carte : une rangée (ou plus) par famille
+const carte = new THREE.Group(), etiq = document.getElementById('etiquettes'), f = document.getElementById('choix'), poses = [];
+scene.add(carte);
+let ligne = 0;
+for (const [groupe, bs] of Map.groupBy(liste, b => b.groupe)) {
+  const el = document.createElement('span'); el.className = 'titre'; el.textContent = groupe; etiq.append(el);
+  poses.push({ el, p: new THREE.Vector3(-PAS * 0.9, 0, ligne * PAS), titre: true });
+  bs.forEach((b, k) => {
+    const x = (k % COLS) * PAS + (ligne % 2) * PAS / 2, z = (ligne + (k / COLS | 0)) * PAS;  // rangées décalées, comme un plateau hexagonal
+    const T = lot(), mer = MER.includes(b.cle);
+    put(T, cyl(R * 0.965, R, 0.16, 6), mer ? EAU : SOL, 0, -0.08, 0, 0, 0);
+    if (RIVIERE.includes(b.cle)) put(T, boite(0.35, 0.02, 1.75), EAU, 0, 0.005, 0, 0, 0);
+    fige(T, carte).position.set(x, 0, z);
+    const m = b.cle === 'grue' ? modele(BAT.poste, k, { chantier: true }) : modele(b.dessin, k + 1);  // le chantier : un poste en travaux, comme carte-test
+    m.groupe.position.set(x, b.cle === 'barrage' ? -0.1 : 0, z);
+    carte.add(m.groupe); animer(m);
+    const n = document.createElement('span'); n.textContent = b.nom; etiq.append(n);
+    poses.push({ el: n, p: new THREE.Vector3(x, 0, z + 0.85) });
+  });
+  ligne += Math.ceil(bs.length / COLS);
+}
+
+// ------------------------------------------------------------------ étiquettes, heure, caméra
+apresCamera(() => {
+  const v = new THREE.Vector3(), noms = f.noms.checked;
+  for (const { el, p, titre } of poses) {
+    v.copy(p).project(camera);
+    el.hidden = v.z > 1 || (!titre && (!noms || cam.d > 16));  // les noms des bâtiments seulement de près, pour rester lisible
+    el.style.transform = `translate(${(v.x + 1) / 2 * innerWidth}px, ${(1 - v.y) / 2 * innerHeight}px) translate(-50%, -50%)`;
+  }
+});
+appliquerMeteo({ genre: 'soleil', temperature: 20, pluie: 0, vent: 0.5, neige_sol: 0 }, 2);
+const heure = () => forcerHeure(f.heure.value || null);
+f.addEventListener('change', heure); heure();
+Object.assign(cam, { l: COLS * PAS + 2, h: ligne * PAS + 2, x: (COLS - 1) * PAS / 2, z: (ligne - 1) * PAS / 2, cible: 12, d: 12, lacet: 0, auto: false });
+</script>
+</body>
+</html>

@@ -18,6 +18,11 @@
    "titre": "Arbres et montagnes"
   },
   {
+   "source": "web_engine",
+   "chemin": "maquettes/web_engine/batiments-modernes.html",
+   "titre": "Bâtiments modernes"
+  },
+  {
    "source": "web_power",
    "chemin": "maquettes/web_power/dechets.html",
    "titre": "Maquette Déchets"
