@@ -1,21 +1,24 @@
-// Carte test : une seule carte, une seule scène (le moteur de web_royaumes, avec sa nature, sa météo et ses animations),
+// Carte test (premier client de lib/) : une seule carte, une seule scène (le moteur de web_royaumes, avec sa nature, sa météo et ses animations),
 // et tous les bâtiments de l'époque choisie sur la frise, de 1700 à 2035 :
 //  - époques de web_royaumes : l'état de partie du moteur Rust, retouché (époque, saison…), passé au pipeline du jeu ;
 //  - époques de web_power : ses quartiers, ses fermes et chacune de ses installations de l'époque, dessinés par ses propres
-//    modèles (power.js) et posés sur le même plateau, avec leurs fumées et leurs éoliennes.
-import { THREE, scene, cam, posCase, voisins, viser, chaqueImage } from '../sources/web_royaumes/web/js/rendu/scene.js';
-import * as plateau from '../sources/web_royaumes/web/js/rendu/plateau.js';
-import { initMonde, synchroniser } from '../sources/web_royaumes/web/js/rendu/monde.js';
-import { majVie, bouffee } from '../sources/web_royaumes/web/js/rendu/vie.js';
-import { majQuartiers } from '../sources/web_royaumes/web/js/rendu/quartiers.js';
-import { majBrouillard } from '../sources/web_royaumes/web/js/rendu/brouillard.js';
-import { majMarine } from '../sources/web_royaumes/web/js/rendu/marine.js';
-import { majEspions } from '../sources/web_royaumes/web/js/rendu/espions.js';
-import { appliquerMeteo, forcerHeure, forcerMarche } from '../sources/web_royaumes/web/js/rendu/meteo.js';
-import { majRoutes, niveauRoutes } from '../sources/web_royaumes/web/js/rendu/routes.js';
-import { TECHS_PALIER } from '../sources/web_royaumes/web/js/rendu/modeles.js';
-import { jeter } from '../sources/web_royaumes/web/js/rendu/toon.js';
-import { P, modele } from './power.js';
+//    modèles (lib/power/pont.js) et posés sur le même plateau, avec leurs fumées et leurs éoliennes.
+import { THREE, scene, cam, posCase, voisins, viser, chaqueImage } from '../lib/royaumes/scene.js';
+import * as plateau from '../lib/royaumes/plateau.js';
+import { initMonde, synchroniser } from '../lib/royaumes/monde.js';
+import { majVie, bouffee } from '../lib/royaumes/vie.js';
+import { majQuartiers } from '../lib/royaumes/quartiers.js';
+import { majBrouillard } from '../lib/royaumes/brouillard.js';
+import { majMarine } from '../lib/royaumes/marine.js';
+import { majEspions } from '../lib/royaumes/espions.js';
+import { appliquerMeteo, forcerHeure, forcerMarche } from '../lib/royaumes/meteo.js';
+import { majRoutes, niveauRoutes } from '../lib/royaumes/routes.js';
+import { TECHS_PALIER } from '../lib/royaumes/modeles.js';
+import { jeter } from '../lib/royaumes/toon.js';
+import { chargerPower, modele } from '../lib/power/pont.js';
+
+// le catalogue de web_power (années, noms, groupes des installations ; époques) est une donnée du jeu : lue dans ses fichiers
+const P = await chargerPower(['02-terrain', '05-catalogue', '06-eau', '06b-dechets', '07-epoques-rd'].map(f => `../sources/web_power/js/${f}.js`));
 
 const $ = s => document.querySelector(s);
 const charger = c => fetch(c).then(r => r.json());

@@ -18,10 +18,10 @@
 </form>
 <p class="aide">Glisser : déplacer · clic droit ou Maj : tourner · molette : zoom</p>
 <script type="module">
-// Les modèles et la scène sont ceux du jeu, copiés tels quels (sources/web_royaumes/web/js/rendu) : seule la mise en vitrine est ici.
-import { THREE, scene, cam, lumiere, apresCamera, camera } from '../../sources/web_royaumes/web/js/rendu/scene.js';
-import { maillageBatiment } from '../../sources/web_royaumes/web/js/rendu/modeles.js';
-import { lot, put, fige, cyl, jeter } from '../../sources/web_royaumes/web/js/rendu/toon.js';
+// Les modèles et la scène sont ceux du jeu, copiés tels quels (lib/royaumes) : seule la mise en vitrine est ici.
+import { THREE, scene, cam, lumiere, apresCamera, camera } from '../../lib/royaumes/scene.js';
+import { maillageBatiment } from '../../lib/royaumes/modeles.js';
+import { lot, put, fige, cyl, jeter } from '../../lib/royaumes/toon.js';
 
 const regles = await (await fetch('../../sources/web_royaumes/rust/royaumes/data/regles.json')).json();
 const f = document.getElementById('choix');

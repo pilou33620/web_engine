@@ -1,4 +1,5 @@
 /* Carte test : la carte plein écran (styles du jeu web_royaumes), un bandeau en haut, la frise des époques en bas, la liste à droite. */
+html, body { margin: 0; height: 100%; overflow: hidden; background: #1b211a; }
 .hud { position: fixed; z-index: 5; color: #f3f0e6; font: 14px/1.3 system-ui, sans-serif; }
 .hud * { font-family: system-ui, sans-serif; }
 .hud select, .hud button { font: inherit; }

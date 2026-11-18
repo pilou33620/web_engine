@@ -17,17 +17,17 @@
 </form>
 <p class="aide">Glisser : déplacer · molette : zoom</p>
 
-<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
+<script type="importmap">{ "imports": { "three": "../../lib/three/three.module.js", "three/addons/": "../../lib/three/addons/" } }</script>
 <script type="module">
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 Object.assign(window, { THREE, mergeGeometries });
 </script>
-<!-- scripts du jeu copiés tels quels (sources/web_power/js) : moteur 3D, modèles, catalogue (années de chaque installation), époques -->
-<script defer src="../../sources/web_power/js/01-outils.js"></script>
+<!-- graphismes de web_power (lib/power : outils, moteur 3D, modèles) ; catalogue et époques : données du jeu (sources/web_power/js) -->
+<script defer src="../../lib/power/01-outils.js"></script>
 <script defer src="../../sources/web_power/js/02-terrain.js"></script>
-<script defer src="../../sources/web_power/js/03-moteur-3d.js"></script>
-<script defer src="../../sources/web_power/js/04-modeles.js"></script>
+<script defer src="../../lib/power/03-moteur-3d.js"></script>
+<script defer src="../../lib/power/04-modeles.js"></script>
 <script defer src="../../sources/web_power/js/05-catalogue.js"></script>
 <script defer src="../../sources/web_power/js/06-eau.js"></script>
 <script defer src="../../sources/web_power/js/06b-dechets.js"></script>
