@@ -80,7 +80,8 @@ function batimentsPower(an) {
   const q = (k, n = 1) => Array.from({ length: n }, () => ({ nom: QUARTIERS.find(q => q.cle === k).nom, groupe: 'Villes', dessin: L => QBAT[k](L, { fum: [] }) }));
   const villes = [...q('centre'), ...q('residentiel', 2), ...q('industriel'), ...(an >= 1930 ? q('hopital') : []), ...(an >= 1960 ? q('affaires') : []), ...q('village')];
   const fermes = [['Ferme céréalière', false], ['Ferme d’élevage', true]].map(([nom, e]) => ({ nom, groupe: 'Fermes', dessin: L => bFerme(L, e) }));
-  const inst = INSTALLATIONS.filter(t => t.groupe !== 'Chantier' && t.an <= an && !(t.fin && t.fin < an))
+  const jusque = an >= EPOQUES.at(-1).an ? Infinity : an;  // la dernière époque montre aussi le futur (fusion)
+  const inst = INSTALLATIONS.filter(t => t.an <= jusque && !(t.fin && t.fin < an))
     .map(t => ({ type: t.cle, nom: t.nom, groupe: t.groupe, dessin: (L, ex) => BAT[t.cle](L, ex) }));
   return [...villes, ...fermes, ...inst];
 }
