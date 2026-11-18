@@ -3,6 +3,13 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.4.0 — 2026-11-18
+
+Les villes s'animent aussi, dans `rendu/modernes.js` :
+- voitures qui font le tour du centre-ville, du quartier résidentiel et du village (`ronde()`), arbres qui ploient dans le vent (`arbreVent()`) ;
+- centre-ville et quartier d'affaires : feu de balisage au sommet de la plus haute tour ; affaires : nacelle de laveur de vitres et enseigne qui tourne ;
+- zone industrielle : un camion de livraison ; village : girouette sur le clocher.
+
 ## 2.3.0 — 2026-11-18
 
 Chaque bâtiment moderne a maintenant son animation, dans `rendu/modernes.js` :
