@@ -1,0 +1,7 @@
+{
+  "name": "gridmaster-banc",
+  "private": true,
+  "description": "Banc d'équilibrage de GridMaster : parties complètes jouées par des stratégies programmées",
+  "scripts": { "banc": "node banc.js" },
+  "dependencies": { "playwright": "1.49.1" }
+}

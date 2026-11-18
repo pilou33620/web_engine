@@ -1,0 +1,46 @@
+{
+ "depots": {
+  "web_royaumes": {
+   "commit": "c33f18272e82ca9b16febbc934c37516c6e50f05",
+   "date": "2026-11-18",
+   "message": "Vie des quartiers : la foule de la halle suit le jour de marché du moteur (rien sous siège, blocus ou disette)"
+  },
+  "web_power": {
+   "commit": "14109fc3bdc5f03b62e65a34d1b17d89842bea6c",
+   "date": "2026-11-07",
+   "message": "Appairage : le nom Tailscale exact de ce poste est accepté (Host)"
+  }
+ },
+ "maquettes": [
+  {
+   "source": "web_power-heliosphere",
+   "chemin": "sources/branches/web_power-heliosphere/maquettes/conquete-spatiale.html",
+   "titre": "Héliosphère"
+  },
+  {
+   "source": "web_power",
+   "chemin": "sources/web_power/maquettes/dechets.html",
+   "titre": "Maquette Déchets"
+  },
+  {
+   "source": "web_royaumes",
+   "chemin": "sources/web_royaumes/maquettes/armees.html",
+   "titre": "Armées par technologie"
+  },
+  {
+   "source": "web_royaumes",
+   "chemin": "sources/web_royaumes/maquettes/guerre.html",
+   "titre": "Guerre et diplomatie"
+  },
+  {
+   "source": "web_royaumes",
+   "chemin": "sources/web_royaumes/maquettes/quartiers.html",
+   "titre": "Vie des quartiers"
+  },
+  {
+   "source": "web_royaumes",
+   "chemin": "sources/web_royaumes/maquettes/rendu-power.html",
+   "titre": "Rendu façon web_power"
+  }
+ ]
+}

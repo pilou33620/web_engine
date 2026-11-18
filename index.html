@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Galerie des rendus</title>
+<title>Base graphique</title>
 <style>
   html, body { margin: 0; height: 100%; background: #1b211a; color: #f3f0e6; font: 15px/1.4 system-ui, sans-serif; }
   body { display: flex; flex-direction: column; }
@@ -13,12 +13,13 @@
   nav button { font: inherit; padding: 6px 14px; border-radius: 8px; border: 1px solid #5d6b55; background: transparent; color: inherit; cursor: pointer; }
   nav button[aria-selected="true"] { background: #f3f0e6; color: #1b211a; }
   header p { margin: 0; font-size: 13px; opacity: .75; }
+  select { font: inherit; max-width: 100%; }
   iframe { flex: 1; width: 100%; border: 0; }
 </style>
 </head>
 <body>
 <header>
-  <h1>Galerie des rendus</h1>
+  <h1>Base graphique</h1>
   <nav role="tablist" aria-label="Source des rendus">
     <button role="tab" data-src="web_royaumes">web_royaumes</button>
     <button role="tab" data-src="web_power">web_power</button>
@@ -26,7 +27,9 @@
   <nav role="tablist" aria-label="Page">
     <button role="tab" data-page="visionneuse">Bâtiments</button>
     <button role="tab" data-page="monde">Monde vivant</button>
+    <button role="tab" data-page="maquettes">Maquettes</button>
   </nav>
+  <select id="maquette" aria-label="Maquette" hidden></select>
   <p id="note"></p>
 </header>
 <iframe id="vue" title="Rendus des bâtiments"></iframe>
@@ -36,19 +39,31 @@ const NOTES = {
   web_royaumes: '1700 → 1816 : Ancien Régime, Lumières, Empire, Révolution industrielle. Source retenue pour les époques passées.',
   web_power: '1900 → 2035 : centrales, réseau, eau, déchets, quartiers. Source retenue pour les époques modernes.',
 };
-// « Bâtiments » : chaque modèle seul ; « Monde vivant » : la carte du jeu avec sa nature et ses animations
-const onglets = document.querySelectorAll('nav button');
-let [src, page] = location.hash.slice(1).split('/');
+// « Bâtiments » : chaque modèle seul ; « Monde vivant » : la carte du jeu avec sa nature et ses animations ;
+// « Maquettes » : les maquettes des dépôts (et des branches non fusionnées), listées par outils/synchroniser.sh dans sources/SOURCES.json
+const onglets = document.querySelectorAll('nav button'), choix = document.getElementById('maquette'), vue = document.getElementById('vue');
+let [src, page, ...reste] = location.hash.slice(1).split('/'), SOURCES = { depots: {}, maquettes: [] };
 function ouvrir() {
   if (!(src in NOTES)) src = 'web_royaumes';
-  if (page !== 'monde') page = 'visionneuse';
+  if (!['monde', 'maquettes'].includes(page)) page = 'visionneuse';
   onglets.forEach(b => b.setAttribute('aria-selected', b.dataset.src === src || b.dataset.page === page));
-  document.getElementById('vue').src = `${src}/${page}.html`;
-  document.getElementById('note').textContent = NOTES[src];
-  history.replaceState(null, '', `#${src}/${page}`);
+  const d = SOURCES.depots[src];
+  document.getElementById('note').textContent = NOTES[src] + (d ? ` Copie de ${d.commit.slice(0, 7)} (${d.date}).` : '');
+  choix.hidden = page !== 'maquettes';
+  if (page === 'maquettes') {
+    const liste = SOURCES.maquettes.filter(m => m.source.startsWith(src)), voulu = reste.join('/');
+    choix.replaceChildren(...liste.map(m => new Option(`${m.titre}${m.source !== src ? ' (branche non fusionnée)' : ''}`, m.chemin)));
+    if (liste.some(m => m.chemin === voulu)) choix.value = voulu;
+    vue.src = choix.value || 'about:blank';
+    history.replaceState(null, '', `#${src}/maquettes/${choix.value}`);
+  } else {
+    vue.src = `galerie/${src}/${page}.html`;
+    history.replaceState(null, '', `#${src}/${page}`);
+  }
 }
-onglets.forEach(b => b.onclick = () => { src = b.dataset.src || src; page = b.dataset.page || page; ouvrir(); });
-ouvrir();
+onglets.forEach(b => b.onclick = () => { src = b.dataset.src || src; page = b.dataset.page || page; reste = []; ouvrir(); });
+choix.onchange = () => { reste = [choix.value]; ouvrir(); };
+fetch('sources/SOURCES.json').then(r => r.json()).then(j => { SOURCES = j; }).catch(() => {}).finally(ouvrir);
 </script>
 </body>
 </html>

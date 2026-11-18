@@ -1,0 +1,5 @@
+node_modules/
+banc-resultats.json
+banc-rapport.md
+__pycache__/
+*.py[cod]

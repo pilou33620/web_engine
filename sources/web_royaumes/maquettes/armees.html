@@ -1,0 +1,198 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Armées par technologie</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap">
+<style>
+/* Layout : une planche de six figurines, une par palier technologique, dans l'ambiance sombre de web_power. */
+:root {
+  color-scheme: dark;
+  --fond: #141813; --carte: #1b211a; --carte2: #253021; --bord: #0f130e; --txt: #f6f4ea; --doux: #b3bca5; --or: #ffc94d; --encre: #1b211a;
+  --titre: Fredoka, "Trebuchet MS", system-ui, sans-serif; --corps: Nunito, "Segoe UI", system-ui, sans-serif;
+  --ombre: 0 4px 0 rgba(0,0,0,.35);
+}
+body { background: var(--fond); color: var(--txt); font-family: var(--corps); font-size: 15px; line-height: 1.5; }
+main { max-width: 1180px; margin: 0 auto; padding-block: 24px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 18px; }
+h1 { font-family: var(--titre); font-weight: 700; font-size: clamp(1.7rem, 4vw, 2.4rem); margin: 0; color: var(--or); text-wrap: balance; }
+.intro p { margin: 4px 0 0; max-width: 70ch; color: var(--doux); }
+.barre { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.barre > span { color: var(--doux); font-weight: 800; margin-right: 4px; }
+button { font: inherit; font-weight: 800; border: 2px solid var(--bord); background: var(--carte2); color: var(--txt); padding: 6px 14px; border-radius: 12px; cursor: pointer; box-shadow: 0 3px 0 rgba(0,0,0,.35); }
+button[aria-pressed="true"] { background: var(--or); color: var(--encre); }
+button:focus-visible { outline: 3px solid var(--or); outline-offset: 2px; }
+.grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px; }
+figure { margin: 0; background: var(--carte); border: 2px solid var(--bord); border-radius: 16px; overflow: hidden; box-shadow: var(--ombre); display: grid; grid-template-rows: auto 1fr; min-width: 0; }
+canvas { display: block; width: 100%; aspect-ratio: 4 / 3; max-width: 100%; background: #1b211a; touch-action: pan-y; cursor: grab; }
+figcaption { padding: 12px 16px 16px; display: grid; gap: 6px; align-content: start; }
+.date { font-family: var(--titre); font-weight: 600; color: var(--or); font-size: .9rem; letter-spacing: .03em; }
+figcaption h2 { font-family: var(--titre); font-weight: 600; font-size: 1.2rem; margin: 0; }
+figcaption ul { margin: 0; padding-left: 1.1em; color: var(--doux); font-size: .92rem; display: grid; gap: 2px; }
+.note { background: var(--carte); border: 2px solid var(--bord); border-radius: 16px; padding: 14px 18px; color: var(--doux); box-shadow: var(--ombre); }
+.note b { color: var(--txt); }
+</style>
+<main>
+  <section class="intro">
+    <h1>L'armée change avec les technologies</h1>
+    <p>L'armée est une icône : toujours la même formation (une ligne d'infanterie devant, l'officier et le drapeau au centre, la cavalerie derrière, deux canons sur le flanc), quel que soit le nombre de troupes. Son allure suit les technologies militaires que le royaume a découvertes. Glissez sur une figurine pour la tourner.</p>
+  </section>
+  <div class="barre" role="group" aria-label="Couleur du royaume"><span>Royaume</span>
+    <button data-c="#2f5fa8" aria-pressed="true">Bleu</button><button data-c="#b23a2e" aria-pressed="false">Rouge</button><button data-c="#3f7f3a" aria-pressed="false">Vert</button><button data-c="#d9a43a" aria-pressed="false">Jaune</button>
+  </div>
+  <div class="grille" id="grille"></div>
+  <p class="note"><b>Comment ça marche dans le jeu :</b> chaque royaume affiche le palier de sa technologie militaire la plus avancée. Un rival en retard garde des piquiers face à vos fusiliers, ce qui se voit sur la carte. Le chemin de fer n'a pas de figurine à part : il ajoute un fourgon du train des équipages à l'arrière du dernier palier.</p>
+</main>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }</script>
+<script type="module">
+import * as THREE from 'three';
+// ---------------------------------------------------------------- rendu de web_power : toon 3 tons et contours bruns
+const degrade = new THREE.DataTexture(new Uint8Array([105, 190, 255]), 3, 1, THREE.RedFormat);
+degrade.minFilter = degrade.magFilter = THREE.NearestFilter; degrade.needsUpdate = true;
+const MAT = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: degrade });
+const CONT = new THREE.MeshBasicMaterial({ color: 0x24180f, side: THREE.BackSide });
+const _c = new THREE.Vector3(), _t = new THREE.Vector3();
+function couleur(g, col) { const c = new THREE.Color(col), n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) a.set([c.r, c.g, c.b], i * 3); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; }
+function contour(g, ep) { g.computeBoundingBox(); g.boundingBox.getSize(_t); g.boundingBox.getCenter(_c); const o = g.clone().translate(-_c.x, -_c.y, -_c.z); o.scale((_t.x + 2 * ep) / Math.max(_t.x, 1e-3), (_t.y + 2 * ep) / Math.max(_t.y, 1e-3), (_t.z + 2 * ep) / Math.max(_t.z, 1e-3)); return o.translate(_c.x, _c.y, _c.z); }
+function fusion(geos) { let n = 0; for (const g of geos) n += g.attributes.position.count; const P = new Float32Array(n * 3), N = new Float32Array(n * 3), C = new Float32Array(n * 3); let o = 0; for (const g of geos) { P.set(g.attributes.position.array, o * 3); N.set(g.attributes.normal.array, o * 3); C.set(g.attributes.color.array, o * 3); o += g.attributes.position.count; } const r = new THREE.BufferGeometry(); r.setAttribute('position', new THREE.BufferAttribute(P, 3)); r.setAttribute('normal', new THREE.BufferAttribute(N, 3)); r.setAttribute('color', new THREE.BufferAttribute(C, 3)); return r; }
+const lot = () => ({ g: [], o: [] });
+function put(L, geo, col, x = 0, y = 0, z = 0, ry = 0, ep = 0.08) {
+  let g = geo.index ? geo.toNonIndexed() : geo.clone(); if (g.attributes.uv) g.deleteAttribute('uv'); if (!g.attributes.normal) g.computeVertexNormals();
+  if (ry) g.rotateY(ry); g.translate(x, y, z); couleur(g, col); L.g.push(g); if (ep) L.o.push(couleur(contour(g, ep), 0));
+}
+function fige(L) { const grp = new THREE.Group(); const m = new THREE.Mesh(fusion(L.g), MAT); m.castShadow = m.receiveShadow = true; grp.add(m); if (L.o.length) grp.add(new THREE.Mesh(fusion(L.o), CONT)); return grp; }
+const boite = (w, h, d) => new THREE.BoxGeometry(w, h, d), cyl = (a, b, h, s = 10) => new THREE.CylinderGeometry(a, b, h, s), cone = (r, h, s = 8) => new THREE.ConeGeometry(r, h, s), sphere = (r, d = 1) => new THREE.IcosahedronGeometry(r, d);
+
+// ---------------------------------------------------------------- les paliers
+const PEAU = 0xf0c9a0, BLANC = 0xf2efe6, NOIR = 0x1f1f1f, BOIS = 0x5b3a1e, ACIER = 0xd9d9d9, BRONZE = 0xb08d57, FER = 0x2b2b2b, GARANCE = 0xb8322a, CHEVAL = 0x6b4226;
+const PALIERS = [
+  { date: '1700 · au départ', nom: 'Mousquets et piques', tete: 'tricorne', habit: 'long', piques: true, baionnette: false, cav: 'dragon', art: 'ancienne',
+    notes: ['Mousquetaires en justaucorps long et tricorne, mousquet sans baïonnette.', 'Deux piquiers au centre de la ligne, longues piques dressées.', 'Dragons à cheval, tricorne.', 'Lourds canons de bronze sur affûts rouges à grandes roues.'] },
+  { date: '1703 · Fusil à silex et baïonnette', nom: 'Fini les piques', tete: 'tricorne', habit: 'long', piques: false, baionnette: true, grenadiers: true, cav: 'dragon', art: 'ancienne',
+    notes: ['Les piques disparaissent : toute la ligne a le fusil et la baïonnette.', 'Deux grenadiers en bonnet à plaque au bout de la ligne.', 'Cavalerie et canons inchangés.'] },
+  { date: '1765 · Système Gribeauval', nom: 'Artillerie moderne', tete: 'tricorne', habit: 'long', piques: false, baionnette: true, grenadiers: true, cav: 'dragon', art: 'gribeauval',
+    notes: ['Canons plus courts et plus légers, affûts peints en vert olive.', 'Avant-train attelé de deux chevaux derrière chaque pièce.', 'Infanterie et cavalerie inchangées.'] },
+  { date: '1793 · Levée en masse', nom: 'Les armées de la nation', tete: 'bicorne', habit: 'court', piques: false, baionnette: true, grenadiers: true, cav: 'cuirassier', hussard: true, art: 'gribeauval',
+    notes: ['Fusiliers en habit court et bicorne, guêtres blanches.', 'Cuirassiers : casque à crinière et cuirasse d\'acier.', 'Un hussard en colback et pelisse rejoint la cavalerie.'] },
+  { date: '1825 · Fusil à percussion', nom: 'Capotes et pantalons garance', tete: 'shako', habit: 'capote', pantalon: GARANCE, piques: false, baionnette: true, chasseurs: true, cav: 'cuirassier', lanciers: true, art: 'gribeauval',
+    notes: ['Shako, capote longue et pantalon rouge garance.', 'Deux chasseurs à pied vert sombre déployés en tirailleurs devant la ligne.', 'Un lancier à fanion dans la cavalerie.'] },
+  { date: '1832 · Chemin de fer', nom: 'Le train des équipages', tete: 'kepi', habit: 'capote', pantalon: GARANCE, piques: false, baionnette: true, chasseurs: true, cav: 'cuirassier', lanciers: true, art: 'gribeauval', fourgon: true,
+    notes: ['Le képi remplace le shako.', 'Un fourgon bâché du train des équipages suit l\'armée.', 'Le reste comme au palier précédent.'] },
+];
+
+function tete(L, P, x, y, z, couleurRoy) {
+  if (P.tete === 'bicorne') put(L, boite(0.95, 0.35, 0.3), NOIR, x, y + 0.1, z, 0, 0.05);
+  else if (P.tete === 'shako') { put(L, cyl(0.3, 0.26, 0.5, 8), NOIR, x, y + 0.2, z, 0, 0.05); put(L, boite(0.1, 0.2, 0.1), couleurRoy, x, y + 0.52, z + 0.18, 0, 0); }
+  else if (P.tete === 'kepi') { put(L, cyl(0.24, 0.28, 0.32, 8), couleurRoy, x, y + 0.12, z, 0, 0.05); put(L, boite(0.4, 0.04, 0.2), NOIR, x, y, z + 0.2, 0, 0); }
+  else put(L, cone(0.55, 0.3, 3), NOIR, x, y + 0.1, z, Math.PI, 0.05); // tricorne
+}
+function fantassin(L, P, x, z, roy, genre = 'ligne') {
+  const habit = genre === 'chasseur' ? 0x2f4a32 : roy, pant = P.pantalon || BLANC;
+  for (const dx of [-0.16, 0.16]) put(L, boite(0.24, 0.9, 0.3), pant, x + dx, 0.45, z, 0, 0.05);
+  const long = P.habit === 'long' || P.habit === 'capote';
+  put(L, boite(0.75, long ? 1.25 : 0.95, 0.5), P.habit === 'capote' && genre !== 'chasseur' ? 0x5a6a86 : habit, x, long ? 1.2 : 1.35, z, 0, 0.07);
+  if (P.habit === 'capote' && genre !== 'chasseur') put(L, boite(0.78, 0.25, 0.52), roy, x, 1.75, z, 0, 0); // col et épaulettes à la couleur du royaume
+  put(L, boite(0.8, 0.1, 0.55), BLANC, x, 1.15, z, 0, 0);
+  put(L, sphere(0.28, 1), PEAU, x, 2.1, z, 0, 0.05);
+  if (genre === 'grenadier') { put(L, cone(0.3, 0.8, 4), roy, x, 2.65, z, Math.PI / 4, 0.05); put(L, boite(0.4, 0.5, 0.06), BRONZE, x, 2.55, z + 0.2, 0, 0); }
+  else if (genre === 'piquier') { tete(L, P, x, 2.32, z, roy); put(L, boite(0.08, 4.6, 0.08), BOIS, x + 0.4, 2.3, z + 0.15, 0, 0); put(L, cone(0.1, 0.4, 4), ACIER, x + 0.4, 4.8, z + 0.15, 0, 0); return; }
+  else tete(L, P, x, 2.32, z, roy);
+  put(L, boite(0.09, 2.2, 0.09), BOIS, x + 0.42, 1.5, z + 0.18, 0, 0);
+  if (P.baionnette) put(L, boite(0.04, 0.45, 0.04), ACIER, x + 0.42, 2.82, z + 0.18, 0, 0);
+}
+function cheval(L, x, z, robe = CHEVAL) {
+  put(L, boite(0.7, 0.85, 1.9), robe, x, 1.35, z, 0, 0.07); put(L, boite(0.4, 0.9, 0.45), robe, x, 1.95, z + 0.95, 0, 0.05); put(L, boite(0.35, 0.35, 0.7), robe, x, 2.3, z + 1.25, 0, 0.05);
+  for (const [dx, dz] of [[-0.22, -0.7], [0.22, -0.7], [-0.22, 0.7], [0.22, 0.7]]) put(L, boite(0.16, 0.95, 0.16), 0x4a2c18, x + dx, 0.47, z + dz, 0, 0);
+  put(L, boite(0.12, 0.6, 0.12), 0x2a1d14, x, 1.5, z - 1.05, 0, 0);
+}
+function cavalier(L, P, x, z, roy, genre) {
+  cheval(L, x, z, genre === 'hussard' ? 0x8a5a32 : CHEVAL);
+  const habit = genre === 'hussard' ? 0x3f6f9a : roy;
+  put(L, boite(0.6, 0.8, 0.45), habit, x, 2.15, z - 0.1, 0, 0.06);
+  put(L, sphere(0.25, 1), PEAU, x, 2.8, z - 0.1, 0, 0.05);
+  if (genre === 'cuirassier') { put(L, boite(0.64, 0.55, 0.5), ACIER, x, 2.25, z - 0.1, 0, 0.05); put(L, new THREE.SphereGeometry(0.3, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), ACIER, x, 2.95, z - 0.1, 0, 0.04); put(L, boite(0.08, 0.3, 0.55), NOIR, x, 3.2, z - 0.2, 0, 0); }
+  else if (genre === 'hussard') { put(L, cyl(0.28, 0.3, 0.5, 8), NOIR, x, 3.15, z - 0.1, 0, 0.05); put(L, boite(0.3, 0.6, 0.5), GARANCE, x - 0.42, 2.2, z - 0.1, 0, 0.04); }
+  else if (genre === 'lancier') { tete(L, P, x, 3, z - 0.1, roy); put(L, boite(0.07, 4, 0.07), BOIS, x + 0.42, 3, z + 0.1, 0, 0); put(L, boite(0.04, 0.35, 0.6), roy, x + 0.42, 4.6, z + 0.45, 0, 0); put(L, boite(0.04, 0.17, 0.6), BLANC, x + 0.42, 4.37, z + 0.45, 0, 0); }
+  else tete(L, P, x, 3, z - 0.1, roy);
+  if (genre !== 'lancier') put(L, boite(0.06, 0.06, 1.1), ACIER, x + 0.4, 2.3, z + 0.35, 0, 0);
+}
+function canon(L, P, x, z) {
+  const gri = P.art === 'gribeauval';
+  const fut = cyl(gri ? 0.2 : 0.24, gri ? 0.3 : 0.36, gri ? 2 : 2.9, 10); fut.rotateX(Math.PI / 2 - 0.12); put(L, fut, BRONZE, x, 1, z + (gri ? 0.3 : 0.5), 0, 0.06);
+  const affut = gri ? 0x6b7a4a : 0x8a3a2a;
+  put(L, boite(0.6, 0.35, 1.9), affut, x, 0.6, z - 0.35, 0, 0.05);
+  for (const dx of [-0.58, 0.58]) { const r = cyl(gri ? 0.55 : 0.68, gri ? 0.55 : 0.68, 0.14, 12); r.rotateZ(Math.PI / 2); put(L, r, gri ? affut : 0x4a3420, x + dx, gri ? 0.55 : 0.68, z, 0, 0.05); }
+  if (gri) { // avant-train attelé
+    put(L, boite(1.1, 0.5, 0.8), affut, x, 0.75, z - 2.1, 0, 0.05);
+    for (const dx of [-0.6, 0.6]) { const r = cyl(0.45, 0.45, 0.12, 12); r.rotateZ(Math.PI / 2); put(L, r, affut, x + dx, 0.45, z - 2.1, 0, 0.05); }
+    put(L, boite(0.08, 0.08, 1.4), BOIS, x, 0.7, z - 2.9, 0, 0);
+    for (const dx of [-0.45, 0.45]) cheval(L, x + dx, z - 4.3);
+  } else for (let i = 0; i < 3; i++) put(L, sphere(0.16, 0), FER, x - 0.3 + i * 0.3, 0.16, z - 1.7, 0, 0);
+}
+function fourgon(L, x, z) {
+  put(L, boite(1.5, 0.5, 2.6), 0x8a6a4a, x, 0.9, z, 0, 0.05);
+  put(L, new THREE.CylinderGeometry(0.78, 0.78, 2.6, 12, 1, false, -Math.PI / 2, Math.PI).rotateX(-Math.PI / 2), 0xe9e2d0, x, 1.15, z, 0, 0.05);
+  for (const [dx, dz] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) { const r = cyl(0.42, 0.42, 0.12, 12); r.rotateZ(Math.PI / 2); put(L, r, 0x4a3420, x + dx, 0.42, z + dz, 0, 0.05); }
+  cheval(L, x, z + 2.7);
+}
+function armee(P, roy) {
+  const L = lot();
+  // la ligne, devant : piquiers au centre au départ, grenadiers au bout ensuite
+  for (let i = 0; i < 6; i++) fantassin(L, P, -3.4 + i * 1.15, 2.4, roy, P.piques && (i === 2 || i === 3) ? 'piquier' : P.grenadiers && i === 5 ? 'grenadier' : 'ligne');
+  if (P.chasseurs) { fantassin(L, P, -2.6, 4.6, roy, 'chasseur'); fantassin(L, P, 1.4, 5.0, roy, 'chasseur'); } // tirailleurs en avant
+  // la cavalerie, derrière
+  const cav = [P.cav, P.hussard ? 'hussard' : P.lanciers ? 'lancier' : P.cav, P.cav];
+  cav.forEach((g, i) => cavalier(L, P, -2.6 + i * 2, -2.8, roy, g));
+  // l'artillerie, sur le flanc
+  canon(L, P, 5.4, 1.8); canon(L, P, 7.2, 1.2);
+  fantassin(L, P, 4.4, 0.4, roy); fantassin(L, P, 6.4, 0, roy);
+  // le drapeau et l'officier
+  put(L, boite(0.14, 4.6, 0.14), 0x4a3420, -0.2, 2.3, 0.4, 0, 0.05);
+  put(L, boite(0.05, 1.1, 1.6), roy, -0.2, 3.95, 1.25, 0, 0.04); put(L, boite(0.06, 0.25, 1.6), BLANC, -0.2, 3.95, 1.25, 0, 0); put(L, boite(0.06, 1.1, 0.25), BLANC, -0.2, 3.95, 1.25, 0, 0);
+  fantassin(L, P, 0.2, 0.4, roy);
+  cavalier(L, P, -1.6, 0, roy, P.cav === 'cuirassier' ? 'officier' : P.cav);
+  if (P.fourgon) fourgon(L, -5.8, -3); // sur le flanc gauche, à l'écart des attelages
+  // le sol : une case de pré
+  put(L, cyl(9.65, 10, 1, 6), 0x84c450, 1.2, -0.5, 0, 0, 0);
+  return fige(L);
+}
+
+// ---------------------------------------------------------------- une petite scène par palier
+const grille = document.getElementById('grille');
+let ROY = '#2f5fa8';
+const reduit = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const vues = PALIERS.map((P, i) => {
+  const fig = document.createElement('figure');
+  fig.innerHTML = `<canvas aria-label="Figurine d'armée : ${P.nom}"></canvas><figcaption><span class="date">${P.date}</span><h2>${P.nom}</h2><ul>${P.notes.map(n => `<li>${n}</li>`).join('')}</ul></figcaption>`;
+  grille.appendChild(fig);
+  const canvas = fig.querySelector('canvas');
+  const ren = new THREE.WebGLRenderer({ canvas, antialias: true }); ren.setPixelRatio(Math.min(devicePixelRatio, 2)); ren.shadowMap.enabled = true; ren.shadowMap.type = THREE.PCFSoftShadowMap;
+  const sc = new THREE.Scene(); sc.background = new THREE.Color(0x1b211a);
+  sc.add(new THREE.HemisphereLight(0xeef7ff, 0x7d8466, 1.5));
+  const sol = new THREE.DirectionalLight(0xfff0d4, 2.6); sol.position.set(-8, 14, 9); sol.castShadow = true; sol.shadow.mapSize.set(1024, 1024); Object.assign(sol.shadow.camera, { left: -12, right: 12, top: 12, bottom: -12 }); sol.shadow.bias = -0.0005; sc.add(sol);
+  const cam = new THREE.PerspectiveCamera(30, 4 / 3, 0.5, 200);
+  const pivot = new THREE.Group(); sc.add(pivot);
+  const v = { P, ren, sc, cam, pivot, canvas, angle: -0.3, glisse: null, obj: null };
+  v.monter = () => { if (v.obj) pivot.remove(v.obj); v.obj = armee(P, ROY); v.obj.position.x = -1.2; pivot.add(v.obj); };
+  v.monter();
+  canvas.addEventListener('pointerdown', e => { v.glisse = e.clientX; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', e => { if (v.glisse != null) { v.angle += (e.clientX - v.glisse) * 0.01; v.glisse = e.clientX; } });
+  canvas.addEventListener('pointerup', () => { v.glisse = null; });
+  return v;
+});
+document.querySelectorAll('[data-c]').forEach(b => b.addEventListener('click', () => {
+  ROY = b.dataset.c; vues.forEach(v => v.monter());
+  document.querySelectorAll('[data-c]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+}));
+let avant = performance.now();
+function image(t) {
+  const dt = Math.min(0.05, (t - avant) / 1000); avant = t;
+  for (const v of vues) {
+    const w = v.canvas.clientWidth, h = Math.round(w * 3 / 4);
+    if (v.canvas.width !== Math.round(w * v.ren.getPixelRatio())) v.ren.setSize(w, h, false);
+    if (!reduit && v.glisse == null) v.angle += dt * 0.25;
+    v.pivot.rotation.y = v.angle;
+    v.cam.position.set(0, 11.5, 19); v.cam.lookAt(0, 1, 0);
+    v.ren.render(v.sc, v.cam);
+  }
+  requestAnimationFrame(image);
+}
+requestAnimationFrame(image);
+</script>

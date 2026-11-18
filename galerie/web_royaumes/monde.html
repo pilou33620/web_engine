@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Monde vivant web_royaumes</title>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="../../sources/web_royaumes/web/css/style.css">
 <link rel="stylesheet" href="../visionneuse.css">
 </head>
 <body>
@@ -25,23 +25,23 @@
 </form>
 <p class="aide">Glisser : déplacer · clic droit ou Maj : tourner · molette : zoom</p>
 <script type="module">
-// Le vrai pipeline de rendu du jeu (js/rendu, copié tel quel), appelé dans le même ordre que appliquer() de main.js,
+// Le vrai pipeline de rendu du jeu (sources/web_royaumes/web/js/rendu), appelé dans le même ordre que appliquer() de main.js,
 // sur une carte et un état produits par le moteur Rust (donnees/carte.json, etat.json). Seul l'état est retouché ici :
 // époque, saison, météo, et tous les bâtiments posés autour de la capitale.
-import { cam, posCase, voisins } from './js/rendu/scene.js';
-import * as plateau from './js/rendu/plateau.js';
-import { initMonde, synchroniser } from './js/rendu/monde.js';
-import { majVie } from './js/rendu/vie.js';
-import { majQuartiers } from './js/rendu/quartiers.js';
-import { majBrouillard } from './js/rendu/brouillard.js';
-import { majMarine } from './js/rendu/marine.js';
-import { majEspions } from './js/rendu/espions.js';
-import { appliquerMeteo, forcerHeure, forcerMarche } from './js/rendu/meteo.js';
-import { majRoutes, niveauRoutes } from './js/rendu/routes.js';
-import { TECHS_PALIER } from './js/rendu/modeles.js';
+import { cam, posCase, voisins } from '../../sources/web_royaumes/web/js/rendu/scene.js';
+import * as plateau from '../../sources/web_royaumes/web/js/rendu/plateau.js';
+import { initMonde, synchroniser } from '../../sources/web_royaumes/web/js/rendu/monde.js';
+import { majVie } from '../../sources/web_royaumes/web/js/rendu/vie.js';
+import { majQuartiers } from '../../sources/web_royaumes/web/js/rendu/quartiers.js';
+import { majBrouillard } from '../../sources/web_royaumes/web/js/rendu/brouillard.js';
+import { majMarine } from '../../sources/web_royaumes/web/js/rendu/marine.js';
+import { majEspions } from '../../sources/web_royaumes/web/js/rendu/espions.js';
+import { appliquerMeteo, forcerHeure, forcerMarche } from '../../sources/web_royaumes/web/js/rendu/meteo.js';
+import { majRoutes, niveauRoutes } from '../../sources/web_royaumes/web/js/rendu/routes.js';
+import { TECHS_PALIER } from '../../sources/web_royaumes/web/js/rendu/modeles.js';
 
-const charger = n => fetch(`donnees/${n}.json`).then(r => r.json());
-const [R, carte, base] = await Promise.all([charger('regles'), charger('carte'), charger('etat')]);
+const charger = chemin => fetch(chemin).then(r => r.json());
+const [R, carte, base] = await Promise.all([charger('../../sources/web_royaumes/rust/royaumes/data/regles.json'), charger('donnees/carte.json'), charger('donnees/etat.json')]);
 const f = document.getElementById('choix');
 for (const e of R.epoques) f.epoque.add(new Option(`${e.nom} (${e.debut})`, e.cle));
 

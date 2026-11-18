@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#123a62">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Royaumes">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Royaumes des Rives</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="carte" aria-label="Carte du monde"></canvas>
+<div id="etiquettes"></div>
+<div id="eclair"></div>
+
+<header id="haut" hidden>
+  <div id="ressources"></div>
+  <div id="ligne-date">
+    <button class="pilule" id="date"></button>
+    <button class="pilule" id="meteo"></button>
+  </div>
+  <div id="quete"></div>
+</header>
+<div id="bandeau-mode"><span id="texte-mode"></span><button id="annuler-mode">Annuler</button></div>
+<div id="annonces"></div>
+
+<button id="fin-tour" hidden><span class="ft-1">Fin du mois</span><span class="ft-2" id="fin-tour-mois"></span></button>
+<nav id="bas" hidden>
+  <button class="nb" data-panneau="construire"><span>🏗️</span>Construire</button>
+  <button class="nb" data-panneau="diplomatie" id="nb-diplo"><span>🤝</span>Diplomatie</button>
+  <button class="nb" data-panneau="armees" id="nb-armees"><span>⚔️</span>Armées</button>
+  <button class="nb" data-panneau="royaume" id="nb-royaume"><span>📊</span>Royaume</button>
+  <button class="nb" data-panneau="menu"><span>☰</span>Menu</button>
+</nav>
+
+<section id="feuille"><div id="feuille-tete"><div id="feuille-titre"></div><button id="feuille-fermer" aria-label="Fermer">✕</button></div><div id="feuille-corps"></div></section>
+<div id="modale"><div id="modale-boite" role="dialog" aria-modal="true"></div></div>
+
+<div id="accueil">
+  <div id="accueil-titre">
+    <div class="titre">Royaumes des Rives</div>
+    <div class="ruban">1700 – 1850 · Bâtissez · Commercez · Conquérez</div>
+  </div>
+  <div id="accueil-panneau">
+    <div id="reprendre" hidden><button class="btn go b2" id="btn-reprendre">▶ Reprendre la partie</button></div>
+    <div class="grille">
+      <div class="sec">🗺️ Carte</div>
+      <div class="reglage large"><label>Forme de la carte</label><select id="o_forme">
+        <option value="classique" data-d="Une grande terre aux côtes découpées, bordée d'océan.">🏝️ Classique</option>
+        <option value="continent" data-d="Une seule grande masse de terre entourée d'océan : on y marche partout.">🌍 Continent</option>
+        <option value="deux_continents" data-d="Deux terres séparées par un bras de mer, reliées par un isthme ou des îles relais.">🌓 Deux continents</option>
+        <option value="iles" data-d="Cinq à huit grandes îles : chacun la sienne, et des flûtes pour passer la mer.">🏖️ Îles</option>
+        <option value="archipel" data-d="Une poussière de petites îles et de hauts-fonds : la marine est reine.">⛵ Archipel</option>
+        <option value="mer_interieure" data-d="Une mer fermée au centre, la terre tout autour, sans océan au bord.">🌊 Mer intérieure</option>
+        <option value="peninsule" data-d="Une terre rattachée par un côté, la mer sur les trois autres.">🗾 Péninsule</option>
+        <option value="cote" data-d="La terre d'un côté, l'océan de l'autre, et des baies entre les deux.">🏞️ Côte</option>
+        <option value="terres" data-d="Presque pas de mer : des lacs et des rivières, et des frontières à pied.">🌲 Terres</option>
+        <option value="aleatoire" data-d="Une forme tirée au sort selon la graine.">🎲 Aléatoire</option>
+      </select><div class="mini" id="d_forme"></div></div>
+      <div class="reglage"><label>Taille</label><select id="o_taille"><option value="petite">Petite</option><option value="moyenne" selected>Moyenne</option><option value="grande">Grande</option></select></div>
+      <div class="reglage"><label>Graine</label><div class="rang"><input type="text" id="o_graine" inputmode="numeric"><button class="btn b2" id="de">🎲</button></div></div>
+      <div class="reglage"><label>Océans <b id="v_oceans"></b></label><input type="range" id="o_oceans" min="15" max="70" value="42"></div>
+      <div class="reglage"><label>Densité de forêt <b id="v_forets"></b></label><input type="range" id="o_forets" min="0" max="80" value="38"></div>
+      <div class="reglage"><label>Lacs <b id="v_lacs"></b></label><input type="range" id="o_lacs" min="0" max="14" value="4"></div>
+      <div class="reglage"><label>Rivières <b id="v_rivieres"></b></label><input type="range" id="o_rivieres" min="0" max="14" value="5"></div>
+      <div class="reglage"><label>Montagnes <b id="v_montagnes"></b></label><input type="range" id="o_montagnes" min="0" max="22" value="7"></div>
+      <div class="reglage"><label>Richesse minière <b id="v_mines"></b></label><input type="range" id="o_mines" min="1" max="3" value="2"></div>
+      <div class="sec">👑 Royaumes</div>
+      <div class="reglage"><label>Royaumes rivaux <b id="v_rivaux"></b></label><input type="range" id="o_rivaux" min="1" max="5" value="3"></div>
+      <div class="reglage"><label>Attitude des rivaux</label><select id="o_attitude"><option value="mixte">Mixte</option><option value="agressifs">Agressifs</option><option value="pacifiques">Pacifiques</option></select></div>
+      <div class="reglage"><label>Difficulté</label><select id="o_difficulte"><option value="0.75">Facile</option><option value="1" selected>Normale</option><option value="1.35">Difficile</option></select></div>
+      <div class="reglage"><label>Brigands</label><select id="o_brigands"><option value="1">Oui</option><option value="0">Non</option></select></div>
+      <div class="reglage large"><label>Nom de votre capitale</label><input type="text" id="o_capitale" value="Valdor" maxlength="18"></div>
+    </div>
+    <button class="btn go" id="btn-fonder">⚔️ Fonder mon royaume en 1700</button>
+    <div class="mini" id="accueil-info"></div>
+  </div>
+</div>
+
+<div id="chargement"><div class="titre petit">Royaumes des Rives</div><div id="chargement-texte">Préparation du monde…</div></div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

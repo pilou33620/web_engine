@@ -1,0 +1,2093 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Héliosphère</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Maquette « Héliosphère » : conquête du système solaire sur hexagones isométriques. Page autonome, un seul thème sombre (l'espace). */
+/* Mise en page : carte à gauche, panneau de gestion à droite ; en portrait, carte en haut et panneau en dessous. */
+:root {
+  color-scheme: dark;
+  --vide: #070a1a; --nuit: #0f1533; --nuit2: #19214b; --nuit3: #222c5e; --bord: #03050d;
+  --txt: #eef1ff; --doux: #a7afd9; --gris: #7f88b8;
+  --soleil: #ffb547; --vert: #7be08a; --rouge: #ff6b6b; --violet: #b98cff; --creme: #fff3d9; --encre: #1a1408;
+  --j: #59d3ff; /* couleur de la faction du joueur, changée au démarrage */
+  --titre: Oxanium, "Trebuchet MS", system-ui, sans-serif; --corps: Nunito, "Segoe UI", system-ui, sans-serif;
+  --ombre: 0 4px 0 rgba(0,0,0,.45);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--vide); color: var(--txt); font: 700 14px/1.4 var(--corps); }
+button { font-family: inherit; color: inherit; }
+button:focus-visible { outline: 3px solid var(--soleil); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+#app { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 390px; grid-template-rows: auto minmax(0, 1fr); gap: 10px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 10px; }
+
+.barre { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-width: 0; }
+.logo { font: 700 22px/1 var(--titre); letter-spacing: 3px; color: var(--soleil); text-transform: uppercase; }
+.date { font: 600 15px/1.1 var(--titre); white-space: nowrap; }
+.date small { display: block; font: 800 11px var(--corps); color: var(--gris); letter-spacing: 1px; }
+.ressources { display: flex; gap: 6px; min-width: 0; overflow-x: auto; scrollbar-width: none; flex: 1 1 300px; }
+.ressources::-webkit-scrollbar { display: none; }
+.pill { flex: none; display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 12px; background: var(--nuit2); border: 2px solid var(--bord); font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pill i { width: 10px; height: 10px; border-radius: 3px; border: 2px solid var(--bord); flex: none; }
+.pill small { color: var(--doux); font-weight: 700; }
+.pill .neg { color: var(--rouge); } .pill .pos { color: var(--vert); }
+.chaleur { flex: none; display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 12px; background: var(--nuit2); border: 2px solid var(--bord); font-size: 12px; }
+.jauge { width: 80px; height: 9px; border-radius: 5px; background: var(--nuit3); border: 1.5px solid var(--bord); overflow: hidden; }
+.jauge b { display: block; height: 100%; background: linear-gradient(90deg, #ff7a3d, var(--soleil)); }
+.btn { min-height: 38px; padding: 0 14px; border-radius: 12px; border: 2.5px solid var(--bord); background: var(--nuit3); font-weight: 800; font-size: 13px; cursor: pointer; box-shadow: var(--ombre); }
+.btn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,.45); }
+.btn.or { background: var(--soleil); color: var(--encre); }
+.btn.j { background: var(--j); color: var(--encre); }
+.btn.rouge { background: var(--rouge); color: var(--encre); }
+.btn:disabled { opacity: .4; cursor: not-allowed; box-shadow: none; transform: none; }
+.btn.petit { min-height: 30px; padding: 0 10px; font-size: 12px; box-shadow: 0 3px 0 rgba(0,0,0,.45); }
+
+main { position: relative; overflow: hidden; border-radius: 18px; border: 3px solid var(--bord); background: var(--vide); min-width: 0; min-height: 0; }
+#globe { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+#etiquettes { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 2; }
+.etiq { position: absolute; left: 0; top: 0; padding: 0 6px; border-radius: 6px; background: rgba(3,5,13,.72); font-size: 12px; white-space: nowrap; }
+.etiq.lune { font-size: 10.5px; color: var(--doux); margin-top: -16px; }
+.etiq.sel { color: var(--soleil); }
+.etiq.flotte { background: none; font-size: 12px; font-weight: 800; text-shadow: 0 1px 2px #000; }
+.flottant { position: absolute; z-index: 3; background: var(--nuit); border: 2.5px solid var(--bord); border-radius: 14px; box-shadow: var(--ombre); }
+.vues { left: 10px; top: 10px; display: flex; gap: 3px; padding: 4px; }
+.vues button { min-height: 34px; padding: 0 11px; border: 0; border-radius: 10px; background: transparent; font-weight: 800; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.vues button.actif { background: var(--soleil); color: var(--encre); }
+.zoom { right: 10px; top: 10px; display: flex; flex-direction: column; gap: 3px; padding: 4px; }
+.zoom button { width: 34px; height: 32px; border: 0; border-radius: 9px; background: var(--nuit2); font-weight: 800; font-size: 16px; cursor: pointer; }
+.aide { pointer-events: none; left: 50%; transform: translateX(-50%); top: 58px; padding: 6px 12px; background: var(--creme); color: var(--encre); font-size: 12.5px; width: max-content; max-width: calc(100% - 24px); text-align: center; }
+.journal { left: 10px; bottom: 10px; max-width: min(420px, calc(100% - 20px)); padding: 6px 10px; display: flex; flex-direction: column; gap: 2px; font-size: 12px; pointer-events: none; background: rgba(15,21,51,.88); }
+.journal.haut { bottom: 108px; }
+.journal p { margin: 0; color: var(--doux); }
+.journal p.bon { color: var(--vert); } .journal p.mal { color: var(--rouge); } .journal p.alien { color: var(--violet); }
+.journal p:first-child { color: var(--txt); }
+.chantier { left: 50%; transform: translateX(-50%); bottom: 10px; max-width: calc(100% - 20px); display: flex; gap: 6px; padding: 6px; overflow-x: auto; }
+.carte-c { flex: none; width: 104px; padding: 6px 6px 5px; border-radius: 11px; border: 2px solid var(--bord); background: var(--nuit2); cursor: pointer; display: flex; flex-direction: column; gap: 2px; text-align: left; }
+.carte-c b { font-size: 11.5px; line-height: 1.15; }
+.carte-c span { font-size: 10.5px; color: var(--doux); font-variant-numeric: tabular-nums; }
+.carte-c .pastille { width: 100%; height: 5px; border-radius: 3px; }
+.carte-c.actif { background: var(--soleil); color: var(--encre); } .carte-c.actif span { color: var(--encre); }
+.carte-c:disabled { opacity: .4; cursor: not-allowed; }
+.chantier .vide { padding: 8px 10px; font-size: 12.5px; color: var(--doux); max-width: 360px; }
+.bulle { position: fixed; z-index: 9; pointer-events: none; padding: 6px 10px; border-radius: 11px; background: var(--creme); color: var(--encre); border: 2px solid var(--bord); font-size: 12px; max-width: 260px; }
+.bulle b { font: 600 14px var(--titre); }
+
+aside { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--nuit); border: 3px solid var(--bord); border-radius: 18px; overflow: hidden; }
+.onglets { display: flex; gap: 4px; padding: 8px; border-bottom: 2px solid var(--nuit2); overflow-x: auto; scrollbar-width: none; }
+.onglets::-webkit-scrollbar { display: none; }
+.onglets button { flex: none; min-height: 32px; padding: 0 10px; border-radius: 10px; border: 2px solid var(--bord); background: var(--nuit2); font-weight: 800; font-size: 12.5px; cursor: pointer; }
+.onglets button.actif { background: var(--soleil); color: var(--encre); }
+#panneau { flex: 1; overflow-y: auto; padding: 6px 16px 24px; min-width: 0; }
+h2 { font: 600 24px/1.1 var(--titre); margin: 10px 0 2px; text-wrap: balance; }
+h3 { font: 600 15px var(--titre); margin: 18px 0 6px; color: var(--soleil); letter-spacing: .5px; }
+.sous { color: var(--doux); font-size: 12.5px; margin: 0 0 8px; }
+p { margin: 6px 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0; }
+.chip { padding: 2px 8px; border-radius: 8px; background: var(--nuit2); border: 1.5px solid var(--bord); font-size: 11.5px; }
+.chip.fac { color: var(--encre); }
+.chip.paix { background: #2d5e3a; } .chip.guerre { background: #7a2a2a; } .chip.pacte { background: #24557a; } .chip.inconnu { background: #3d2d66; }
+.grille { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.grille dt { color: var(--doux); } .grille dd { margin: 0; text-align: right; }
+.barre-p { height: 8px; border-radius: 4px; background: var(--nuit3); overflow: hidden; margin: 3px 0 8px; }
+.barre-p b { display: block; height: 100%; background: var(--vert); }
+.ligne { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1.5px solid var(--nuit2); font-size: 13px; }
+.ligne > div { min-width: 0; }
+.ligne small { display: block; color: var(--doux); font-size: 11.5px; }
+.carte-p { padding: 10px 12px; border-radius: 12px; background: var(--nuit2); border: 2px solid var(--bord); margin: 8px 0; }
+.carte-p.note { background: #2a2140; }
+.lunes { display: flex; gap: 6px; flex-wrap: wrap; }
+svg.graph { width: 100%; height: auto; display: block; }
+.idee { padding: 10px 0; border-bottom: 1.5px solid var(--nuit2); }
+.idee b { font: 600 14.5px var(--titre); }
+.idee p { color: var(--doux); font-size: 13px; margin: 3px 0 0; }
+.etat { font-size: 10.5px; padding: 1px 6px; border-radius: 6px; margin-left: 6px; vertical-align: 2px; letter-spacing: .5px; }
+.etat.oui { background: var(--vert); color: var(--encre); } .etat.non { background: var(--nuit3); color: var(--doux); }
+
+.modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(3,5,13,.72); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 16px; }
+.boite { width: min(720px, 100%); max-height: 100%; overflow-y: auto; background: var(--nuit); border: 3px solid var(--bord); border-radius: 20px; box-shadow: var(--ombre); padding: 18px 20px; }
+.boite h1 { font: 700 34px/1 var(--titre); letter-spacing: 5px; color: var(--soleil); margin: 0 0 6px; text-transform: uppercase; }
+.factions { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin: 14px 0 6px; }
+.factions button { text-align: left; padding: 12px; border-radius: 14px; border: 2.5px solid var(--bord); background: var(--nuit2); cursor: pointer; display: flex; flex-direction: column; gap: 4px; box-shadow: var(--ombre); }
+.factions button b { font: 600 16px var(--titre); }
+.factions button span { color: var(--doux); font-size: 12.5px; }
+.factions button em { font-style: normal; font-size: 12px; color: var(--encre); padding: 2px 7px; border-radius: 7px; align-self: flex-start; }
+.camps { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; margin: 12px 0; }
+.camp { padding: 10px; border-radius: 12px; background: var(--nuit2); border: 2px solid var(--bord); min-width: 0; }
+.camp b { font: 600 15px var(--titre); }
+.vs { font: 700 22px var(--titre); color: var(--soleil); }
+.log { font-size: 12.5px; color: var(--doux); max-height: 120px; overflow-y: auto; background: var(--vide); border-radius: 10px; padding: 8px 10px; border: 2px solid var(--bord); }
+.log p { margin: 2px 0; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-top: 12px; }
+
+#bannieres { position: fixed; z-index: 30; top: 74px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; width: min(440px, calc(100% - 32px)); }
+.banniere { width: 100%; padding: 10px 14px; border-radius: 14px; background: var(--nuit); border: 2.5px solid var(--bord); box-shadow: var(--ombre); display: flex; flex-direction: column; gap: 2px; animation: banEntre .45s cubic-bezier(.2,1.4,.4,1), banSort .5s ease-in 3.7s forwards; }
+.banniere b { font: 600 16px var(--titre); }
+.banniere span { color: var(--doux); font-size: 13px; }
+.banniere.bon { border-color: var(--vert); } .banniere.mal { border-color: var(--rouge); }
+.banniere.toast { width: auto; padding: 5px 12px; } .banniere.toast b { font: 800 12px var(--corps); color: var(--doux); }
+@keyframes banEntre { from { transform: translateY(-30px) scale(.9); opacity: 0; } }
+@keyframes banSort { to { transform: translateY(-20px); opacity: 0; } }
+#flash { position: fixed; inset: 0; z-index: 25; pointer-events: none; opacity: 0; }
+#flash.eruption { background: radial-gradient(circle, rgba(255,190,90,.75), rgba(255,120,30,.35)); animation: flash 1.6s ease-out; }
+#flash.impact { background: rgba(255,255,255,.8); animation: flash .7s ease-out; }
+#flash.alerte { box-shadow: inset 0 0 120px 40px rgba(255,80,80,.7); animation: flash 1.4s ease-out; }
+@keyframes flash { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; } }
+.etiq.alerte::after { content: '!'; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 5px; border-radius: 50%; background: var(--rouge); color: var(--encre); font-size: 11px; animation: pouls 1s ease-in-out infinite; }
+@keyframes pouls { 50% { transform: scale(1.35); } }
+.etiq.lagr { font-size: 10.5px; color: var(--doux); background: rgba(3,5,13,.55); margin-top: -20px; }
+.etiq.gain { background: none; font-weight: 800; font-size: 14px; text-shadow: 0 1px 3px #000; }
+.barre-p.anim b { animation: pousse .7s cubic-bezier(.2,.9,.3,1); transform-origin: left; }
+@keyframes pousse { from { transform: scaleX(0); } }
+.etapes { display: grid; gap: 6px; }
+.etape { padding: 6px 10px; border-radius: 10px; background: var(--nuit2); border: 2px solid var(--bord); opacity: .55; }
+.etape b { display: block; font-size: 13px; } .etape small { color: var(--doux); font-size: 11.5px; }
+.etape.faite { opacity: 1; border-color: var(--vert); }
+.etape.cours { opacity: 1; border-color: var(--soleil); animation: lueurEtape 2s ease-in-out infinite; }
+@keyframes lueurEtape { 50% { box-shadow: 0 0 0 3px rgba(255,181,71,.25); } }
+.courbe { display: flex; align-items: flex-end; gap: 2px; height: 64px; margin: 8px 0 4px; }
+.courbe i { flex: 1; background: var(--nuit3); border-radius: 3px 3px 0 0; animation: monte .6s cubic-bezier(.2,.9,.3,1) both; transform-origin: bottom; }
+.courbe i.best { background: var(--soleil); } .courbe i.now { background: var(--j); }
+@keyframes monte { from { transform: scaleY(0); } }
+.nom-flotte { width: 100%; font: 600 16px var(--titre); color: var(--txt); background: transparent; border: 0; border-bottom: 2px dashed var(--nuit3); padding: 2px 0; }
+.nom-flotte:focus { outline: none; border-bottom-color: var(--soleil); }
+.role { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--doux); margin-top: 6px; }
+.role select { flex: 1; min-width: 0; min-height: 30px; border-radius: 9px; border: 2px solid var(--bord); background: var(--nuit3); color: var(--txt); font: 700 12.5px var(--corps); padding: 0 6px; }
+.modal .boite { animation: boiteEntre .4s cubic-bezier(.2,1.3,.4,1); }
+@keyframes boiteEntre { from { transform: translateY(24px) scale(.96); opacity: 0; } }
+#fin { overflow: hidden; } #feu { position: absolute; inset: 0; width: 100%; height: 100%; }
+#fin .boite { position: relative; text-align: center; width: min(520px, 100%); }
+#fin .grille { max-width: 320px; margin: 12px auto; text-align: left; }
+#fin h1 { animation: titreFin 1.2s cubic-bezier(.2,1.4,.4,1); text-transform: none; letter-spacing: 1px; font-size: 30px; }
+#fin.defaite h1 { color: var(--rouge); }
+@keyframes titreFin { from { transform: scale(.4); opacity: 0; letter-spacing: 16px; } }
+.objectif { padding: 10px 0; border-bottom: 1.5px solid var(--nuit2); }
+@media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation: none !important; } }
+@media (max-width: 900px) {
+  #app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 60fr) minmax(0, 40fr); gap: 8px; padding-block: 8px; }
+  .logo, .chaleur > span:first-child { display: none; }
+  .ressources { order: 3; flex-basis: 100%; }
+  .chaleur .jauge { width: 54px; }
+  .barre .btn.or { margin-left: auto; }
+  .journal p:nth-child(n+2) { display: none; }
+  .journal { font-size: 11.5px; }
+  .aide { top: 56px; font-size: 12px; left: 10px; transform: none; max-width: calc(100% - 70px); text-align: left; }
+  .carte-c { width: 92px; }
+  .journal.haut { bottom: 100px; }
+}
+@media (prefers-reduced-motion: reduce) { .btn:active { transform: none; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="barre">
+    <div class="logo">Héliosphère</div>
+    <div class="date" id="date">Janvier 2081<small>TOUR 1</small></div>
+    <div class="ressources" id="ressources"></div>
+    <div class="chaleur" title="Part de la lumière du Soleil qui atteint encore les planètes"><span>Chaleur solaire</span><div class="jauge"><b id="jaugeChaleur" style="width:100%"></b></div><span id="txtChaleur">100 %</span></div>
+    <button class="btn or" id="btnTour" data-a="tour">Mois suivant ▸</button>
+  </header>
+
+  <main>
+    <canvas id="globe" aria-label="Système solaire et planètes en hexagones"></canvas>
+    <div id="etiquettes"></div>
+    <div class="flottant vues" role="group" aria-label="Vue">
+      <button data-a="vue:systeme" id="vSys" class="actif">Système</button>
+      <button data-a="vue:planete" id="vPla">Surface</button>
+    </div>
+    <div class="flottant zoom" role="group" aria-label="Zoom">
+      <button data-a="zoom:+" aria-label="Zoomer">+</button>
+      <button data-a="zoom:-" aria-label="Dézoomer">−</button>
+      <button data-a="pivot:-1" aria-label="Tourner à gauche">⟲</button>
+      <button data-a="pivot:1" aria-label="Tourner à droite">⟳</button>
+      <button data-a="zoom:0" aria-label="Recentrer">◎</button>
+    </div>
+    <div class="flottant aide" id="aide"></div>
+    <div class="flottant journal" id="journal"></div>
+    <div class="flottant chantier" id="chantier" hidden></div>
+  </main>
+
+  <aside>
+    <nav class="onglets" id="onglets">
+      <button data-a="tab:corps">Corps</button>
+      <button data-a="tab:flottes">Flottes</button>
+      <button data-a="tab:soleil">Soleil</button>
+      <button data-a="tab:recherche">Recherche</button>
+      <button data-a="tab:factions">Factions</button>
+      <button data-a="tab:objectifs">Objectifs</button>
+      <button data-a="tab:idees">Idées</button>
+    </nav>
+    <div id="panneau"></div>
+  </aside>
+</div>
+
+<div class="bulle" id="bulle" hidden></div>
+<div id="bannieres" aria-live="polite"></div>
+<div id="flash"></div>
+
+<div class="modal" id="offre" hidden>
+  <div class="boite" style="width:min(480px,100%)">
+    <p class="sous" id="oFac"></p>
+    <h2 id="oTitre"></h2>
+    <p id="oTexte"></p>
+    <div class="actions"><button class="btn" data-a="offre:non">Refuser</button><button class="btn j" data-a="offre:oui">Accepter</button></div>
+  </div>
+</div>
+
+<div class="modal" id="fin" hidden>
+  <canvas id="feu"></canvas>
+  <div class="boite">
+    <h1 id="fTitre"></h1>
+    <p id="fTexte"></p>
+    <dl class="grille" id="fStats"></dl>
+    <div class="actions" id="fActions" style="justify-content:center"></div>
+  </div>
+</div>
+
+<div class="modal" id="accueil">
+  <div class="boite">
+    <h1>Héliosphère</h1>
+    <p>2081. La Terre est partagée entre trois puissances. Le reste du système solaire est vide : Mercure, Vénus, Mars, la ceinture, les lunes de Jupiter et de Saturne attendent leurs colons. Au-delà de Neptune, quelque chose observe.</p>
+    <p class="sous">Colonisez les planètes, construisez sur leur surface et en orbite, menez vos flottes, et captez l'énergie du Soleil sans geler la Terre.</p>
+    <div id="reprise"></div>
+    <div class="factions" id="choixFaction"></div>
+    <p class="sous">Maquette jouable : un tour = un mois, les planètes tournent vraiment autour du Soleil (périodes réelles).</p>
+  </div>
+</div>
+
+<div class="modal" id="combat" hidden>
+  <div class="boite">
+    <h2 id="cTitre">Bataille</h2>
+    <p class="sous" id="cLieu"></p>
+    <div class="camps">
+      <div class="camp" id="cA"></div>
+      <div class="vs">VS</div>
+      <div class="camp" id="cB"></div>
+    </div>
+    <div class="log" id="cLog"></div>
+    <div class="actions" id="cActions"></div>
+  </div>
+</div>
+
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }</script>
+<script type="module">
+import * as THREE from 'three';
+// ---------- Outils ----------
+const $ = id => document.getElementById(id);
+const SQ3 = Math.sqrt(3), TAU = Math.PI * 2;
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const fmt = (x, d = 0) => x.toLocaleString('fr-FR', { maximumFractionDigits: d, minimumFractionDigits: d });
+const signe = x => (x >= 0 ? '+' : '−') + fmt(Math.abs(x));
+function alea(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const rnd = alea(2081);
+const pick = a => a[Math.floor(rnd() * a.length)];
+const MOIS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+const DIRS = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+const dist = (a, b) => { const dq = a[0] - b[0], dr = a[1] - b[1]; return (Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2; };
+function hexRound(q, r) { let x = q, z = r, y = -x - z, rx = Math.round(x), ry = Math.round(y), rz = Math.round(z); const dx = Math.abs(rx - x), dy = Math.abs(ry - y), dz = Math.abs(rz - z); if (dx > dy && dx > dz) rx = -ry - rz; else if (dy > dz) ry = -rx - rz; else rz = -rx - ry; return [rx, rz]; }
+const cap1 = t => t[0].toUpperCase() + t.slice(1);
+const kelvin = T => fmt(T - 273) + ' °C';
+
+// ---------- Données ----------
+const FAC = {
+  atl: { nom: 'Coalition Atlantique', le: 'la Coalition Atlantique', du: 'de la Coalition Atlantique', c: '#59d3ff', bonus: '+25 % de science', desc: 'Universités, sondes et diplomatie.' },
+  hel: { nom: 'Consortium Hélios', le: 'le Consortium Hélios', du: 'du Consortium Hélios', c: '#ff9f43', bonus: 'Solaire et Dyson −25 %', desc: 'Énergéticiens privés, obsédés par le Soleil.' },
+  pac: { nom: 'Directoire du Pacifique', le: 'le Directoire du Pacifique', du: 'du Directoire du Pacifique', c: '#ff6b6b', bonus: '+25 % de puissance de flotte', desc: 'Flotte puissante, chantiers navals géants.' },
+  vei: { nom: 'Les Veilleurs', le: 'les Veilleurs', du: 'des Veilleurs', c: '#b98cff', desc: 'Présence inconnue au-delà de Neptune.' },
+};
+// ua : distance au Soleil ; per : période en mois ; T0 : température sans sphère de Dyson (K) ; bm, bs : bonus métaux, science
+const CORPS = [
+  { id: 'mercure', nom: 'Mercure', anneau: 3, per: 2.9, a0: .3, ua: .39, T0: 440, g: .38, ray: 6, c1: '#c9b9a8', c2: '#5e5248', sol: 'mercure', bm: 2, bs: 1, specs: ['Métaux ×2', 'Panneaux solaires ×6,6', 'Segments de Dyson −40 % avec une mine ici'], desc: 'Une boule de roche brûlée. Pas d\'air, 430 °C le jour, −170 °C la nuit.' },
+  { id: 'venus', nom: 'Vénus', anneau: 4, per: 7.4, a0: 2.1, ua: .72, T0: 737, g: .9, ray: 9, c1: '#f8e0a4', c2: '#b9853f', sol: 'venus', bm: 1, bs: 1.5, specs: ['Sol de lave : cités flottantes seulement', 'Terraformable (parasols, terraformeurs)', 'Se refroidit avec la sphère de Dyson'], desc: 'Effet de serre extrême. À 50 km d\'altitude, la pression et la température sont terrestres.' },
+  { id: 'terre', nom: 'Terre', anneau: 5, per: 12, a0: 0, ua: 1, T0: 288, atmo: 1, g: 1, ray: 10, c1: '#8fd3ff', c2: '#245c38', sol: 'terre', bm: 1, bs: 1, specs: ['Départ : Amérique du Nord, Europe et Asie de l\'Est', 'Gravité forte : missions chères', 'Gèle si la sphère de Dyson est trop grande'], desc: 'Berceau de l\'humanité, découpé entre les puissances.' },
+  { id: 'lune', nom: 'Lune', parent: 'terre', ua: 1, T0: 250, g: .17, ray: 4.5, c1: '#e0e0e0', c2: '#6e6e72', sol: 'lune', bm: 1, bs: 1, specs: ['Hélium-3 dans le régolithe', 'Gravité faible : missions −25 %, vaisseaux −30 %'], desc: 'À trois jours de la Terre. Le port spatial naturel.' },
+  { id: 'mars', nom: 'Mars', anneau: 6, per: 22.6, a0: 4, ua: 1.52, T0: 210, atmo: .05, g: .38, ray: 8, c1: '#ee8a60', c2: '#8a3a22', sol: 'mars', bm: 1.2, bs: 1, specs: ['Glace d\'eau aux pôles', 'Terraformable', 'Tempêtes de poussière'], desc: 'Froide et sèche, mais la meilleure candidate pour une seconde Terre.' },
+  { id: 'phobos', nom: 'Phobos', parent: 'mars', ua: 1.52, T0: 233, g: .001, ray: 2.5, c1: '#9a8a7c', c2: '#4a3e36', sol: 'phobos', bm: 1.5, bs: 1, specs: ['Gravité nulle : vaisseaux −50 %', 'Port d\'attache au-dessus de Mars'], desc: 'Un caillou de 22 km qui frôle Mars. Il s\'écrasera sur elle dans 50 millions d\'années.' },
+  { id: 'ceres', nom: 'Cérès', anneau: 8, per: 55, a0: 1, ua: 2.8, T0: 168, g: .03, ray: 5, c1: '#a8a39b', c2: '#4a4744', sol: 'ceres', bm: 3, bs: 1, specs: ['Ceinture d\'astéroïdes : métaux ×3', 'Gravité nulle : vaisseaux −50 %'], desc: 'Le plus gros astéroïde de la ceinture. Une mine à ciel ouvert.' },
+  { id: 'jupiter', nom: 'Jupiter', anneau: 11, per: 142, a0: 5.5, ua: 5.2, T0: 110, g: 2.5, ray: 17, c1: '#f0d3aa', c2: '#a86d43', gaz: true, bm: 1, bs: 1, specs: ['Géante gazeuse : orbite seulement', 'Écopes à hélium-3', 'Radiations intenses'], desc: 'Pas de sol. Ses écopes peuvent alimenter toute la fusion du système.' },
+  { id: 'europe', nom: 'Europe', parent: 'jupiter', ua: 5.2, T0: 102, g: .13, ray: 4, c1: '#f2e9dc', c2: '#a07454', sol: 'europe', bm: 1, bs: 2.5, specs: ['Océan sous la glace', 'Vie microbienne : science ×2,5'], desc: 'Sous 20 km de glace, un océan salé. Peut-être de la vie.' },
+  { id: 'io', nom: 'Io', parent: 'jupiter', ua: 5.2, T0: 110, g: .18, ray: 4.2, c1: '#f2de6c', c2: '#b8742a', sol: 'io', bm: 2, bs: 1.5, specs: ['400 volcans actifs : métaux ×2', 'En plein dans les radiations de Jupiter'], desc: 'Le corps le plus volcanique du système, chauffé par les marées de Jupiter.' },
+  { id: 'ganymede', nom: 'Ganymède', parent: 'jupiter', ua: 5.2, T0: 110, g: .15, ray: 5, c1: '#cdbfab', c2: '#6e6256', sol: 'ganymede', bm: 1, bs: 1.5, specs: ['Plus grosse lune du système', 'Champ magnétique propre : abri contre les radiations'], desc: 'Plus grande que Mercure, avec un océan salé sous sa croûte de glace.' },
+  { id: 'callisto', nom: 'Callisto', parent: 'jupiter', ua: 5.2, T0: 134, g: .13, ray: 4.8, c1: '#958a7c', c2: '#3e3730', sol: 'callisto', bm: 1, bs: 1, specs: ['Hors des radiations : base idéale vers Jupiter', 'Surface la plus cratérisée du système'], desc: 'Une vieille surface criblée de cratères, loin des ceintures de radiations.' },
+  { id: 'saturne', nom: 'Saturne', anneau: 15, per: 354, a0: 3.2, ua: 9.5, T0: 95, g: 1.06, ray: 15, c1: '#f4e1b0', c2: '#b09060', gaz: true, anneaux: true, bm: 1, bs: 1, specs: ['Géante gazeuse : orbite seulement', 'Anneaux de glace'], desc: 'Ses anneaux sont une réserve d\'eau pour tout le système extérieur.' },
+  { id: 'titan', nom: 'Titan', parent: 'saturne', ua: 9.5, T0: 94, g: .14, ray: 5.5, c1: '#eab25a', c2: '#8a5a20', sol: 'titan', bm: 1, bs: 1.5, specs: ['Lacs de méthane : carburant', 'Atmosphère épaisse : dômes plus simples'], desc: 'Une lune plus grosse que Mercure, noyée dans une brume orange.' },
+  { id: 'encelade', nom: 'Encelade', parent: 'saturne', ua: 9.5, T0: 75, g: .01, ray: 3, c1: '#ffffff', c2: '#a9c9e0', sol: 'encelade', bm: 1, bs: 2, specs: ['Geysers d\'eau salée : science ×2', 'Gravité nulle : vaisseaux −50 %'], desc: 'Une petite boule de glace qui crache son océan dans l\'espace par des geysers.' },
+  { id: 'uranus', nom: 'Uranus', anneau: 22, per: 1008, a0: .8, ua: 19.2, T0: 76, g: .9, ray: 12, c1: '#c6f3f3', c2: '#5fb2c4', gaz: true, bm: 1, bs: 1, specs: ['Géante de glace', 'Deutérium pour la fusion'], desc: 'Couchée sur le côté, glaciale et lointaine.' },
+  { id: 'neptune', nom: 'Neptune', anneau: 27, per: 1978, a0: 2.6, ua: 30, T0: 72, g: 1.1, ray: 12, c1: '#7f9cff', c2: '#2b3fa8', gaz: true, bm: 1, bs: 1, specs: ['Avant-poste face aux Veilleurs', 'Vents à 2 000 km/h'], desc: 'La sentinelle du système, au bord du vide.' },
+  { id: 'triton', nom: 'Triton', parent: 'neptune', ua: 30, T0: 38, g: .08, ray: 4, c1: '#f2d9d4', c2: '#8f7a80', sol: 'triton', bm: 1, bs: 1.3, specs: ['Tourne à l\'envers : capturée par Neptune', 'Geysers d\'azote'], desc: 'Lune capturée qui tourne à contresens. Ses geysers d\'azote montent à 8 km.' },
+  { id: 'pluton', nom: 'Pluton', anneau: 31, per: 2976, a0: 4.6, ua: 39.5, T0: 44, g: .06, ray: 4, c1: '#f2dfc8', c2: '#8f6e58', sol: 'pluton', bm: 1, bs: 1.2, specs: ['Porte d\'entrée des Veilleurs', 'Glaciers d\'azote'], desc: 'Planète naine aux confins. Les Veilleurs y passent en premier.' },
+  { id: 'charon', nom: 'Charon', parent: 'pluton', ua: 39.5, T0: 53, g: .03, ray: 3, c1: '#bdb7ae', c2: '#5e5852', sol: 'charon', bm: 1, bs: 1, specs: ['Couple avec Pluton : les deux tournent l\'un autour de l\'autre', 'Gravité nulle : vaisseaux −50 %'], desc: 'Si gros par rapport à Pluton que les deux forment une planète double.' },
+];
+const C = Object.fromEntries(CORPS.map(c => [c.id, c]));
+
+// Terrains : h = hauteur du prisme, tg = étiquettes utilisées par les bâtiments
+const TER = {
+  ocean: ['Océan', '#2f78c4', 0, 'eau'], plage: ['Côte', '#e6d49a', 1, 'sol'], plaine: ['Plaine', '#7cc35a', 1.5, 'sol'], foret: ['Forêt', '#3f9a48', 1.7, 'sol'],
+  montagne: ['Montagne', '#8d8f98', 3.6, 'sol roche'], neige: ['Glace', '#eef4f8', 1.2, 'sol glace'],
+  desert: ['Désert', '#e2c27a', 1.3, 'sol'], toundra: ['Toundra', '#9fae8a', 1.3, 'sol'], hautfond: ['Haut-fond', '#3f92d6', .15, 'eau'],
+  regolithe: ['Régolithe', '#c4643a', 1.5, 'sol roche'], dune: ['Dunes', '#d98a50', 1.6, 'sol'], canyon: ['Canyon', '#7d321e', .4, 'sol roche'], mont_m: ['Mont martien', '#a14d2e', 3.8, 'sol roche'], glace: ['Calotte de glace', '#e4f1fa', 1.8, 'sol glace'],
+  mer_l: ['Mer lunaire', '#6d7076', 1, 'sol regl'], regl: ['Régolithe lunaire', '#a8aaae', 1.6, 'sol roche regl'], cratere: ['Cratère', '#8f9196', 1.1, 'sol roche regl crat'],
+  roche_m: ['Roche brûlée', '#8a7a6a', 1.6, 'sol roche'], faille: ['Faille ardente', '#5a3a2a', .5, 'sol roche lave'],
+  lave: ['Lave à 460 °C', '#c4472a', .3, 'lave'], nuage: ['Couche de nuages', '#f1cf7c', 4.6, 'nuage'],
+  banquise: ['Glace d\'eau', '#e7f3fa', 1.6, 'sol glace'], fissure: ['Linea (fissure)', '#b9805e', .8, 'sol glace'],
+  lac: ['Lac de méthane', '#3d3b2e', .2, 'methane'], dune_t: ['Dunes organiques', '#c08640', 1.4, 'sol'], glace_t: ['Socle de glace', '#d9c79c', 2.2, 'sol glace roche'],
+  roche_c: ['Roche carbonée', '#6c6966', 1.5, 'sol roche'], sel: ['Dépôt de sel', '#efeee6', 1.4, 'sol roche'], soufre: ['Plaine de soufre', '#e6cf48', 1.2, 'sol roche'], tigre: ['Rayure de tigre', '#7fb8e0', .6, 'sol glace'],
+  azote: ['Glacier d\'azote', '#f3e7d2', 1, 'sol glace'], glace_p: ['Glace de méthane', '#c7ac90', 1.8, 'sol glace'], mont_p: ['Mont de glace', '#8f7766', 3.4, 'sol glace roche'],
+};
+const tags = t => TER[t][3].split(' ');
+
+const BAT = {
+  habitat: { n: 'Habitat', f: 'tour', cout: { cr: 60, me: 30 }, sur: ['sol'], d: '+300 M d\'habitants × habitabilité', p: { en: -1 } },
+  solaire: { n: 'Centrale solaire', f: 'panneau', cout: { cr: 50, me: 20 }, sur: ['sol', 'nuage'], d: '+5 énergie × lumière reçue', p: {} },
+  mine: { n: 'Mine', f: 'mine', cout: { cr: 70, me: 10 }, sur: ['roche'], d: '+4 métaux × richesse', p: { en: -2 } },
+  labo: { n: 'Laboratoire', f: 'dome', cout: { cr: 80, me: 30 }, sur: ['sol', 'nuage'], d: '+3 science × intérêt', p: { en: -2 } },
+  port: { n: 'Spatioport', f: 'port', cout: { cr: 120, me: 60 }, sur: ['sol'], d: 'Permet de construire en orbite. Module de survie : +1 eau, nourriture et oxygène', p: { en: -2 }, vit: { eau: 1, nou: 1, oxy: 1 } },
+  he3: { n: 'Extracteur d\'hélium-3', f: 'extracteur', cout: { cr: 90, me: 40 }, sur: ['regl'], d: '+2 hélium-3', p: { he: 2, en: -2 } },
+  foreuse: { n: 'Foreuse de glace', f: 'foreuse', cout: { cr: 60, me: 30 }, sur: ['glace'], d: '+4 eau pour la colonie, dômes +3 % d\'habitabilité', p: { en: -1 }, vit: { eau: 4 } },
+  ferme: { n: 'Serre hydroponique', f: 'serre', cout: { cr: 60, me: 25 }, sur: ['sol', 'nuage'], d: '+4 nourriture pour la colonie', p: { en: -1 }, vit: { nou: 4 } },
+  recycleur: { n: 'Recycleur d\'air', f: 'recycleur', cout: { cr: 70, me: 35 }, sur: ['sol', 'nuage'], d: '+4 oxygène et +1 eau pour la colonie', p: { en: -2 }, vit: { oxy: 4, eau: 1 } },
+  raff: { n: 'Raffinerie de méthane', f: 'raff', cout: { cr: 80, me: 40 }, sur: ['methane'], d: '+8 énergie', p: { en: 8 } },
+  cite: { n: 'Cité flottante', f: 'cite', cout: { cr: 140, me: 80 }, sur: ['nuage'], d: '+150 M d\'habitants, +6 crédits, sert de port, recycle l\'air', p: { cr: 6, en: -1 }, vit: { oxy: 3, eau: 1 } },
+  terra: { n: 'Terraformeur', f: 'terra', cout: { cr: 150, me: 90 }, sur: ['sol', 'nuage'], tech: 'terra', corps: ['mars', 'venus'], d: '+2 % de terraformation par mois', p: { en: -4 } },
+  fusion: { n: 'Centrale à fusion', f: 'fusion', cout: { cr: 200, me: 120 }, sur: ['sol', 'nuage'], tech: 'he3t', d: '+25 énergie, −1 hélium-3', p: { en: 25, he: -1 } },
+  defense: { n: 'Batterie de défense', f: 'defense', cout: { cr: 90, me: 70 }, sur: ['sol', 'nuage'], d: 'Défense +8 contre les raids', p: { en: -1 } },
+};
+const ORB = {
+  station: { n: 'Station habitée', cout: { cr: 220, me: 160 }, d: 'Tore géant qui tourne pour recréer la gravité : +200 M d\'habitants, +4 crédits, +2 science, autonome en eau, nourriture et air pour 200 M', p: { cr: 4, sc: 2, en: -2 }, vit: { eau: 2, nou: 2, oxy: 2 } },
+  chantier: { n: 'Chantier naval', cout: { cr: 150, me: 120 }, d: 'Construit des vaisseaux', p: { en: -2 } },
+  anneau: { n: 'Anneau de vie', cout: { cr: 600, me: 500 }, tech: 'mega', d: '+2 000 M d\'habitants, +10 crédits. Gravité artificielle : ne dépend pas du climat', p: { cr: 10, en: -6 }, vit: { eau: 20, nou: 20, oxy: 20 } },
+  ecope: { n: 'Écope gazière', cout: { cr: 140, me: 90 }, gaz: true, d: '+4 hélium-3', p: { he: 4, en: -1 } },
+  miroir: { n: 'Miroir orbital', cout: { cr: 100, me: 60 }, tech: 'terra', solide: true, d: '+15 °C sur ce corps : compense le froid de la sphère', p: {} },
+  parasol: { n: 'Parasol orbital', cout: { cr: 200, me: 120 }, tech: 'terra', corps: ['venus'], d: '−60 °C sur Vénus', p: {} },
+  satdef: { n: 'Satellites de défense', cout: { cr: 160, me: 120 }, d: '+10 de puissance aux combats ici, tirent sur les flottes qui assiègent', p: { en: -1 } },
+  bouclier: { n: 'Bouclier orbital', cout: { cr: 300, me: 220 }, tech: 'boucl', d: 'Protège des raids et des comètes, ralentit les sièges de moitié', p: { en: -3 } },
+  arche: { n: 'Vaisseau-arche', cout: { cr: 1500, me: 1200 }, tech: 'arche', req: 'chantier', d: '6 mois d\'assemblage, puis départ vers Alpha du Centaure : victoire scientifique', p: { en: -5 } },
+};
+const NAV = { ch: { n: 'Chasseur', pw: 1, cout: { cr: 20, me: 15 } }, cr: { n: 'Croiseur', pw: 4, cout: { cr: 60, me: 50 } }, pv: { n: 'Porte-vaisseaux', pw: 10, cout: { cr: 150, me: 140 }, tech: 'pv' }, se: { n: 'Sentinelle', pw: 5 }, tr: { n: 'Transport de troupes', pw: .5, cout: { cr: 50, me: 40 } } };
+const TECH = {
+  ion: { n: 'Propulsion ionique', b: 'Propulsion', cout: 40, req: [], d: 'Flottes et missions : +1 hex par mois.' },
+  fus: { n: 'Moteurs à fusion', b: 'Propulsion', cout: 110, req: ['ion', 'he3t'], d: 'Encore +2 hex par mois.' },
+  he3t: { n: 'Fusion à l\'hélium-3', b: 'Énergie', cout: 60, req: [], d: 'Débloque la centrale à fusion.' },
+  mega: { n: 'Mégastructures', b: 'Énergie', cout: 120, req: ['he3t'], d: 'Débloque l\'anneau de vie.' },
+  dyson: { n: 'Collecteurs stellaires', b: 'Énergie', cout: 160, req: ['mega'], d: 'Débloque les segments de la sphère de Dyson.' },
+  dome: { n: 'Habitats clos', b: 'Biosphère', cout: 45, req: [], d: 'Habitabilité des dômes ×1,5.' },
+  terra: { n: 'Terraformation', b: 'Biosphère', cout: 90, req: ['dome'], d: 'Terraformeurs, miroirs et parasols orbitaux.' },
+  rail: { n: 'Canons à rail', b: 'Armement', cout: 50, req: [], d: '+25 % de puissance de flotte.' },
+  pv: { n: 'Porte-vaisseaux', b: 'Armement', cout: 100, req: ['rail'], d: 'Débloque les porte-vaisseaux.' },
+  xeno: { n: 'Xénolinguistique', b: 'Contact', cout: 120, req: [], d: 'Permet de parler aux Veilleurs.' },
+  boucl: { n: 'Boucliers magnétiques', b: 'Armement', cout: 90, req: ['rail'], d: 'Débloque le bouclier orbital.' },
+  arche: { n: 'Arche interstellaire', b: 'Propulsion', cout: 320, req: ['fus', 'mega'], d: 'Débloque le vaisseau-arche : victoire scientifique.' },
+};
+const RES = [['cr', 'Crédits', '#ffd166'], ['me', 'Métaux', '#b8c0d8'], ['he', 'Hélium-3', '#7ef0e0'], ['sc', 'Science', '#b98cff'], ['en', 'Énergie', '#ffb547'], ['pop', 'Population', '#7be08a']];
+
+// ---------- Grille du système (hexagones pointe en haut) ----------
+// rayon de l'orbite en cases ≈ 5 × √(distance en ua) : le système intérieur reste serré, l'extérieur est vaste
+const S = 26, RMAX = 32;
+const axPix = (q, r) => [S * SQ3 * (q + r / 2), S * 1.5 * r];
+const ANNEAUX = [];
+for (let k = 0; k <= RMAX; k++) {
+  const cells = [];
+  if (k === 0) cells.push([0, 0]);
+  else { let q = DIRS[4][0] * k, r = DIRS[4][1] * k; for (let i = 0; i < 6; i++) for (let j = 0; j < k; j++) { cells.push([q, r]); q += DIRS[i][0]; r += DIRS[i][1]; } }
+  const ang = c => { const [x, y] = axPix(c[0], c[1]); return (Math.atan2(y, x) + TAU) % TAU; };
+  ANNEAUX.push(cells.sort((a, b) => ang(a) - ang(b)));
+}
+function posA(c, t) {
+  if (c.parent) return posA(C[c.parent], t);
+  const cells = ANNEAUX[c.anneau], f = ((c.a0 / TAU + t / c.per) % 1 + 1) % 1;
+  return cells[Math.floor(f * cells.length) % cells.length];
+}
+const pos = c => posA(c, E.tour);
+
+// ---------- Surfaces : sphère de Goldberg (12 pentagones, tout le reste en hexagones) ----------
+const V3 = THREE.Vector3, GB = {};
+function goldberg(f) {
+  if (GB[f]) return GB[f];
+  const p = (1 + Math.sqrt(5)) / 2;
+  const ico = [[-1, p, 0], [1, p, 0], [-1, -p, 0], [1, -p, 0], [0, -1, p], [0, 1, p], [0, -1, -p], [0, 1, -p], [p, 0, -1], [p, 0, 1], [-p, 0, -1], [-p, 0, 1]].map(v => new V3(...v).normalize());
+  const faces = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
+  const pts = [], cles = new Map(), tris = [];
+  const id = v => { const k = v.toArray().map(x => Math.round(x * 1e4)).join(','); if (!cles.has(k)) { cles.set(k, pts.length); pts.push(v); } return cles.get(k); };
+  faces.forEach(([a, b, c]) => {
+    const g = [];
+    for (let i = 0; i <= f; i++) { g[i] = []; for (let j = 0; j <= f - i; j++) g[i][j] = id(new V3().addScaledVector(ico[a], (f - i - j) / f).addScaledVector(ico[b], i / f).addScaledVector(ico[c], j / f).normalize()); }
+    for (let i = 0; i < f; i++) for (let j = 0; j < f - i; j++) { tris.push([g[i][j], g[i + 1][j], g[i][j + 1]]); if (j < f - i - 1) tris.push([g[i + 1][j], g[i + 1][j + 1], g[i][j + 1]]); }
+  });
+  // la case = un sommet de l'icosaèdre subdivisé ; ses coins = les centres des triangles autour
+  const centres = tris.map(t => t.reduce((acc, i) => acc.add(pts[i]), new V3()).normalize()), autourS = pts.map(() => []);
+  tris.forEach((t, k) => t.forEach(i => autourS[i].push(k)));
+  const cells = pts.map((n, i) => {
+    const u = new V3().crossVectors(Math.abs(n.y) < .9 ? new V3(0, 1, 0) : new V3(1, 0, 0), n).normalize(), w = new V3().crossVectors(n, u);
+    const ks = autourS[i].sort((a, b) => Math.atan2(centres[a].dot(w), centres[a].dot(u)) - Math.atan2(centres[b].dot(w), centres[b].dot(u)));
+    const face = ks.map((k, m) => tris[k].find(v => v !== i && tris[ks[(m + 1) % ks.length]].includes(v))); // voisin de l'autre côté de chaque arête
+    return { n, coins: ks.map(k => centres[k]), face, nb: [...new Set(face)] };
+  });
+  console.assert(cells.length === 10 * f * f + 2 && cells.filter(c => c.coins.length === 5).length === 12, 'sphère de Goldberg invalide');
+  return GB[f] = { cells };
+}
+function bruit(seed) { const r = alea(seed); const w = Array.from({ length: 8 }, () => { const d = [r() - .5, r() - .5, r() - .5], l = Math.hypot(...d); return { d: d.map(x => x / l), f: 1.5 + r() * 3, p: r() * TAU }; }); return (x, y, z) => w.reduce((acc, o) => acc + Math.sin((o.d[0] * x + o.d[1] * y + o.d[2] * z) * o.f + o.p), 0) / 4; }
+function terrain(sol, n, lat, u) {
+  switch (sol) {
+    case 'terre': return lat > .86 ? 'neige' : n < -.08 ? 'ocean' : n < .04 ? 'plage' : n > .78 ? 'montagne' : n > .4 ? 'foret' : 'plaine';
+    case 'mars': return lat > .8 ? 'glace' : n < -.4 ? 'canyon' : n > .5 ? 'mont_m' : n > .12 ? 'dune' : 'regolithe';
+    case 'lune': return n < -.2 ? 'mer_l' : u < .2 ? 'cratere' : 'regl';
+    case 'mercure': return n > .55 ? 'faille' : u < .22 ? 'cratere' : 'roche_m';
+    case 'venus': return n > -.05 ? 'nuage' : 'lave';
+    case 'europe': return n < -.3 ? 'fissure' : 'banquise';
+    case 'titan': return n < -.15 ? 'lac' : n > .4 ? 'glace_t' : 'dune_t';
+    case 'ceres': return u < .25 ? 'cratere' : n > .55 ? 'sel' : 'roche_c';
+    case 'pluton': return n < -.1 ? 'azote' : n > .4 ? 'mont_p' : 'glace_p';
+    case 'phobos': return u < .35 ? 'cratere' : 'roche_c';
+    case 'io': return n > .5 ? 'lave' : n < -.35 ? 'faille' : 'soufre';
+    case 'ganymede': return u < .1 ? 'cratere' : n > .15 ? 'roche_c' : 'banquise';
+    case 'callisto': return u < .35 ? 'cratere' : n > 0 ? 'roche_c' : 'banquise';
+    case 'encelade': return lat > .6 && n < .1 ? 'tigre' : 'banquise';
+    case 'triton': return lat > .55 ? 'azote' : n > .3 ? 'glace_p' : 'glace_t';
+    case 'charon': return u < .25 ? 'cratere' : n > .3 ? 'glace_p' : 'roche_c';
+  }
+}
+// nombre de cases : 10 f² + 2 (Terre 1 442, planètes 252, lunes 162, petites lunes 92, géantes 642)
+const FREQ = c => c.id === 'terre' ? 12 : c.gaz ? 8 : c.ray < 3.2 ? 3 : c.parent || c.id === 'ceres' || c.id === 'pluton' ? 4 : 5;
+// La Terre : continents simplifiés, en [longitude, latitude] (degrés)
+const CONTINENTS = [
+  [[-168, 66], [-162, 70], [-140, 70], [-125, 71], [-95, 72], [-85, 70], [-82, 66], [-88, 64], [-94, 60], [-92, 57], [-85, 55], [-80, 52], [-79, 57], [-77, 62], [-72, 62], [-64, 60], [-56, 52], [-66, 45], [-70, 42], [-76, 38], [-76, 35], [-81, 31], [-80, 25], [-83, 29], [-90, 30], [-97, 27], [-98, 22], [-95, 18], [-91, 21], [-87, 21], [-88, 16], [-84, 15], [-83, 10], [-79, 9], [-77, 8], [-80, 7], [-85, 11], [-92, 14], [-97, 16], [-105, 20], [-112, 29], [-117, 32], [-121, 35], [-124, 40], [-124, 46], [-127, 51], [-133, 56], [-140, 60], [-150, 61], [-157, 58], [-163, 55], [-160, 59], [-166, 62]],
+  [[-73, 78], [-60, 82], [-30, 83], [-20, 80], [-20, 70], [-30, 68], [-42, 60], [-50, 64], [-55, 70], [-60, 76]],
+  [[-77, 8], [-72, 12], [-62, 11], [-52, 5], [-50, 0], [-44, -2], [-35, -5], [-35, -9], [-39, -15], [-40, -22], [-48, -26], [-53, -34], [-58, -38], [-62, -39], [-65, -45], [-67, -50], [-69, -55], [-74, -52], [-74, -45], [-73, -37], [-71, -30], [-70, -18], [-76, -14], [-81, -6], [-80, -2], [-79, 2]],
+  [[-9, 37], [-9, 43], [-2, 43.5], [-5, 48], [2, 51], [8, 54], [9, 57], [11, 56], [13, 55], [21, 55], [24, 59], [22, 61], [25, 65], [22, 66], [18, 63], [17, 60], [18, 59], [16, 56], [12, 56], [11, 59], [5, 59], [5, 62], [13, 67], [20, 70], [28, 71], [34, 69], [41, 67], [44, 68], [54, 69], [60, 70], [68, 73], [73, 72], [80, 73], [88, 76], [100, 78], [112, 74], [130, 72], [140, 72], [150, 71], [160, 70], [170, 70], [180, 68], [180, 66], [175, 62], [165, 60], [157, 51], [155, 57], [150, 59], [142, 59], [136, 55], [140, 48], [133, 43], [129, 41], [129, 35], [126, 35], [126, 38], [122, 40], [121, 37], [119, 35], [122, 31], [120, 26], [115, 22], [110, 21], [108, 17], [109, 12], [105, 9], [103, 11], [100, 13], [101, 7], [103, 1.5], [100, 5], [98, 8], [98, 16], [94, 17], [92, 22], [90, 22], [87, 21], [80, 15], [80, 10], [77, 8], [73, 17], [72, 21], [67, 25], [62, 25], [57, 25], [56, 27], [52, 28], [49, 30], [48, 29], [51, 24], [56, 25], [58, 23], [59, 21], [55, 17], [52, 16], [45, 13], [43, 15], [39, 21], [35, 28], [35, 32], [36, 36], [30, 36], [27, 37], [26, 40], [29, 41], [23, 40], [24, 38], [22, 37], [21, 39], [19, 42], [15, 41], [16, 38], [12, 42], [10, 44], [7, 44], [3, 43], [0, 39], [-2, 37], [-6, 36]],
+  [[-17, 21], [-16, 28], [-10, 30], [-6, 35.8], [3, 37], [10, 37], [11, 33], [20, 31], [25, 32], [32, 31], [34, 28], [32, 22], [37, 18], [43, 12], [51, 12], [51, 10], [44, 4], [40, -3], [40, -10], [35, -17], [35, -24], [32, -28], [28, -33], [20, -35], [18, -31], [12, -18], [13, -10], [9, -1], [9, 4], [4, 6], [-8, 4], [-13, 8], [-17, 14]],
+  [[44, -25], [47, -25], [50, -15], [49, -12], [44, -17]],
+  [[114, -22], [114, -34], [118, -35], [124, -34], [131, -31], [138, -35], [141, -38], [148, -38], [151, -34], [153, -28], [153, -25], [146, -19], [145, -15], [142, -11], [141, -17], [136, -12], [132, -11], [129, -15], [125, -14], [122, -18]],
+  [[-5, 50], [1, 51], [1, 53], [-2, 56], [-2, 58], [-5, 58.6], [-6, 56], [-3, 54], [-5, 52]], [[-10, 52], [-6, 52], [-6, 55], [-10, 54]],
+  [[130, 31], [135, 34], [140, 35], [141, 38], [142, 42], [145, 44], [141, 45], [140, 41], [136, 37], [131, 34]],
+  [[95, 5], [106, -6], [103, -5], [98, 2]], [[109, 2], [117, 7], [119, 1], [116, -4], [110, -3]], [[105, -6], [115, -8], [114, -9], [106, -7.5]], [[131, -1], [141, -2], [150, -10], [141, -9], [137, -5]],
+  [[-24, 64], [-14, 64], [-14, 66], [-22, 66.5]], [[172, -34], [178, -38], [174, -41], [171, -46], [167, -46], [172, -40]], [[120, 22], [122, 25], [121, 19]], [[80, 6], [82, 7], [80, 10]],
+];
+const DESERTS = [[-17, 35, 15, 31], [35, 58, 14, 32], [118, 145, -32, -19], [55, 115, 37, 48], [15, 25, -28, -20], [-118, -103, 28, 37]];
+const MONTAGNES = [[72, 100, 28, 38], [-80, -74, -15, 8], [-72, -67, -45, -15], [-122, -105, 35, 58], [5, 15, 44, 48], [57, 61, 50, 68]];
+const CAPITALES = { atl: [-77, 39], hel: [9, 48], pac: [118, 31] };
+const dansPoly = (lo, la, pts) => { let d = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const [xi, yi] = pts[i], [xj, yj] = pts[j]; if ((yi > la) !== (yj > la) && lo < (xj - xi) * (la - yi) / (yj - yi) + xi) d = !d; } return d; };
+const dansBoite = ([a, b, c, d], lo, la) => lo >= a && lo <= b && la >= c && la <= d;
+const lonLat = n => [Math.atan2(n.x, n.z) * 180 / Math.PI, Math.asin(n.y) * 180 / Math.PI]; // longitude 0 face à la caméra, l'est à droite
+function terreReelle(n, b) {
+  const [lo, la] = lonLat(n);
+  if (la < -64) return 'neige';
+  if (!CONTINENTS.some(p => dansPoly(lo, la, p))) return la > 76 ? 'neige' : 'ocean';
+  if (la > 72 || lo > -75 && lo < -15 && la > 60) return 'neige'; // Groenland, îles arctiques
+  if (MONTAGNES.some(x => dansBoite(x, lo, la))) return 'montagne';
+  if (DESERTS.some(x => dansBoite(x, lo, la))) return 'desert';
+  if (la > 62) return 'toundra';
+  return Math.abs(la) < 12 ? (b > -.3 ? 'foret' : 'plaine') : la > 50 ? (b > 0 ? 'foret' : 'plaine') : b > .25 ? 'foret' : 'plaine';
+}
+function genSurface(c, i) {
+  const f = FREQ(c), nz = bruit(100 + i * 17), u = alea(500 + i);
+  const cells = goldberg(f).cells, tuiles = cells.map(({ n }, k) => { const uu = u(), b = nz(n.x, n.y, n.z); return { i: k, t: c.id === 'terre' ? terreReelle(n, b) : terrain(c.sol, b, Math.abs(n.y), uu), u: uu, o: null, b: null }; });
+  if (c.id === 'terre') tuiles.filter(t => t.t === 'ocean' && cells[t.i].nb.some(j => tags(tuiles[j].t).includes('sol'))).forEach(t => { t.t = 'hautfond'; });
+  return { f, tuiles };
+}
+
+// ---------- État de la partie ----------
+const etatNeuf = () => ({
+  j: null, rivaux: [], tour: 0, res: { cr: 500, me: 300, he: 10 }, dyson: 0,
+  techs: new Set(), recherche: null, prog: 0, c: {}, flottes: [], missions: [], convois: [], journal: [], combats: [], offres: [],
+  rel: {}, tension: {}, vagues: 0, ia: {}, lagrange: {}, evts: [], effets: {}, compteurs: { faillite: 0, gel: 0, paix: 0 },
+  capitales: {}, arche: null, fin: null, reps: {}, geysers: 0, stade: {},
+  vue: 'systeme', onglet: 'corps', sel: 'terre', selL: null, selFlotte: null, carteBat: null, selTuile: null,
+});
+const E = etatNeuf();
+const s = id => E.c[id];
+const capture = () => E.dyson * .04; // 20 segments captent 80 % : la Terre peut rester habitable avec des miroirs
+const facteurT = () => Math.pow(1 - capture(), .25); // loi de Stefan-Boltzmann : T ∝ (flux)^1/4
+function nbOrb(id, t, o) { return s(id).orb.filter(x => x.t === t && (!o || x.o === o)).length; }
+function temp(c) {
+  const st = s(c.id), f = facteurT(), mir = nbOrb(c.id, 'miroir') * 15;
+  if (c.id === 'venus') return Math.max(230, c.T0 * f - st.terra * 4.5 - nbOrb(c.id, 'parasol') * 60 + mir);
+  if (c.id === 'mars') return c.T0 * f + st.terra * .75 + mir;
+  return c.T0 * f + mir;
+}
+function atmo(c) { const t = s(c.id).terra; return c.id === 'mars' ? .05 + t / 100 * .95 : c.id === 'venus' ? t / 100 : c.atmo || 0; }
+function habitabilite(c, fac = E.j) {
+  const st = s(c.id); let dome = c.id === 'titan' ? .2 : .12;
+  if (fac === E.j && E.techs.has('dome')) dome *= 1.5;
+  if (st.tuiles) dome += Math.min(3, st.tuiles.filter(t => t.b === 'foreuse' && t.o === fac).length) * .03;
+  const climat = atmo(c) * clamp(1 - Math.abs(temp(c) - 290) / 60, 0, 1);
+  return Math.max(dome, climat);
+}
+// distance réelle entre deux corps (ua), d'après leurs vraies positions sur l'orbite
+function distReelle(a, b) { const A = a.parent ? C[a.parent] : a, B = b.parent ? C[b.parent] : b, an = x => x.a0 + TAU * E.tour / x.per; return Math.sqrt(A.ua ** 2 + B.ua ** 2 - 2 * A.ua * B.ua * Math.cos(an(A) - an(B))); }
+const lumiere = c => Math.min(6.6, 1 / c.ua ** 2) * (1 - capture());
+function presents(id) { const st = s(id), f = new Set(); st.tuiles?.forEach(t => t.o && f.add(t.o)); st.orb.forEach(o => f.add(o.o)); return [...f]; }
+const present = (id, fac = E.j) => presents(id).includes(fac);
+function capacite(c, fac) {
+  const st = s(c.id); let cap = 0;
+  st.tuiles?.forEach(t => { if (t.o !== fac) return; if (t.b === 'habitat') cap += 300 * habitabilite(c, fac); if (t.b === 'cite') cap += 150; });
+  cap += nbOrb(c.id, 'station', fac) * 200 + nbOrb(c.id, 'anneau', fac) * 2000;
+  return cap;
+}
+const voisins = (st, t) => GB[st.f].cells[t.i].nb.map(j => st.tuiles[j]);
+function autour(st, t, k) { const d = new Map([[t, 0]]), file = [t]; for (const x of file) if (d.get(x) < k) voisins(st, x).forEach(v => { if (!d.has(v)) { d.set(v, d.get(x) + 1); file.push(v); } }); return d; }
+function revendiquer(st, t, rayon, fac) { autour(st, t, rayon).forEach((_, x) => { if (!x.o) x.o = fac; }); }
+const peutConstruire = (b, t) => BAT[b].sur.some(g => tags(t.t).includes(g));
+
+function journal(txt, k = '') { E.journal.unshift({ txt, k }); E.journal.length = Math.min(E.journal.length, 30); }
+
+function initPartie(j) {
+  E.j = j; E.rivaux = ['atl', 'hel', 'pac'].filter(f => f !== j);
+  document.documentElement.style.setProperty('--j', FAC[j].c);
+  E.rel = { [E.rivaux[0]]: 'paix', [E.rivaux[1]]: 'paix', vei: 'inconnu' };
+  E.tension = { [E.rivaux[0]]: 20, [E.rivaux[1]]: 35 };
+  CORPS.forEach((c, i) => { E.c[c.id] = { tuiles: null, f: FREQ(c), orb: [], pop: {}, terra: 0, stock: { me: 0, he: 0 }, moral: 70, revolte: 0, fete: 0, raid: -99, ...(c.sol ? genSurface(c, i) : {}) }; });
+  E.rivaux.forEach(r => { E.ia[r] = { cr: 400, me: 250 }; });
+  // La Terre : trois capitales, chacune avec son territoire
+  const T = s('terre'), facs = [j, ...E.rivaux];
+  facs.forEach(f => {
+    // Atlantique : Amérique du Nord ; Hélios : Europe ; Pacifique : Asie de l'Est
+    const [lo, la] = CAPITALES[f].map(x => x * Math.PI / 180), dir = new V3(Math.cos(la) * Math.sin(lo), Math.sin(la), Math.cos(la) * Math.cos(lo)), cells = GB[T.f].cells;
+    const cap = T.tuiles.filter(t => tags(t.t).includes('sol')).reduce((m, t) => cells[t.i].n.dot(dir) > cells[m.i].n.dot(dir) ? t : m);
+    const zone = autour(T, cap, 4);
+    let mt = [...zone.keys()].find(t => t !== cap && t.t === 'montagne');
+    if (!mt) { mt = ([...zone].find(([t, d]) => d >= 2 && tags(t.t).includes('sol')) || [...zone].find(([, d]) => d === 2))[0]; mt.t = 'montagne'; }
+    revendiquer(T, cap, 4, f);
+    cap.b = 'port'; E.capitales[f] = cap.i;
+    const libres = () => T.tuiles.filter(t => t.o === f && !t.b);
+    const plan = f === j ? ['habitat', 'habitat', 'habitat', 'solaire', 'solaire', 'solaire', 'labo'] : ['habitat', 'habitat', 'solaire', 'labo'];
+    plan.forEach(b => { const l = libres().filter(t => peutConstruire(b, t)); if (l.length) pick(l).b = b; });
+    mt.b = 'mine';
+    T.pop[f] = 600;
+    T.orb.push({ t: 'station', o: f }, { t: 'chantier', o: f });
+  });
+  E.flottes = [
+    { id: 1, nom: 'Flotte Aurore', camp: j, nav: { ch: 6, cr: 2, pv: 0, tr: 0 }, dock: 'terre', pos: pos(C.terre), mvt: 0, role: 'patrouille' },
+    { id: 2, nom: 'Escadre ' + FAC[E.rivaux[0]].nom.split(' ').pop(), camp: E.rivaux[0], nav: { ch: 6, cr: 2, pv: 0, tr: 0 }, dock: 'terre', pos: pos(C.terre), role: 'patrouille' },
+    { id: 3, nom: 'Escadre ' + FAC[E.rivaux[1]].nom.split(' ').pop(), camp: E.rivaux[1], nav: { ch: 5, cr: 3, pv: 0, tr: 0 }, dock: 'terre', pos: pos(C.terre), role: 'patrouille' },
+  ];
+  E.flottes[0].mvt = portee();
+  E.recherche = 'ion';
+  journal(`Janvier 2081 : ${FAC[j].le} prend son envol. Objectif : coloniser la Lune et Mars.`, 'bon');
+  $('accueil').hidden = true;
+  recentrer(); rendrePanneau(); rendreHUD();
+}
+const portee = () => 3 + (E.techs.has('ion') ? 1 : 0) + (E.techs.has('fus') ? 2 : 0) + (E.lagrange.TL5 === E.j ? 1 : 0);
+const puissance = f => Object.entries(f.nav).reduce((s, [k, n]) => s + NAV[k].pw * n, 0) * (f.camp === E.j && (E.techs.has('rail') ? 1.25 : 1) * (E.j === 'pac' ? 1.25 : 1) || 1);
+const nbNav = f => Object.values(f.nav).reduce((a, b) => a + b, 0);
+function hostile(a, b) {
+  if (a === b) return false;
+  if (a === 'vei' || b === 'vei') { const autre = a === 'vei' ? b : a; return !(autre === E.j && E.rel.vei === 'paix'); }
+  if (a === E.j || b === E.j) return E.rel[a === E.j ? b : a] === 'guerre';
+  return false;
+}
+
+// ---------- Économie ----------
+function bilan() {
+  // les métaux et l'hélium-3 des colonies lointaines restent sur place jusqu'au prochain convoi (b.local)
+  const J = E.j, b = { cr: 0, me: 0, he: 0, sc: 0, en: 0, pop: 0, local: {} }, eruption = E.effets.eruption === E.tour ? .4 : 1;
+  for (const c of CORPS) {
+    const st = s(c.id), loc = surTerre(c) ? b : (b.local[c.id] = { me: 0, he: 0 }), k = assiege(c.id, J) ? .5 : 1;
+    const prod = p => { b.cr += p.cr || 0; b.en += p.en || 0; b.sc += (p.sc || 0) * k; if ((p.he || 0) < 0) b.he += p.he; else loc.he += (p.he || 0) * k; };
+    st.tuiles?.forEach(t => {
+      if (!t.b || t.o !== J) return;
+      prod(BAT[t.b].p);
+      if (t.b === 'solaire') b.en += 5 * lumiere(c) * eruption * (c.id === 'mars' && E.effets.tempete >= E.tour ? .2 : 1);
+      if (t.b === 'mine') loc.me += 4 * c.bm * k;
+      if (t.b === 'labo') b.sc += 3 * c.bs * k;
+    });
+    st.orb.forEach(o => { if (o.o === J) prod(ORB[o.t].p); });
+    b.pop += st.pop[J] || 0;
+  }
+  b.en += E.dyson * 40;
+  b.cr += b.pop * .015;
+  b.cr -= E.flottes.filter(f => f.camp === J).reduce((n, f) => n + puissance(f), 0) * .15; // solde des équipages
+  E.missions.forEach(m => { if (m.camp === J) b.en -= 2; });
+  b.cr += 6 * [...E.rivaux, ...Object.keys(E.reps)].filter(r => E.rel[r] === 'pacte').length;
+  if (E.lagrange.TL1 === J) b.sc += 3;
+  if (E.lagrange.TL4 === J) b.cr += 8;
+  ['JL4', 'JL5'].forEach(id => { if (E.lagrange[id] === J) b.local.jupiter.me += 6; });
+  if (J === 'atl') b.sc *= 1.25;
+  b.panne = b.en < 0;
+  if (b.panne) { b.me *= .5; b.sc *= .5; for (const id in b.local) b.local[id].me *= .5; }
+  return b;
+}
+const peutPayer = (cout, k = 1) => E.res.cr >= cout.cr * k && E.res.me >= cout.me * k;
+function payer(cout, k = 1) { E.res.cr -= cout.cr * k; E.res.me -= cout.me * k; }
+const coutTxt = (cout, k = 1) => `${fmt(cout.cr * k)} ₡ · ${fmt(cout.me * k)} métaux`;
+function remiseBat(b) { return E.j === 'hel' && b === 'solaire' ? .75 : 1; }
+function coutDyson() { let k = E.j === 'hel' ? .75 : 1; if (s('mercure').tuiles.some(t => t.o === E.j && t.b === 'mine')) k *= .6; return k; }
+const COUT_DYSON = { cr: 300, me: 250 };
+const remiseChantier = c => c.g < .05 ? .5 : c.g < .2 ? .7 : 1;
+
+// ---------- Missions de colonisation ----------
+function origines() { return CORPS.filter(c => present(c.id) && (s(c.id).tuiles?.some(t => t.o === E.j && (t.b === 'port' || t.b === 'cite')) || nbOrb(c.id, 'station', E.j))); }
+function meilleureOrigine(cible, t = E.tour) {
+  let best = null;
+  origines().forEach(o => { if (o.id === cible.id) return; const d = dist(posA(o, t), posA(cible, t)); if (!best || d < best.d || d === best.d && o.g < best.o.g) best = { o, d }; });
+  return best;
+}
+function infoMission(cible) {
+  const m = meilleureOrigine(cible); if (!m) return null;
+  const v = portee(), k = .75 + .25 * m.o.g, P = cible.parent ? C[cible.parent] : cible, J = pos(C.jupiter);
+  // fronde : passer près de Jupiter pour aller au-delà raccourcit le voyage
+  const fronde = P.anneau > C.jupiter.anneau && dist(pos(m.o), J) + dist(J, pos(cible)) <= m.d * 1.35, f = fronde ? .6 : 1;
+  let fen = { t: 0, d: m.d };
+  for (let t = 1; t <= 36; t++) { const x = meilleureOrigine(cible, E.tour + t); if (x && x.d < fen.d - 1) fen = { t, d: x.d }; }
+  const courbe = Array.from({ length: 25 }, (_, t) => meilleureOrigine(cible, E.tour + t)?.d || 0);
+  return { ...m, duree: Math.max(1, Math.ceil(m.d / v * f)), dureeFen: Math.max(1, Math.ceil(fen.d / v * f)), fronde, courbe, cout: { cr: Math.round((150 + 12 * m.d) * k), me: Math.round(80 * k) }, fen };
+}
+function coloniser(fac, c) {
+  const st = s(c.id);
+  if (c.gaz) { st.orb.push({ t: 'station', o: fac }); st.pop[fac] = (st.pop[fac] || 0) + 1; return true; }
+  const ok = st.tuiles.filter(t => !t.o && !t.b && (c.id === 'venus' ? t.t === 'nuage' : tags(t.t).includes('sol')) && voisins(st, t).every(v => !v.o));
+  if (!ok.length) return false;
+  const lieu = pick(ok);
+  revendiquer(st, lieu, 2, fac);
+  lieu.b = c.id === 'venus' ? 'cite' : 'port';
+  if (fac !== E.j) { const l = st.tuiles.filter(t => t.o === fac && !t.b && tags(t.t).some(g => g === 'sol' || g === 'nuage')); if (l.length) pick(l).b = c.id === 'venus' ? 'solaire' : 'habitat'; }
+  st.pop[fac] = (st.pop[fac] || 0) + 2;
+  return true;
+}
+
+// ---------- Tour ----------
+function tourSuivant() {
+  if (E.combats.length || !E.j || !$('offre').hidden || !$('fin').hidden) return;
+  const b = bilan();
+  E.res.cr += b.cr; E.res.me += b.me; E.res.he = Math.max(0, E.res.he + b.he);
+  for (const id in b.local) { s(id).stock.me += b.local[id].me; s(id).stock.he += b.local[id].he; }
+  if (E.recherche) {
+    E.prog += b.sc;
+    if (E.prog >= coutTech(E.recherche)) { E.techs.add(E.recherche); journal(`Recherche terminée : ${TECH[E.recherche].n}.`, 'bon'); banniere('Découverte', TECH[E.recherche].n + ' · ' + TECH[E.recherche].d, 'bon'); E.prog = 0; E.recherche = Object.keys(TECH).find(k => dispoTech(k)) || null; }
+  }
+  for (const c of CORPS) {
+    const st = s(c.id);
+    for (const f of presents(c.id)) {
+      let cap = capacite(c, f) || (f === E.j ? 2 : 4); const p = st.pop[f] || 0;
+      // une colonie du joueur ne grandit que si l'eau, la nourriture et l'air suivent
+      if (f === E.j && c.id !== 'terre') { const bs = besoins(c); if (bs.ratio < 1) { st.pop[f] = p * (1 - .06 * (1 - bs.ratio)); continue; } cap = Math.min(cap, Math.max(2, bs.limite)); }
+      st.pop[f] = p < cap ? p + (cap - p) * .06 : p - (p - cap) * .1;
+    }
+    const nT = st.tuiles?.filter(t => t.b === 'terra').length || 0;
+    if (nT && !b.panne) st.terra = Math.min(100, st.terra + 2 * nT);
+    if (c.id === 'mars' || c.id === 'venus') terraformer(c);
+    if (c.id !== 'terre' && present(c.id) && (st.pop[E.j] || 0) > 0) {
+      st.moral += (moralCible(c) - st.moral) * .25;
+      if (st.moral >= 25 || st.pop[E.j] < 20) st.revolte = 0; // une poignée de colons ne fait pas sécession
+      else { st.revolte++; if (st.revolte === 1) { journal(`${c.nom} gronde : moral à ${fmt(st.moral)} %. Besoins, défenses ou festivités ?`, 'mal'); banniere(`${c.nom} gronde`, 'Le moral s\'effondre : risque d\'indépendance dans 3 mois.', 'mal'); } if (st.revolte >= 4) independance(c); }
+    }
+  }
+  if (b.panne) journal('Panne d\'énergie : mines et laboratoires tournent à moitié.', 'mal');
+  if (temp(C.terre) < 273 && rnd() < .5) journal(`La Terre gèle (${kelvin(temp(C.terre))}) : les habitants quittent les habitats.`, 'mal');
+
+  E.tour++;
+  E.flottes.forEach(f => { if (f.dock) f.pos = pos(C[f.dock]); if (f.camp === E.j) { f.mvt = portee() + (f.elan ? 3 : 0); f.elan = false; } });
+
+  E.missions = E.missions.filter(m => {
+    if (m.arrivee > E.tour) return true;
+    const c = C[m.vers];
+    if (coloniser(m.camp, c)) journal(`${c.nom} : la colonie ${FAC[m.camp].du} est fondée.`, m.camp === E.j ? 'bon' : '');
+    else if (m.camp === E.j) journal(`${c.nom} : plus de place libre, la mission rentre.`, 'mal');
+    return false;
+  });
+
+  lancerConvois(); avancerConvois();
+  tourSieges();
+  tourRivaux();
+  tourVeilleurs();
+  tourLagrange();
+  // les flottes hostiles qui partagent une case se battent
+  E.flottes.forEach(a => E.flottes.forEach(b2 => { if (a.id < b2.id && nbNav(a) && nbNav(b2) && dist(a.pos, b2.pos) === 0 && hostile(a.camp, b2.camp)) engager(a, b2); }));
+  evenements();
+  verifierFin();
+  sauver();
+  rendreHUD(); rendrePanneau(); suiteCombats();
+}
+
+function pasVers(de, vers) {
+  if (dist(de, vers) === 0) return de;
+  return DIRS.map(d => [de[0] + d[0], de[1] + d[1]]).filter(p => dist(p, [0, 0]) >= 1 && dist(p, [0, 0]) <= RMAX).reduce((m, p) => dist(p, vers) < dist(m, vers) ? p : m);
+}
+function deplacerIA(f, cible, pas) {
+  for (let i = 0; i < pas; i++) {
+    f.pos = pasVers(f.pos, cible); f.dock = null;
+    const ennemi = E.flottes.find(g => g !== f && g.pos[0] === f.pos[0] && g.pos[1] === f.pos[1] && hostile(f.camp, g.camp));
+    if (ennemi) { engager(f, ennemi); return; }
+  }
+  const corps = CORPS.find(c => !c.parent && dist(pos(c), f.pos) === 0);
+  f.dock = corps ? corps.id : null;
+}
+function engager(a, b) {
+  if (a.camp === E.j || b.camp === E.j) { if (!E.combats.some(x => x.a === a && x.b === b)) E.combats.push(a.camp === E.j ? { a, b } : { a: b, b: a }); }
+  else { const r = resoudre(a, b); journal(`${cap1(FAC[r.v.camp].le)} bat ${FAC[r.p.camp].le} près de ${lieuTxt(a.pos)}.`, a.camp === 'vei' || b.camp === 'vei' ? 'alien' : ''); }
+}
+function tourVeilleurs() {
+  const arrivee = Math.max(5, 16 - 2 * E.dyson);
+  if (E.rel.vei !== 'paix' && (E.vagues === 0 && E.tour >= arrivee || E.vagues > 0 && E.tour % 18 === 0 && E.flottes.filter(f => f.camp === 'vei').length < 3)) {
+    E.vagues++;
+    const p = pick(ANNEAUX[RMAX]);
+    E.flottes.push({ id: 100 + E.vagues, nom: 'Essaim des Veilleurs', camp: 'vei', nav: { se: 2 + E.dyson + Math.floor(E.tour / 12) }, dock: null, pos: p });
+    if (E.rel.vei === 'inconnu') E.rel.vei = 'hostile';
+    journal(E.vagues === 1 ? 'Contact ! Des vaisseaux inconnus franchissent l\'orbite de Pluton.' + (E.dyson ? ' La chaleur de votre sphère les a attirés.' : '') : 'Une nouvelle vague de Veilleurs approche.', 'alien');
+  }
+  E.flottes.filter(f => f.camp === 'vei').forEach(f => {
+    if (E.rel.vei === 'paix') return;
+    const cibles = CORPS.filter(c => !c.parent && presents(c.id).length);
+    const c = cibles.reduce((m, x) => dist(pos(x), f.pos) < dist(pos(m), f.pos) ? x : m, cibles[0]);
+    if (dist(pos(c), f.pos) === 0) { const vic = pick(presents(c.id)); const ennemi = E.flottes.find(g => g.camp === vic && dist(g.pos, f.pos) === 0); if (ennemi) engager(f, ennemi); else raid(f, c, vic); }
+    else deplacerIA(f, pos(c), 3);
+  });
+}
+function raid(f, c, vic) {
+  const st = s(c.id), cibles = [c, ...CORPS.filter(x => x.parent === c.id)];
+  const def = cibles.reduce((n, x) => n + (s(x.id).tuiles?.filter(t => t.o === vic && t.b === 'defense').length || 0), 0) * 8;
+  const defTot = def + cibles.reduce((n, x) => n + nbOrb(x.id, 'satdef', vic), 0) * 10;
+  if (defTot >= puissance(f) * .6) { const k = Object.keys(f.nav).find(k => f.nav[k] > 0); if (k) f.nav[k]--; journal(`${c.nom} : les défenses ${FAC[vic].du} repoussent le raid.`, vic === E.j ? 'bon' : ''); return; }
+  if (cibles.some(x => nbOrb(x.id, 'bouclier', vic))) { journal(`${c.nom} : le bouclier ${FAC[vic].du} absorbe le raid ${FAC[f.camp].du}.`, vic === E.j ? 'bon' : ''); return; }
+  st.raid = E.tour; if (sysO.pret) fxExplosion(sys, posCorpsSys(c.id), '#ff7a3a', .5);
+  const bats = st.tuiles?.filter(t => t.o === vic && t.b) || [];
+  if (bats.length) { const t = pick(bats); journal(`${c.nom} : raid ${FAC[f.camp].du}, ${BAT[t.b].n.toLowerCase()} détruit.`, vic === E.j ? 'mal' : f.camp === 'vei' ? 'alien' : ''); t.b = null; }
+  else if (st.orb.some(o => o.o === vic)) { const i = st.orb.findIndex(o => o.o === vic); journal(`${c.nom} : ${ORB[st.orb[i].t].n.toLowerCase()} ${FAC[vic].du} détruite.`, vic === E.j ? 'mal' : ''); st.orb.splice(i, 1); }
+  if (st.pop[vic]) st.pop[vic] *= .85;
+}
+
+// ---------- Vie des colonies : besoins vitaux, moral, terraformation par étapes ----------
+const nid = () => Date.now() + Math.floor(Math.random() * 1e6);
+const dateTxt = () => `${MOIS[E.tour % 12]} ${2081 + Math.floor(E.tour / 12)}`;
+const surTerre = c => dist(pos(c), pos(C.terre)) === 0; // la Terre et la Lune partagent la même case : leur production arrive sans convoi
+const naissances = new Map(); // bâtiments tout juste construits, pour leur animation d'apparition
+const naissance = (id, i) => naissances.set(id + ':' + i, performance.now());
+const coutTech = k => TECH[k].cout * (k === 'xeno' && E.geysers >= 2 ? .5 : 1);
+const VITAUX = [['eau', 'Eau', '#6fb8ff'], ['nou', 'Nourriture', '#7be08a'], ['oxy', 'Oxygène', '#c6f3f3']];
+function besoins(c, fac = E.j) {
+  const st = s(c.id), n = (st.pop[fac] || 0) / 100, pr = { eau: 0, nou: 0, oxy: 0 };
+  if (c.id === 'terre' || atmo(c) >= .6) return { n, pr: { eau: n, nou: n, oxy: n }, ratio: 1, libre: true, limite: Infinity };
+  const add = v => { for (const k in v) pr[k] += v[k]; };
+  st.tuiles?.forEach(t => { if (t.o === fac && t.b && BAT[t.b].vit) add(BAT[t.b].vit); });
+  st.orb.forEach(o => { if (o.o === fac && ORB[o.t].vit) add(ORB[o.t].vit); });
+  if (c.id === 'mars' && st.terra >= 25) pr.eau += 3; // lacs de fonte
+  return { n, pr, ratio: n ? Math.min(1, ...Object.values(pr).map(v => v / n)) : 1, limite: 100 * Math.min(...Object.values(pr)) };
+}
+function moralCible(c) {
+  const st = s(c.id), def = st.tuiles?.filter(t => t.o === E.j && t.b === 'defense').length || 0;
+  return clamp(75 - dist(pos(c), pos(C.terre)) * 1.2 - 40 * (1 - besoins(c).ratio) + Math.min(16, def * 8) + nbOrb(c.id, 'station', E.j) * 3 + (st.fete > E.tour ? 25 : 0) - (E.tour - st.raid < 4 ? 20 : 0) - (assiege(c.id, E.j) ? 15 : 0), 0, 100);
+}
+function independance(c) {
+  const id = 'rep_' + c.id, de = /^[AEIOUÉ]/.test(c.nom) ? 'd\'' : 'de ', st = s(c.id);
+  FAC[id] = E.reps[id] = { nom: `République ${de}${c.nom}`, le: `la République ${de}${c.nom}`, du: `de la République ${de}${c.nom}`, c: ['#e8e8e8', '#9df0c0', '#f5d76e', '#f08ab8'][Object.keys(E.reps).length % 4], desc: 'Ancienne colonie devenue indépendante.' };
+  st.tuiles?.forEach(t => { if (t.o === E.j) t.o = id; });
+  st.orb.forEach(o => { if (o.o === E.j) o.o = id; });
+  st.pop[id] = st.pop[E.j] || 0; delete st.pop[E.j]; st.moral = 70; st.revolte = 0;
+  E.rel[id] = 'paix'; E.tension[id] = 60;
+  journal(`${c.nom} proclame son indépendance : ${FAC[id].le} est née.`, 'mal');
+  banniere('Déclaration d\'indépendance', `${c.nom} rompt avec vous et devient ${FAC[id].le}.`, 'mal');
+  fxEcran('alerte');
+}
+const ETAPES = {
+  mars: [['Réchauffement', 'Le CO₂ des pôles se libère, la pression monte.'], ['Fonte des pôles', 'Les calottes fondent en lacs : +3 eau pour les colonies.'], ['Mers et pluies', 'Les canyons se remplissent, l\'air devient respirable.'], ['Biosphère', 'Plaines et forêts couvrent le régolithe.']],
+  venus: [['Ombre', 'Les parasols refroidissent la lave en roche constructible.'], ['Pluies', 'La roche refroidie se couvre de pluies.'], ['Océans', 'Les bassins se remplissent d\'eau.'], ['Ciel dégagé', 'Les nuages se dissipent : plaines à l\'air libre.']],
+};
+function terraformer(c) {
+  const st = s(c.id), T = st.terra, ch = (seuil, de, vers, f = 1) => { if (T >= seuil) st.tuiles.forEach(t => { if (!t.b && de.includes(t.t) && t.u * f < (T - seuil) / 25) t.t = vers; }); };
+  if (c.id === 'mars') { ch(25, ['glace'], 'hautfond'); ch(50, ['canyon', 'hautfond'], 'ocean'); ch(75, ['regolithe', 'dune'], 'plaine'); ch(88, ['plaine'], 'foret', 3); }
+  else { ch(25, ['lave'], 'roche_m'); ch(50, ['roche_m'], 'ocean', 1.6); ch(75, ['nuage'], 'plaine'); }
+  const e = Math.min(4, Math.floor(T / 25));
+  if (e > (E.stade[c.id] || 0)) { E.stade[c.id] = e; const [n, d] = ETAPES[c.id][e - 1]; journal(`${c.nom}, étape ${e} de la terraformation : ${n}.`, 'bon'); banniere(`${c.nom} · étape ${e} : ${n}`, d, 'bon'); }
+}
+
+// ---------- Convois : la production des colonies lointaines voyage jusqu'à la Terre ----------
+const convoiK = v => clamp((E.tour - v.depart) / Math.max(1, v.arrivee - v.depart), 0, 1);
+function convoiPos(v) { const k = convoiK(v); return hexRound(v.a[0] + (v.b[0] - v.a[0]) * k, v.a[1] + (v.b[1] - v.a[1]) * k); }
+function nouveauConvoi(camp, c, me, he) { const dur = Math.max(1, Math.ceil(dist(pos(c), pos(C.terre)) / 4)); E.convois.push({ id: nid(), camp, de: c.id, me: Math.round(me), he: Math.round(he), depart: E.tour, arrivee: E.tour + dur, a: pos(c), b: posA(C.terre, E.tour + dur) }); }
+function lancerConvois() {
+  CORPS.forEach(c => {
+    const st = s(c.id);
+    if (st.stock.me + st.stock.he >= 15 && !E.convois.some(v => v.de === c.id && v.camp === E.j) && !assiege(c.id, E.j)) { nouveauConvoi(E.j, c, st.stock.me, st.stock.he); st.stock = { me: 0, he: 0 }; }
+    if (E.tour % 4 === 0 && !surTerre(c)) E.rivaux.forEach(r => { if (present(c.id, r) && !assiege(c.id, r) && !E.convois.some(v => v.de === c.id && v.camp === r)) nouveauConvoi(r, c, 10 + 4 * (st.tuiles?.filter(t => t.o === r && t.b === 'mine').length || 0), 2); });
+  });
+}
+function avancerConvois() {
+  E.convois = E.convois.filter(v => {
+    const p = convoiPos(v), pirate = E.flottes.find(f => nbNav(f) && hostile(f.camp, v.camp) && dist(f.pos, p) <= 1 && (f.camp !== E.j || f.role === 'raid'));
+    if (pirate) {
+      const escorte = E.flottes.find(f => f.camp === v.camp && f.role === 'escorte' && nbNav(f) && dist(f.pos, p) <= 2);
+      if (escorte && resoudre(escorte, pirate).v === escorte) { journal(`${escorte.nom} repousse ${FAC[pirate.camp].le} et sauve un convoi.`, v.camp === E.j ? 'bon' : ''); fxConvoi(v, 'escorte'); }
+      else {
+        if (pirate.camp === E.j) { E.res.me += v.me; E.res.he += v.he; journal(`${pirate.nom} pille un convoi ${FAC[v.camp].du} : +${v.me} métaux.`, 'bon'); }
+        else { if (E.ia[pirate.camp]) E.ia[pirate.camp].me += v.me; journal(`Convoi ${FAC[v.camp].du} intercepté par ${FAC[pirate.camp].le} près de ${lieuTxt(p)}.`, v.camp === E.j ? 'mal' : pirate.camp === 'vei' ? 'alien' : ''); }
+        fxConvoi(v, 'detruit'); return false;
+      }
+    }
+    if (E.tour < v.arrivee) return true;
+    if (v.camp === E.j) { E.res.me += v.me; E.res.he += v.he; journal(`Convoi de ${C[v.de].nom} arrivé : +${v.me} métaux, +${v.he} hélium-3.`, 'bon'); fxConvoi(v, 'arrive'); }
+    else if (E.ia[v.camp]) E.ia[v.camp].me += v.me;
+    return false;
+  });
+}
+
+// ---------- Sièges et débarquements ----------
+const corpsIci = h => CORPS.filter(c => dist(pos(c), h) === 0);
+function assiege(id, fac) { const h = pos(C[id]); return E.flottes.find(f => f.role === 'siege' && f.dock && nbNav(f) && dist(f.pos, h) === 0 && f.siege?.fac === fac); }
+const garnison = (c, fac) => 10 + (s(c.id).tuiles?.filter(t => t.o === fac && t.b === 'defense').length || 0) * 8 + (c.id === 'terre' ? 50 : 0) + (s(c.id).pop[fac] || 0) / 50;
+function tourSieges() {
+  E.flottes.filter(f => f.role === 'siege').forEach(f => {
+    const corps = f.dock ? corpsIci(f.pos) : [], cibles = [...new Set(corps.flatMap(c => presents(c.id)))].filter(x => hostile(f.camp, x));
+    if (!cibles.length) { f.siege = null; return; }
+    const fac = cibles.includes(f.siege?.fac) ? f.siege.fac : cibles[0];
+    const sat = corps.reduce((n, c) => n + nbOrb(c.id, 'satdef', fac), 0), boucl = corps.some(c => nbOrb(c.id, 'bouclier', fac));
+    if (sat) { perte(f, sat * 2.5); fxLaser(corps.find(c => nbOrb(c.id, 'satdef', fac)).id, f, FAC[fac].c); }
+    const avant = f.siege?.fac === fac ? f.siege.prog : 0;
+    f.siege = { fac, prog: Math.min(100, avant + (15 + puissance(f) / 3) * (boucl ? .5 : 1)) };
+    if (avant < 100 && f.siege.prog >= 100) journal(`${corps[0].nom} : le blocus ${FAC[f.camp].du} est complet${f.camp === E.j ? ', vous pouvez débarquer' : ''}.`, fac === E.j ? 'mal' : 'bon');
+    if (f.camp !== E.j && f.siege.prog >= 100 && f.nav.tr) debarquer(f, corps.find(c => present(c.id, fac)), fac);
+  });
+  nettoyer();
+}
+function debarquer(f, c, fac) {
+  const st = s(c.id), troupes = (f.nav.tr || 0) * 10, g = garnison(c, fac);
+  f.nav.tr = 0;
+  if (troupes < g) { f.siege.prog = 50; journal(`${c.nom} : le débarquement ${FAC[f.camp].du} est repoussé (${fmt(troupes)} troupes contre ${fmt(g)}).`, fac === E.j ? 'bon' : 'mal'); banniere('Débarquement repoussé', `${c.nom} tient bon.`, fac === E.j ? 'bon' : 'mal'); return; }
+  const prises = [];
+  st.tuiles?.forEach(t => { if (t.o === fac) { t.o = f.camp; prises.push(t.i); } });
+  st.orb.forEach(o => { if (o.o === fac) o.o = f.camp; });
+  st.pop[f.camp] = (st.pop[f.camp] || 0) + (st.pop[fac] || 0) * .8; delete st.pop[fac];
+  f.siege = null;
+  const txt = `${cap1(FAC[f.camp].le)} s'empare du territoire ${FAC[fac].du} sur ${c.nom}${c.id === 'terre' ? ' : sa capitale tombe' : ''}.`;
+  journal(txt, f.camp === E.j ? 'bon' : 'mal');
+  banniere('Débarquement réussi', txt, f.camp === E.j ? 'bon' : 'mal');
+  fxDebarquement(c.id, prises, f.camp);
+}
+const bonusOrb = f => corpsIci(f.pos).reduce((n, c) => n + nbOrb(c.id, 'satdef', f.camp), 0) * 10;
+
+// ---------- Points de Lagrange : des cases qui suivent une planète sur son orbite ----------
+const LAGRANGE = [
+  { id: 'TL1', nom: 'L1 Soleil-Terre', p: 'terre', dk: -1, da: 0, effet: 'Observatoire solaire : éruptions annoncées 3 mois à l\'avance, +3 science' },
+  { id: 'TL4', nom: 'L4 Terre', p: 'terre', dk: 0, da: 1 / 6, effet: 'Port franc : +8 crédits par mois' },
+  { id: 'TL5', nom: 'L5 Terre', p: 'terre', dk: 0, da: -1 / 6, effet: 'Relais de navigation : vos flottes +1 case par mois' },
+  { id: 'JL4', nom: 'Troyens L4', p: 'jupiter', dk: 0, da: 1 / 6, effet: 'Mines d\'astéroïdes : +6 métaux par mois, envoyés par convoi' },
+  { id: 'JL5', nom: 'Troyens L5', p: 'jupiter', dk: 0, da: -1 / 6, effet: 'Mines d\'astéroïdes : +6 métaux par mois, envoyés par convoi' },
+];
+const COUT_LAGRANGE = { cr: 200, me: 150 };
+function posL(L, t = E.tour) { const P = C[L.p], cells = ANNEAUX[P.anneau + L.dk], f = ((P.a0 / TAU + t / P.per + L.da) % 1 + 1) % 1; return cells[Math.floor(f * cells.length) % cells.length]; }
+function tourLagrange() {
+  LAGRANGE.forEach(L => {
+    const o = E.lagrange[L.id]; if (!o) return;
+    const ennemi = E.flottes.find(f => nbNav(f) && dist(f.pos, posL(L)) === 0 && hostile(f.camp, o));
+    if (!ennemi) return;
+    E.lagrange[L.id] = null;
+    journal(`${L.nom} : le poste ${FAC[o].du} est détruit par ${FAC[ennemi.camp].le}.`, o === E.j ? 'mal' : 'bon');
+    if (sysO.pret) fxExplosion(sys, hx(...posL(L), .5), '#ffb04a', .9);
+  });
+}
+
+// ---------- Événements spatiaux ----------
+function evenements() {
+  E.evts = E.evts.filter(ev => { if (ev.tour > E.tour) return true; declencher(ev.type); return false; });
+  if (rnd() < .05 && !E.evts.length) {
+    if (E.lagrange.TL1 === E.j) { E.evts.push({ type: 'eruption', tour: E.tour + 3 }); journal('Observatoire L1 : une éruption solaire frappera dans 3 mois. Mettez vos flottes à quai.', 'bon'); banniere('Alerte de l\'observatoire L1', 'Éruption solaire dans 3 mois.', 'bon'); }
+    else declencher('eruption');
+  }
+  if (presents('mars').length && !(E.effets.tempete >= E.tour) && rnd() < .06) declencher('tempete');
+  if (rnd() < .035) declencher('comete');
+  if (rnd() < .04) declencher('geyser');
+  if (rnd() < .04) declencher('radiations');
+}
+function declencher(type) {
+  switch (type) {
+    case 'eruption':
+      E.effets.eruption = E.tour;
+      E.flottes.filter(f => !f.dock && f.camp !== 'vei').forEach(f => perte(f, 2)); nettoyer();
+      journal('Éruption solaire ! Centrales solaires à 40 % ce mois-ci, les flottes en transit sont touchées.', 'mal');
+      banniere('Éruption solaire', 'Centrales solaires à 40 %, flottes en transit endommagées.', 'mal'); fxEruption(); break;
+    case 'tempete':
+      E.effets.tempete = E.tour + 2;
+      journal('Tempête de poussière globale sur Mars : panneaux solaires à 20 % pendant 2 mois.', 'mal');
+      banniere('Tempête martienne', 'Panneaux solaires de Mars à 20 % pendant 2 mois.', 'mal'); break;
+    case 'comete': {
+      const c = pick(CORPS.filter(x => x.sol && presents(x.id).length)); if (!c) break;
+      const st = s(c.id), t = pick(st.tuiles.filter(x => x.o)), garde = nbOrb(c.id, 'bouclier', t.o);
+      if (garde) { journal(`Une comète fonce sur ${c.nom} : le bouclier ${FAC[t.o].du} la dévie.`, t.o === E.j ? 'bon' : ''); banniere('Comète déviée', `Le bouclier de ${c.nom} a tenu.`, 'bon'); fxComete(c, t, false); break; }
+      let n = 0; autour(st, t, 1).forEach((_, x) => { if (x.b) { n++; x.b = null; } });
+      if (tags(t.t).includes('sol')) t.t = 'cratere';
+      const eau = c.id === 'mars' || c.id === 'venus'; if (eau) st.terra = Math.min(100, st.terra + 5);
+      journal(`Impact de comète sur ${c.nom} : ${n} bâtiment${n > 1 ? 's' : ''} détruit${n > 1 ? 's' : ''}${eau ? ', mais ses glaces font avancer la terraformation de 5 %' : ''}.`, presents(c.id).includes(E.j) ? 'mal' : '');
+      banniere('Impact de comète', `${c.nom} est frappée.`, 'mal'); fxComete(c, t, true); break;
+    }
+    case 'geyser': {
+      const moi = presents('encelade').includes(E.j);
+      if (moi) { E.prog += 40; E.geysers++; journal(`Geysers d'Encelade : vos sondes récoltent l'océan, +40 science${E.geysers === 2 ? '. Des molécules inconnues : la Xénolinguistique coûte moitié moins' : ''}.`, 'bon'); }
+      else journal('Encelade crache d\'immenses geysers. Une colonie là-bas en tirerait de la science.');
+      banniere('Geysers d\'Encelade', moi ? '+40 science' : 'Un océan jaillit dans l\'espace.', 'bon'); fxGeyser(); break;
+    }
+    case 'radiations': {
+      const J = pos(C.jupiter), touches = E.flottes.filter(f => f.camp !== 'vei' && dist(f.pos, J) <= 3);
+      touches.forEach(f => perte(f, 2)); nettoyer();
+      journal(`Orage de radiations autour de Jupiter${touches.length ? ' : ' + touches.length + ' flotte(s) endommagée(s)' : ''}.`, touches.some(f => f.camp === E.j) ? 'mal' : '');
+      banniere('Orage jovien', 'Aurores géantes et radiations autour de Jupiter.', ''); fxAurores(); break;
+    }
+  }
+}
+
+// ---------- Victoires, défaites, sauvegarde ----------
+const capitalePrise = fac => s('terre').tuiles[E.capitales[fac]].o !== fac;
+function objectifs() {
+  const prises = E.rivaux.filter(r => s('terre').tuiles[E.capitales[r]].o === E.j).length;
+  return [
+    { id: 'domination', n: 'Domination', d: 'Prendre les capitales rivales sur Terre : blocus avec une flotte en rôle « siège », puis débarquement de troupes.', p: prises / E.rivaux.length },
+    { id: 'science', n: 'Arche interstellaire', d: 'Rechercher l\'Arche interstellaire, construire le vaisseau-arche en orbite, puis tenir 6 mois d\'assemblage.', p: E.arche ? .3 + .7 * clamp(1 - (E.arche - E.tour) / 6, 0, 1) : E.techs.has('arche') ? .3 : .1 * (E.techs.has('fus') + E.techs.has('mega')) },
+    { id: 'energie', n: 'Sphère achevée', d: 'Poser les 20 segments de Dyson sans que la Terre passe sous 0 °C (miroirs orbitaux).', p: E.dyson / 20 * (temp(C.terre) >= 273 ? 1 : .95) },
+    { id: 'paix', n: 'Paix des étoiles', d: 'Trêve avec les Veilleurs et pacte avec chaque rival pendant 24 mois de suite.', p: Math.min(1, E.compteurs.paix / 24) },
+  ];
+}
+let finAttente = null;
+function verifierFin(compter = true) {
+  const k = E.compteurs;
+  if (compter) { k.faillite = E.res.cr < 0 ? k.faillite + 1 : 0; k.gel = temp(C.terre) < 258 ? k.gel + 1 : 0; k.paix = E.rel.vei === 'paix' && E.rivaux.every(r => E.rel[r] === 'pacte') ? k.paix + 1 : 0; }
+  if (E.fin) return;
+  let fin = null;
+  if (capitalePrise(E.j)) fin = { v: false, titre: 'Capitale perdue', texte: 'Votre territoire sur Terre est tombé. Sans capitale, vos colonies se dispersent.' };
+  else if (k.faillite >= 6) fin = { v: false, titre: 'Faillite', texte: 'Six mois de dettes : vos créanciers saisissent les spatioports.' };
+  else if (k.gel >= 12) fin = { v: false, titre: 'La Terre est perdue', texte: 'Un an sous −15 °C : la sphère de Dyson a gelé le berceau de l\'humanité.' };
+  else { const o = objectifs().find(x => x.p >= 1); if (o) fin = { v: true, titre: o.n, texte: o.d }; }
+  if (!fin) return;
+  E.fin = fin; finAttente = fin;
+  if (fin.titre === 'Arche interstellaire') { E.vue = 'systeme'; recentrer(); fxLancementArche(); }
+}
+const CLE = 'heliosphere-partie';
+function sauver() {
+  try {
+    const d = { ...E, techs: [...E.techs], combats: [], offres: [], selFlotte: null, selTuile: null, carteBat: null, c: Object.fromEntries(Object.entries(E.c).map(([id, st]) => [id, { ...st, tuiles: st.tuiles?.map(t => [t.t, t.o, t.b]) || null }])) };
+    localStorage.setItem(CLE, JSON.stringify(d)); toast(`Partie sauvegardée · ${dateTxt()}`);
+  } catch { toast('Sauvegarde impossible dans ce navigateur'); }
+}
+function lireSauvegarde() { try { return JSON.parse(localStorage.getItem(CLE)); } catch { return null; } }
+function charger(d) {
+  Object.assign(FAC, d.reps);
+  Object.assign(E, etatNeuf(), d, { techs: new Set(d.techs) });
+  CORPS.forEach((c, i) => { const st = d.c[c.id]; E.c[c.id] = { ...st, tuiles: c.sol ? genSurface(c, i).tuiles.map((t, k) => ({ ...t, t: st.tuiles[k][0], o: st.tuiles[k][1], b: st.tuiles[k][2] })) : null }; });
+  document.documentElement.style.setProperty('--j', FAC[E.j].c);
+  $('accueil').hidden = true; globe.id = null; sysO.posF = {};
+  recentrer(); rendrePanneau(); rendreHUD(); banniere('Partie reprise', `${FAC[E.j].nom} · ${dateTxt()}`, 'bon');
+}
+
+// ---------- Rivaux : économie, constructions, colonisation, diplomatie, guerre ----------
+function construireIA(r) {
+  const ia = E.ia[r], guerre = E.rel[r] === 'guerre', opts = [];
+  CORPS.forEach(c => {
+    const st = s(c.id); if (!st.tuiles) return;
+    const libres = st.tuiles.filter(t => t.o === r && !t.b); if (!libres.length) return;
+    const nb = b => st.tuiles.filter(t => t.o === r && t.b === b).length, pop = st.pop[r] || 0;
+    const b = guerre && nb('defense') < 3 ? 'defense' : pop > capacite(c, r) * .8 ? (c.id === 'venus' ? 'cite' : 'habitat') : nb('mine') < 2 ? 'mine' : pick(['solaire', 'labo', 'habitat']);
+    const t = libres.find(x => peutConstruire(b, x)); if (t) opts.push({ c, t, b });
+  });
+  const o = pick(opts); if (!o) return;
+  const k = BAT[o.b].cout; if (ia.cr < k.cr || ia.me < k.me) return;
+  ia.cr -= k.cr; ia.me -= k.me; o.t.b = o.b; revendiquer(s(o.c.id), o.t, 1, r); naissance(o.c.id, o.t.i);
+}
+function tourRivaux() {
+  const colJ = CORPS.filter(c => c.id !== 'terre' && present(c.id)).length;
+  E.rivaux.forEach(r => {
+    const ia = E.ia[r];
+    let pop = 0, mines = 0;
+    CORPS.forEach(c => { const st = s(c.id); pop += st.pop[r] || 0; if (surTerre(c)) mines += st.tuiles?.filter(t => t.o === r && t.b === 'mine').length || 0; });
+    ia.cr += 8 + pop * .015; ia.me += 3 + mines * 4;
+    const assiegee = E.flottes.some(f => f.camp === E.j && f.siege?.fac === r);
+    E.tension[r] = clamp(E.tension[r] + colJ * .4 + Math.max(0, E.dyson - 3) * 2 + (assiegee ? 5 : 0) - (E.rel[r] === 'pacte' ? 2 : 0) - (E.rel[r] === 'guerre' ? 1.2 : .3), 0, 100);
+    if (E.dyson > 3 && rnd() < .15) journal(`${cap1(FAC[r].le)} proteste : votre sphère refroidit la Terre.`, 'mal');
+    if (E.tension[r] >= 85 && E.rel[r] !== 'guerre') { E.rel[r] = 'guerre'; journal(`${cap1(FAC[r].le)} vous déclare la guerre !`, 'mal'); banniere('Déclaration de guerre', `${cap1(FAC[r].le)} vous déclare la guerre.`, 'mal'); fxEcran('alerte'); }
+    // propositions diplomatiques
+    if (!E.offres.length) {
+      if (E.rel[r] === 'paix' && E.tension[r] < 30 && rnd() < .05) E.offres.push({ fac: r, type: 'pacte', texte: `${cap1(FAC[r].le)} propose un pacte commercial : +6 ₡ par mois et une tension qui baisse.` });
+      else if (E.rel.vei === 'hostile' && E.rel[r] === 'paix' && rnd() < .04) E.offres.push({ fac: r, type: 'alliance', texte: `${cap1(FAC[r].le)} propose une alliance contre les Veilleurs : un pacte commercial, et sa flotte défendra aussi vos colonies.` });
+      else if (E.rel[r] === 'guerre' && E.tension[r] < 75 && rnd() < .08) E.offres.push({ fac: r, type: 'paix', texte: `${cap1(FAC[r].le)}, usé par la guerre, propose la paix sans conditions.` });
+    }
+    if (ia.cr > (E.flottes.some(g => g.camp === r) ? 120 : 320)) construireIA(r); // sans flotte, le rival épargne d'abord pour en reconstruire une
+    // coloniser la cible la plus rentable, pas au hasard
+    if (E.tour > 2 && ia.cr > 260 && !E.missions.some(m => m.camp === r) && !assiege('terre', r)) {
+      const score = c => (c.bm * 2 + c.bs + (c.gaz ? 1 : 0)) / (1 + dist(pos(C.terre), pos(c)) / 6) * (presents(c.id).length ? .6 : 1);
+      const cible = CORPS.filter(c => c.id !== 'terre' && !present(c.id, r)).sort((a, b) => score(b) - score(a))[0];
+      if (cible) { ia.cr -= 200; E.missions.push({ camp: r, de: 'terre', vers: cible.id, depart: E.tour, arrivee: E.tour + Math.ceil(dist(pos(C.terre), pos(cible)) / 3) }); }
+    }
+    if (ia.cr > 450 && rnd() < .03) { const L = LAGRANGE.find(x => !E.lagrange[x.id] && x.p === 'terre'); if (L) { E.lagrange[L.id] = r; ia.cr -= 200; journal(`${cap1(FAC[r].le)} installe un poste au point ${L.nom}.`); } }
+    let f = E.flottes.find(g => g.camp === r);
+    const menace = E.flottes.find(v => v.camp === 'vei' && CORPS.some(c => (present(c.id, r) || E.rel[r] === 'pacte' && present(c.id)) && dist(pos(c), v.pos) < 8));
+    if (!f && ia.cr > 150) { f = { id: nid(), nom: 'Escadre ' + FAC[r].nom.split(' ').pop(), camp: r, nav: { ch: 2, cr: 1, pv: 0, tr: 0 }, dock: 'terre', pos: pos(C.terre), role: 'patrouille' }; E.flottes.push(f); ia.cr -= 100; }
+    if (!f) return;
+    if ((E.rel[r] === 'guerre' || menace) && ia.cr > 90 && ia.me > 60) { const tr = E.rel[r] === 'guerre' && (f.nav.tr || 0) < 9 && ia.cr > 160, k = tr ? 'tr' : 'cr'; f.nav[k] = (f.nav[k] || 0) + 1; ia.cr -= tr ? 50 : 60; ia.me -= tr ? 40 : 50; }
+    else if (E.tour % 6 === 0) f.nav.ch += 1;
+    if (E.rel[r] === 'guerre') {
+      // la colonie la plus faible du joueur : peu de défenses, pas de flotte
+      const faible = c => corpsIci(pos(c)).reduce((n, x) => n + (present(x.id) ? garnison(x, E.j) + nbOrb(x.id, 'satdef', E.j) * 10 : 0), 0) + E.flottes.filter(g => g.camp === E.j && dist(g.pos, pos(c)) === 0).reduce((n, g) => n + puissance(g), 0);
+      const cible = CORPS.filter(c => !c.parent && corpsIci(pos(c)).some(x => present(x.id))).sort((a, b) => faible(a) - faible(b))[0];
+      f.role = (f.nav.tr || 0) >= 3 ? 'siege' : 'raid';
+      if (cible && dist(f.pos, pos(cible)) > 0) deplacerIA(f, pos(cible), 3);
+      else if (cible && f.role === 'raid') raid(f, cible, E.j);
+    } else { f.role = 'patrouille'; f.siege = null; deplacerIA(f, menace ? menace.pos : pos(C.terre), 3); }
+  });
+}
+function repondreOffre(oui) {
+  const o = E.offres.shift(); if (!o) return;
+  if (oui) {
+    if (o.type === 'paix') { E.rel[o.fac] = 'paix'; E.tension[o.fac] = 40; } else { E.rel[o.fac] = 'pacte'; E.tension[o.fac] = Math.max(0, E.tension[o.fac] - (o.type === 'alliance' ? 25 : 10)); }
+    journal(`Accord signé avec ${FAC[o.fac].le}.`, 'bon'); banniere('Accord signé', `${cap1(FAC[o.fac].le)} : ${o.type === 'paix' ? 'paix' : o.type === 'alliance' ? 'alliance contre les Veilleurs' : 'pacte commercial'}.`, 'bon');
+  } else { E.tension[o.fac] = Math.min(100, E.tension[o.fac] + 5); journal(`Vous refusez la proposition ${FAC[o.fac].du}.`); }
+  rendreHUD(); rendrePanneau(); suiteOffres();
+}
+function suiteOffres() {
+  const o = E.offres[0];
+  if (o) { $('oTitre').textContent = { pacte: 'Proposition de pacte', alliance: 'Proposition d\'alliance', paix: 'Proposition de paix' }[o.type]; $('oTexte').textContent = o.texte; $('oFac').textContent = FAC[o.fac].nom; $('oFac').style.color = FAC[o.fac].c; $('offre').hidden = false; return; }
+  $('offre').hidden = true;
+  if (finAttente) { const f = finAttente; finAttente = null; setTimeout(() => montrerFin(f), f.titre === 'Arche interstellaire' ? 3200 : 400); }
+}
+
+// ---------- Combat ----------
+function perte(f, dmg) {
+  for (const k of ['tr', 'ch', 'se', 'cr', 'pv']) { if (!f.nav[k]) continue; const hp = NAV[k].pw; while (f.nav[k] > 0 && dmg >= hp) { f.nav[k]--; dmg -= hp; } if (f.nav[k] > 0 && rnd() < dmg / hp) { f.nav[k]--; dmg = 0; } }
+}
+function round(a, b) { const da = (puissance(a) + bonusOrb(a)) * (.3 + rnd() * .2), db = (puissance(b) + bonusOrb(b)) * (.3 + rnd() * .2); perte(b, da); perte(a, db); return [da, db]; }
+function resoudre(a, b) { for (let i = 0; i < 8 && nbNav(a) && nbNav(b); i++) round(a, b); const v = nbNav(a) ? a : b, p = v === a ? b : a; nettoyer(); return { v, p }; }
+function nettoyer() { E.flottes = E.flottes.filter(f => nbNav(f) > 0); if (E.selFlotte && !E.flottes.includes(E.selFlotte)) E.selFlotte = null; }
+const lieuTxt = p => { const c = CORPS.find(x => !x.parent && dist(pos(x), p) === 0); return c ? c.nom : 'l\'espace profond'; };
+let combat = null;
+function suiteCombats() {
+  combat = E.combats.shift() || null;
+  if (!combat) { $('combat').hidden = true; suiteOffres(); return; }
+  if (!nbNav(combat.a) || !nbNav(combat.b)) { suiteCombats(); return; }
+  combat.log = []; $('combat').hidden = false; rendreCombat();
+}
+function campHTML(f) {
+  return `<b style="color:${FAC[f.camp].c}">${f.nom}</b><div class="sous">${FAC[f.camp].nom}</div>` +
+    Object.entries(f.nav).filter(([, n]) => n).map(([k, n]) => `<div class="ligne"><span>${NAV[k].n}</span><b>${n}</b></div>`).join('') +
+    `<div class="ligne"><span>Puissance</span><b>${fmt(puissance(f))}${bonusOrb(f) ? ` + ${bonusOrb(f)} (satellites)` : ''}</b></div>`;
+}
+function rendreCombat() {
+  const { a, b } = combat, fini = !nbNav(a) || !nbNav(b);
+  $('cTitre').textContent = fini ? (nbNav(a) ? 'Victoire' : 'Défaite') : 'Bataille stellaire';
+  $('cLieu').textContent = `Près de ${lieuTxt(a.pos)} · ${MOIS[E.tour % 12]} ${2081 + Math.floor(E.tour / 12)}`;
+  $('cA').innerHTML = campHTML(a); $('cB').innerHTML = campHTML(b);
+  $('cLog').innerHTML = combat.log.map(l => `<p>${l}</p>`).join('') || '<p>Les deux flottes se font face. Chaque passe échange des tirs selon la puissance.</p>';
+  $('cActions').innerHTML = fini ? '<button class="btn or" data-a="combat:fin">Continuer</button>' :
+    '<button class="btn" data-a="combat:fuite">Battre en retraite</button><button class="btn" data-a="combat:round">Une passe</button><button class="btn j" data-a="combat:auto">Combattre jusqu\'au bout</button>';
+}
+function actionCombat(x) {
+  const { a, b } = combat;
+  if (x === 'fin') { nettoyer(); rendreHUD(); rendrePanneau(); suiteCombats(); return; }
+  if (x === 'fuite') { perte(a, 1.5); const p = pasVers(a.pos, [a.pos[0] * 2, a.pos[1] * 2]); a.pos = p; a.dock = null; a.mvt = 0; journal(`${a.nom} bat en retraite.`, 'mal'); nettoyer(); rendreHUD(); rendrePanneau(); suiteCombats(); return; }
+  const n = x === 'auto' ? 8 : 1;
+  for (let i = 0; i < n && nbNav(a) && nbNav(b); i++) { const [da, db] = round(a, b); combat.log.unshift(`Passe : vous infligez ${fmt(da, 1)}, vous subissez ${fmt(db, 1)}.`); }
+  if (!nbNav(b)) journal(`Victoire près de ${lieuTxt(a.pos)} contre ${FAC[b.camp].le}.`, 'bon');
+  if (!nbNav(a)) journal(`${a.nom} est détruite.`, 'mal');
+  rendreCombat();
+}
+
+// ---------- Rendu 3D (three.js) : une scène pour le système, une pour la planète choisie ----------
+const toile = $('globe'), zoneCarte = toile.parentElement;
+let W = 0, H = 0, DPR = 1;
+const reduit = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const rendu = new THREE.WebGLRenderer({ canvas: toile, antialias: true });
+rendu.setClearColor(0x070a1a);
+const camSys = new THREE.PerspectiveCamera(40, 1, .1, 900), camera = new THREE.PerspectiveCamera(35, 1, .1, 200);
+function taille() { DPR = Math.min(2, devicePixelRatio || 1); W = zoneCarte.clientWidth; H = zoneCarte.clientHeight; rendu.setPixelRatio(DPR); rendu.setSize(W, H, false); for (const c of [camSys, camera]) { c.aspect = W / H; c.updateProjectionMatrix(); } }
+new ResizeObserver(() => { const avant = W; taille(); if (!avant) recentrer(); }).observe(zoneCarte);
+const demiChamp = fov => Math.min(fov / 2, Math.atan(Math.tan(fov / 2 * Math.PI / 180) * W / H) * 180 / Math.PI) * Math.PI / 180;
+const vueSys = { cible: new V3(), dist: 30, az: 0, tilt: .95 };
+function placerCamSys() { const { cible, dist: d, az, tilt } = vueSys; camSys.position.set(cible.x + Math.sin(az) * Math.cos(tilt) * d, Math.sin(tilt) * d, cible.z + Math.cos(az) * Math.cos(tilt) * d); camSys.lookAt(cible); }
+function recentrer() {
+  if (E.vue === 'systeme') { vueSys.cible.set(0, 0, 0); vueSys.dist = clamp(10 / Math.tan(demiChamp(40)), 12, 140); return; }
+  // la planète tourne pour montrer votre territoire ; la caméra recule assez pour la voir entière avec son orbite
+  const st = s(E.sel), t = st.tuiles?.find(x => x.o === E.j && x.b) || st.tuiles?.find(x => x.o);
+  const n0 = t ? GB[st.f].cells[t.i].n : new V3(0, 0, 1);
+  planete.quaternion.setFromEuler(new THREE.Euler(Math.asin(n0.y) - .35, -Math.atan2(n0.x, n0.z), 0)); // nord en haut
+  globe.v = [0, 0];
+  camera.position.set(0, 0, (C[E.sel].anneaux ? 2.5 : 1.75) / Math.sin(demiChamp(35)));
+}
+function etoiles(n, r0, taillePt) {
+  const r = alea(42 + n), p = [];
+  for (let i = 0; i < n; i++) { const v = new V3(r() - .5, r() - .5, r() - .5).normalize().multiplyScalar(r0 * (1 + r() * .7)); p.push(v.x, v.y, v.z); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+  return new THREE.Points(g, new THREE.PointsMaterial({ color: 0xdfe6ff, size: taillePt }));
+}
+
+// ----- pièces communes -----
+const Y = new V3(0, 1, 0);
+const G = {
+  boite: new THREE.BoxGeometry(1, 1, 1).translate(0, .5, 0), cyl: new THREE.CylinderGeometry(.5, .5, 1, 16).translate(0, .5, 0),
+  cone: new THREE.ConeGeometry(.5, 1, 12).translate(0, .5, 0), cone4: new THREE.ConeGeometry(.5, 1, 4).translate(0, .5, 0),
+  demi: new THREE.SphereGeometry(.5, 18, 8, 0, TAU, 0, Math.PI / 2), boule: new THREE.SphereGeometry(.5, 12, 8),
+  tore: new THREE.TorusGeometry(.5, .08, 8, 28), anneau: new THREE.TorusGeometry(1, .16, 12, 64), disque: new THREE.CylinderGeometry(.5, .5, .04, 24),
+  arbre: new THREE.ConeGeometry(.2, .65, 6).translate(0, .32, 0), pic: new THREE.ConeGeometry(.6, .85, 5).translate(0, .42, 0),
+  plat: new THREE.CylinderGeometry(.45, .45, .03, 14), noyau: new THREE.SphereGeometry(.94, 40, 20), halo: new THREE.SphereGeometry(1.13, 48, 24),
+  fleche: new THREE.ConeGeometry(.17, .5, 4).rotateZ(-Math.PI / 2), octa: new THREE.OctahedronGeometry(.24), rocher: new THREE.DodecahedronGeometry(1, 0),
+  hex: new THREE.CircleGeometry(.95, 6).rotateZ(Math.PI / 6).rotateX(-Math.PI / 2), ombre: new THREE.CircleGeometry(1, 32).rotateX(-Math.PI / 2),
+};
+const mats = {};
+const mat = (col, o = {}) => mats[col + JSON.stringify(o)] ||= new THREE.MeshStandardMaterial({ color: col, flatShading: true, roughness: .55, ...o });
+const matPlat = (col, op = 1) => mats['plat' + col + op] ||= new THREE.MeshBasicMaterial({ color: col, transparent: op < 1, opacity: op, side: THREE.DoubleSide, depthWrite: op === 1 });
+const matHalo = col => mats['halo' + col] ||= new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .16, side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false });
+const matTiret = col => mats['tiret' + col] ||= new THREE.LineDashedMaterial({ color: col, dashSize: .4, gapSize: .3, transparent: true, opacity: .85 });
+const matSol = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: .8, metalness: .05 });
+const matBouclier = new THREE.MeshBasicMaterial({ color: '#7fe3ff', transparent: true, opacity: .1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+const matBouclierL = new THREE.LineBasicMaterial({ color: '#7fe3ff', transparent: true, opacity: .4, blending: THREE.AdditiveBlending, depthWrite: false });
+const matSiege = new THREE.MeshBasicMaterial({ color: '#ff5a5a', transparent: true, opacity: .6, blending: THREE.AdditiveBlending, depthWrite: false });
+const matPoussiere = new THREE.MeshStandardMaterial({ vertexColors: true, transparent: true, opacity: .55, depthWrite: false, roughness: 1 });
+const matFil = col => mats['fil' + col] ||= new THREE.MeshBasicMaterial({ color: col, wireframe: true });
+const verre = { transparent: true, opacity: .55, roughness: .1 }, lueur = c => ({ emissive: c, emissiveIntensity: 1.3 });
+function piece(g, col, p, sc, o, r) { const m = new THREE.Mesh(G[g], mat(col, o)); m.position.set(...p); m.scale.set(...sc); if (r) m.rotation.set(...r); return m; }
+const HALO = { terre: '#6fb8ff', venus: '#ffd88a', titan: '#e8a64a' };
+// bouclier : un maillage d'hexagones (sphère de Goldberg) ; tempête : un voile de poussière marbré
+const lignesHex = (() => { const p = []; goldberg(4).cells.forEach(c => c.coins.forEach((a, i) => { const b = c.coins[(i + 1) % c.coins.length]; p.push(a.x, a.y, a.z, b.x, b.y, b.z); })); const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); return g; })();
+G.voile = (() => { const g = new THREE.SphereGeometry(1.06, 32, 16), a = g.attributes.position, col = new Float32Array(a.count * 3), b = bruit(9); for (let i = 0; i < a.count; i++) { const v = .5 + .5 * b(a.getX(i) * 3, a.getY(i) * 3, a.getZ(i) * 3); col.set([.75 * v + .2, .45 * v + .12, .25 * v + .08], i * 3); } g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); return g; })();
+function bouclierMesh(r) { const g = new THREE.Group(), f = new THREE.Mesh(G.halo, matBouclier), l = new THREE.LineSegments(lignesHex, matBouclierL); f.scale.setScalar(r * .95); l.scale.setScalar(r * 1.06); g.add(f, l); return g; }
+function anneauxSaturne(parent, jet) { [[1.35, 1.7, .5], [1.75, 2.15, .75], [2.2, 2.4, .35]].forEach(([r1, r2, op]) => { const g = new THREE.RingGeometry(r1, r2, 120); jet.push(g); const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: '#e6d3a3', transparent: true, opacity: op, side: THREE.DoubleSide })); m.rotation.x = -Math.PI / 2; parent.add(m); }); }
+
+// prismes : une plaque par case, une rainure entre les cases ; h(k) = rayon du dessus, rBas = rayon du pied
+function prismes(cells, h, rBas = .94, retrait = .07) {
+  const pos = [], tri = [], debut = [], nTop = [], tops = [], cts = [], a = new V3(), b = new V3();
+  const t3 = (p1, p2, p3, ref, k) => { a.subVectors(p2, p1); b.subVectors(p3, p1); (a.cross(b).dot(ref) < 0 ? [p1, p3, p2] : [p1, p2, p3]).forEach(v => pos.push(v.x, v.y, v.z)); tri.push(k); };
+  cells.forEach((cell, k) => {
+    const n = cell.n, hk = h(k), m = cell.coins.length;
+    const ci = cell.coins.map(p => p.clone().lerp(n, retrait).normalize());
+    const top = ci.map(p => p.clone().multiplyScalar(hk)), bas = ci.map(p => p.clone().multiplyScalar(rBas)), ct = n.clone().multiplyScalar(hk);
+    tops.push(top); cts.push(ct); debut.push(pos.length / 3); nTop.push(m * 3);
+    for (let i = 0; i < m; i++) t3(ct, top[i], top[(i + 1) % m], n, k);
+    for (let i = 0; i < m; i++) { const j = (i + 1) % m, ref = top[i].clone().add(top[j]).multiplyScalar(.5).sub(ct); t3(top[i], bas[i], top[j], ref, k); t3(top[j], bas[i], bas[j], ref, k); }
+  });
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(pos.length).fill(1), 3)); geo.computeVertexNormals();
+  return { geo, tri, debut, nTop, tops, cts };
+}
+function teinter(p, cols, ombre = .5) {
+  const arr = p.geo.attributes.color.array;
+  cols.forEach((cc, k) => { const d = p.debut[k], n = p.nTop[k]; for (let v = d; v < d + 3 * n; v++) { const f = v < d + n ? 1 : ombre; arr[v * 3] = cc.r * f; arr[v * 3 + 1] = cc.g * f; arr[v * 3 + 2] = cc.b * f; } });
+  p.geo.attributes.color.needsUpdate = true;
+}
+const GAZ = {};
+const gaz = c => GAZ[c.id] ||= (() => { // bandes de nuages, et la Grande Tache rouge sur Jupiter
+  const nz = bruit(3 + c.anneau), tache = new V3(.75, -.35, .55).normalize(), relief = [];
+  const cols = goldberg(FREQ(c)).cells.map(({ n }) => { const v = Math.sin(n.y * 10 + nz(n.x, n.y, n.z) * 1.4); relief.push((v + 1) * .005); return c.id === 'jupiter' && n.distanceTo(tache) < .2 ? new THREE.Color('#c8643c') : new THREE.Color(c.c1).lerp(new THREE.Color(c.c2), (v + 1) / 2); });
+  return { cols, relief };
+})();
+const hauteurT = (c, k, ech = .02) => 1 + (s(c.id).tuiles ? TER[s(c.id).tuiles[k].t][2] * ech : gaz(c).relief[k]);
+function couleursCorps(c, teinte = 0) {
+  const st = s(c.id); if (!st.tuiles) return gaz(c).cols;
+  return st.tuiles.map(t => {
+    const col = new THREE.Color(TER[t.t][1]);
+    if (teinte && t.o && !tags(t.t).includes('eau')) col.lerp(new THREE.Color(FAC[t.o].c), teinte);
+    return col;
+  });
+}
+
+// ----- le système solaire -----
+const sys = new THREE.Scene();
+const lumSys = new THREE.PointLight(0xfff0d0, 3.2, 0, 0);
+const lumCam = new THREE.DirectionalLight(0xc8d0ff, .5); lumCam.position.set(0, 0, 1); camSys.add(lumCam);
+sys.add(new THREE.AmbientLight(0x8890c0, .5), lumSys, camSys, etoiles(1500, 320, 1.4));
+const hx = (q, r, y = 0) => { const [x, z] = axPix(q, r); return new V3(x / S, y, z / S); }; // 1 unité = rayon d'une case
+const RVIS = c => c.parent ? .12 + c.ray * .032 : .15 + c.ray * .055;
+const elev = c => c.parent ? 0 : RVIS(c) + .3;
+const INCL = { venus: 177, terre: 23, mars: 25, jupiter: 3, saturne: 27, uranus: 98, neptune: 28, pluton: 120, lune: 7, ceres: 4 };
+const lunesDe = id => CORPS.filter(o => o.parent === id);
+const rayonOrbite = k => ANNEAUX[k].reduce((acc, p) => acc + hx(...p).length(), 0) / ANNEAUX[k].length;
+const sysO = { pret: false, sale: true, corps: {}, dyn: null, jet: [], piqueCorps: [], piqueFlottes: [], piqueL: [], posF: {}, kC: {}, etiqF: [], roues: [], survol: null };
+function texHalo() { const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'), g = x.createRadialGradient(64, 64, 0, 64, 64, 64); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.2, 'rgba(255,255,255,.55)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c); }
+function construireSysteme() {
+  // grille d'hexagones
+  const p = [];
+  for (let k = 1; k <= RMAX; k++) ANNEAUX[k].forEach(([q, r]) => { const c = hx(q, r); for (let i = 0; i < 6; i++) { const a1 = Math.PI / 180 * (60 * i - 30), a2 = a1 + Math.PI / 3; p.push(c.x + Math.cos(a1), 0, c.z + Math.sin(a1), c.x + Math.cos(a2), 0, c.z + Math.sin(a2)); } });
+  const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+  sys.add(new THREE.LineSegments(gg, new THREE.LineBasicMaterial({ color: 0x8296ff, transparent: true, opacity: .1 })));
+  CORPS.filter(c => !c.parent).forEach(c => { const R = rayonOrbite(c.anneau); sys.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(Array.from({ length: 161 }, (_, i) => new V3(Math.cos(i / 160 * TAU) * R, 0, Math.sin(i / 160 * TAU) * R))), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .14 }))); });
+  // ceinture d'astéroïdes (anneaux 7 à 9), ceinture de Kuiper (29 à 32), Troyens de Jupiter
+  const ra = alea(77), m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+  const caillou = (pp, sc) => m.compose(pp, q.setFromEuler(e.set(ra() * 6, ra() * 6, ra() * 6)), new V3().setScalar(sc)).clone();
+  const semer = (k0, k1, dens) => { const l = []; for (let k = k0; k <= k1; k++) ANNEAUX[k].forEach(([qq, rr]) => { for (let i = 0; i < 3; i++) if (ra() < dens) l.push(caillou(hx(qq, rr).add(new V3((ra() - .5) * 1.7, (ra() - .5) * .35, (ra() - .5) * 1.7)), .04 + ra() * .1)); }); return l; };
+  const inst = (l, col) => { const im = new THREE.InstancedMesh(G.rocher, mat(col, { roughness: .9 }), l.length); l.forEach((mx, i) => im.setMatrixAt(i, mx)); return im; };
+  const Rj = rayonOrbite(C.jupiter.anneau), troy = [];
+  for (const sg of [-1, 1]) for (let i = 0; i < 45; i++) { const an = sg * Math.PI / 3 + (ra() - .5) * .4, rr = Rj + (ra() - .5) * 1.6; troy.push(caillou(new V3(Math.cos(an) * rr, (ra() - .5) * .3, Math.sin(an) * rr), .04 + ra() * .08)); }
+  sysO.troyens = inst(troy, '#9a8a70');
+  sys.add(inst(semer(7, 9, .5), '#8a8074'), inst(semer(29, 32, .22), '#a9b8c8'), sysO.troyens);
+  // le Soleil, lui aussi en hexagones, et son halo
+  const rs = alea(5), soleil = prismes(goldberg(5).cells, () => 1.3 * (1 + rs() * .03), 1.22, .05);
+  teinter(soleil, goldberg(5).cells.map(() => new THREE.Color('#ffd25a').lerp(new THREE.Color('#ff7a1a'), rs() * .8)), .7);
+  sysO.soleil = new THREE.Group();
+  sysO.soleil.add(new THREE.Mesh(soleil.geo, new THREE.MeshBasicMaterial({ vertexColors: true })),new THREE.Mesh(new THREE.SphereGeometry(1.22, 24, 12), new THREE.MeshBasicMaterial({ color: '#ff9a30' })));
+  sysO.halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: texHalo(), color: '#ffb547', blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+  sys.add(sysO.soleil, sysO.halo);
+  // la sphère de Dyson : 92 plaques dorées, posées du pôle vers l'équateur à chaque segment construit
+  const cellsD = [...goldberg(3).cells].sort((a, b) => b.n.y - a.n.y);
+  sysO.dyson = prismes(cellsD, () => 2.45, 2.33, .06);
+  sys.add(new THREE.Mesh(sysO.dyson.geo, new THREE.MeshStandardMaterial({ color: '#f0b440', metalness: .3, roughness: .4, emissive: '#6a4508', emissiveIntensity: .6, flatShading: true })));
+  // les corps célestes : mini-globes en hexagones, penchés sur leur axe
+  CORPS.forEach(c => {
+    const R = RVIS(c), g = new THREE.Group(), incl = new THREE.Group(), tour = new THREE.Group();
+    incl.rotation.z = (INCL[c.id] || 0) * Math.PI / 180; g.add(incl); incl.add(tour);
+    const pr = prismes(goldberg(FREQ(c)).cells, k => hauteurT(c, k, .035));
+    tour.add(new THREE.Mesh(pr.geo, matSol), new THREE.Mesh(G.noyau, mat('#151829'))); tour.scale.setScalar(R);
+    if (HALO[c.id]) { const h = new THREE.Mesh(G.halo, matHalo(HALO[c.id])); h.scale.setScalar(R); g.add(h); }
+    if (c.anneaux) { const a = new THREE.Group(); a.scale.setScalar(R); anneauxSaturne(a, []); incl.add(a); }
+    if (!c.parent) { const o = new THREE.Mesh(G.ombre, matPlat('#000000', .35)); o.scale.setScalar(R * 1.1); o.position.y = -elev(c) + .01; g.add(o); }
+    const pique = new THREE.Mesh(G.boule, new THREE.MeshBasicMaterial({ visible: false })); pique.scale.setScalar(Math.max(R * 2.6, c.parent ? .55 : .9)); pique.userData.c = c; g.add(pique); sysO.piqueCorps.push(pique);
+    sys.add(g);
+    const el = document.createElement('span'); el.className = 'etiq' + (c.parent ? ' lune' : ''); el.textContent = c.nom; $('etiquettes').append(el);
+    sysO.corps[c.id] = { c, g, tour, pr, R, el, ang: null, rad: 0, sol: null };
+  });
+  // survol, sélection, comète
+  sysO.survolM = new THREE.Mesh(G.hex, matPlat('#ffffff', .12)); sysO.survolM.visible = false;
+  sysO.selM = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(Array.from({ length: 6 }, (_, i) => { const a = Math.PI / 180 * (60 * i - 30); return new V3(Math.cos(a), .03, Math.sin(a)); })), new THREE.LineBasicMaterial({ color: '#ffb547' }));
+  sysO.comete = new THREE.Mesh(G.boule, new THREE.MeshBasicMaterial({ color: '#eaf6ff' })); sysO.comete.scale.setScalar(.16);
+  const qg = new THREE.BufferGeometry(); qg.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(6), 3)); qg.setAttribute('color', new THREE.Float32BufferAttribute([.8, .95, 1, 0, 0, 0], 3));
+  sysO.queue = new THREE.Line(qg, new THREE.LineBasicMaterial({ vertexColors: true, blending: THREE.AdditiveBlending, transparent: true }));
+  sys.add(sysO.survolM, sysO.selM, sysO.comete, sysO.queue);
+  sysO.pret = true;
+}
+// ce qui change avec la partie : couleurs des colonies, présences, flottes, missions, portée, sphère de Dyson
+function majSysteme() {
+  CORPS.forEach(c => { const o = sysO.corps[c.id]; ['sol', 'st', 'fx'].forEach(k => { if (o[k]) o.g.remove(o[k]); o[k] = null; }); });
+  sysO.roues = []; sysO.piqueL = [];
+  if (sysO.dyn) sys.remove(sysO.dyn);
+  sysO.jet.forEach(g => g.dispose()); sysO.jet = []; sysO.etiqF.forEach(el => el.remove()); sysO.etiqF = [];
+  const dyn = sysO.dyn = new THREE.Group(); sys.add(dyn);
+  CORPS.forEach(c => {
+    const o = sysO.corps[c.id], facs = presents(c.id);
+    teinter(o.pr, couleursCorps(c, .35));
+    const sts = s(c.id).orb.filter(x => x.t === 'station');
+    if (sts.length) { o.st = new THREE.Group(); sts.forEach((x, i) => { const t = new THREE.Mesh(G.anneau, mat(FAC[x.o].c, { emissive: FAC[x.o].c, emissiveIntensity: .5 })), a = TAU * i / sts.length; t.scale.setScalar(o.R * .16); t.rotation.x = Math.PI / 2; t.position.set(Math.cos(a) * (o.R + .3), 0, Math.sin(a) * (o.R + .3)); o.st.add(t); }); o.g.add(o.st); }
+    // effets autour du corps : bouclier, satellites, blocus, tempête ; alerte de pénurie ou de révolte sur l'étiquette
+    o.fx = new THREE.Group(); o.g.add(o.fx);
+    if (facs.some(f => nbOrb(c.id, 'bouclier', f))) o.fx.add(bouclierMesh(o.R * 1.3));
+    const nSat = facs.reduce((n, f) => n + nbOrb(c.id, 'satdef', f), 0);
+    for (let i = 0; i < nSat; i++) { const m = new THREE.Mesh(G.boule, mat('#dfe5f2', lueur('#7fe3ff'))), a = TAU * i / nSat; m.scale.setScalar(.08); m.position.set(Math.cos(a) * (o.R + .45), .12 * Math.sin(a * 3), Math.sin(a) * (o.R + .45)); o.fx.add(m); }
+    if (!c.parent && E.flottes.some(f => f.siege && dist(f.pos, pos(c)) === 0)) { const t = new THREE.Mesh(G.anneau, matSiege); t.rotation.x = Math.PI / 2; t.scale.set(o.R + .6, o.R + .6, .25); o.fx.add(t); }
+    if (c.id === 'mars' && E.effets.tempete >= E.tour) { const d = new THREE.Mesh(G.voile, matPoussiere); d.scale.setScalar(o.R * 1.05); o.fx.add(d); }
+    o.el.classList.toggle('alerte', c.id !== 'terre' && present(c.id) && (besoins(c).ratio < 1 || s(c.id).revolte > 0));
+    if (!facs.length) return;
+    const grp = new THREE.Group();
+    facs.forEach((f, i) => { const g = new THREE.RingGeometry(o.R + .12, o.R + .22, 40, 1, TAU * i / facs.length + .08, TAU / facs.length - .16); sysO.jet.push(g); grp.add(new THREE.Mesh(g, matPlat(FAC[f].c))); });
+    grp.rotation.x = -Math.PI / 2; grp.position.y = c.parent ? 0 : -elev(c) + .03; o.g.add(grp); o.sol = grp;
+  });
+  sysO.piqueFlottes = [];
+  const groupes = {};
+  E.flottes.forEach(f => (groupes[f.pos + ''] ||= []).push(f));
+  Object.values(groupes).forEach(gp => gp.forEach((f, i) => {
+    const grp = new THREE.Group(), col = FAC[f.camp].c;
+    const mo = flotteModele(f); grp.add(mo);
+    if (f === E.selFlotte) { const t = new THREE.Mesh(G.tore, mat('#ffb547', lueur('#ffb547'))); t.rotation.x = Math.PI / 2; t.scale.setScalar(1.1); grp.add(t); }
+    const pique = new THREE.Mesh(G.boule, new THREE.MeshBasicMaterial({ visible: false })); pique.scale.setScalar(.8); pique.userData.f = f; grp.add(pique); sysO.piqueFlottes.push(pique);
+    grp.userData = { f, modele: mo, off: new V3(.9 + i * .75, .65, -.5 + i * .3) };
+    sysO.posF[f.id] ||= hx(...f.pos).add(grp.userData.off);
+    const el = document.createElement('span'); el.className = 'etiq flotte'; el.style.color = col; el.textContent = nbNav(f); $('etiquettes').append(el); grp.userData.el = el; sysO.etiqF.push(el);
+    dyn.add(grp);
+  }));
+  E.missions.forEach(mi => {
+    const a = hx(...pos(C[mi.de]), .3), b = hx(...pos(C[mi.vers]), .3), ctrl = mi.fronde ? hx(...pos(C.jupiter), .8) : a.clone().add(b).multiplyScalar(.5).setY(.3 + a.distanceTo(b) * .08);
+    const courbe = new THREE.QuadraticBezierCurve3(a, ctrl, b), g = new THREE.BufferGeometry().setFromPoints(courbe.getPoints(40)); sysO.jet.push(g);
+    const l = new THREE.Line(g, matTiret(FAC[mi.camp].c)); l.computeLineDistances(); dyn.add(l);
+    const pt = new THREE.Mesh(G.boule, mat(FAC[mi.camp].c, lueur(FAC[mi.camp].c))); pt.scale.setScalar(.22); pt.position.copy(courbe.getPoint(clamp((E.tour - mi.depart) / Math.max(1, mi.arrivee - mi.depart), 0, 1))); dyn.add(pt);
+  });
+  // convois : cargos qui glissent le long de leur route
+  sysO.convois = E.convois.map(v => {
+    const m = vaisseau('cargo', FAC[v.camp].c), A = hx(...v.a, .35), B = hx(...v.b, .35), g = new THREE.BufferGeometry().setFromPoints([A, B]); sysO.jet.push(g);
+    const l = new THREE.Line(g, matTiret(FAC[v.camp].c)); l.computeLineDistances(); l.material.opacity = .35;
+    m.scale.setScalar(.5); dyn.add(m, l); return { v, m, A, B };
+  });
+  // points de Lagrange : un octaèdre qui pulse, un poste en forme de petite station quand il est occupé
+  sysO.lagr = LAGRANGE.map(L => {
+    const g = new THREE.Group(), o = E.lagrange[L.id], col = o ? FAC[o].c : '#a7afd9', m = new THREE.Mesh(G.octa, matFil(col));
+    g.add(m);
+    if (o) { const st = modeleOrb('station', col); st.scale.setScalar(.07); st.traverse(x => x.userData.tourne && sysO.roues.push(x)); g.add(st); }
+    const pq = new THREE.Mesh(G.boule, new THREE.MeshBasicMaterial({ visible: false })); pq.scale.setScalar(1); pq.userData.L = L; g.add(pq); sysO.piqueL.push(pq);
+    g.position.copy(hx(...posL(L), .5)); dyn.add(g);
+    const el = document.createElement('span'); el.className = 'etiq lagr'; el.textContent = L.nom; $('etiquettes').append(el); sysO.etiqF.push(el);
+    return { L, g, m, el };
+  });
+  // fenêtre de lancement : trajectoire au meilleur moment, planètes fantômes au départ et à l'arrivée
+  sysO.arc = null;
+  const cS = C[E.sel];
+  if (E.onglet === 'corps' && !E.selL && !present(cS.id) && !E.missions.some(m => m.camp === E.j && m.vers === cS.id)) {
+    const info = infoMission(cS);
+    if (info) {
+      const t0 = E.tour + info.fen.t, t1 = t0 + info.dureeFen, A = hx(...posA(info.o, t0), .5), B = hx(...posA(cS, t1), .5);
+      const ctrl = info.fronde ? hx(...posA(C.jupiter, Math.round((t0 + t1) / 2)), 1.2) : A.clone().add(B).multiplyScalar(.5).setY(1.5 + A.distanceTo(B) * .12);
+      const courbe = new THREE.QuadraticBezierCurve3(A, ctrl, B), g = new THREE.BufferGeometry().setFromPoints(courbe.getPoints(64)); sysO.jet.push(g);
+      const l = new THREE.Line(g, matTiret('#ffb547')); l.computeLineDistances(); dyn.add(l);
+      const fantome = (cc, p) => { const m = new THREE.Mesh(G.boule, new THREE.MeshBasicMaterial({ color: (cc.parent ? C[cc.parent] : cc).c1, transparent: true, opacity: .35, depthWrite: false })); m.scale.setScalar(RVIS(cc.parent ? C[cc.parent] : cc) * 2); m.position.copy(p); dyn.add(m); return m; };
+      const pt = new THREE.Mesh(G.boule, mat('#ffb547', lueur('#ffb547'))); pt.scale.setScalar(.25); dyn.add(pt);
+      sysO.arc = { courbe, pt, fantomes: [fantome(info.o, A), fantome(cS, B)] };
+    }
+  }
+  const at = atteignables();
+  if (at.length) { const im = new THREE.InstancedMesh(G.hex, matPlat(FAC[E.j].c, .2), at.length); at.forEach((pp, i) => { const v = hx(...pp, .02); im.setMatrixAt(i, new THREE.Matrix4().makeTranslation(v.x, v.y, v.z)); }); dyn.add(im); }
+  const n = Math.round(E.dyson / 20 * sysO.dyson.debut.length);
+  sysO.dyson.geo.setDrawRange(0, n < sysO.dyson.debut.length ? sysO.dyson.debut[n] : Infinity);
+  lumSys.intensity = 3.2 * (1 - capture() * .8);
+  sysO.sale = false;
+}
+function atteignables() {
+  const f = E.selFlotte; if (!f || f.camp !== E.j || !f.mvt) return [];
+  const out = [];
+  for (let k = 1; k <= RMAX; k++) ANNEAUX[k].forEach(p => { if (dist(p, f.pos) <= f.mvt && dist(p, f.pos) > 0) out.push(p); });
+  return out;
+}
+const v3 = new V3();
+function etiquette(el, p, cond = true) {
+  v3.copy(p).project(camSys);
+  const vis = cond && v3.z < 1 && Math.abs(v3.x) < 1.05 && Math.abs(v3.y) < 1.05;
+  el.hidden = !vis;
+  if (vis) el.style.transform = `translate(${(v3.x + 1) / 2 * W}px, ${(1 - v3.y) / 2 * H}px) translateX(-50%)`;
+}
+function dessinSysteme(tt) {
+  if (!sysO.pret) construireSysteme();
+  if (sysO.sale) majSysteme();
+  placerCamSys();
+  // chaque planète glisse le long de son orbite vers sa nouvelle case
+  CORPS.forEach(c => {
+    const o = sysO.corps[c.id];
+    if (!c.parent) {
+      const t = hx(...pos(c)), ta = Math.atan2(t.z, t.x), tr = t.length();
+      if (o.ang === null) { o.ang = ta; o.rad = tr; }
+      o.ang += (((ta - o.ang) % TAU + TAU + Math.PI) % TAU - Math.PI) * .1; o.rad += (tr - o.rad) * .1;
+      o.g.position.set(Math.cos(o.ang) * o.rad, elev(c), Math.sin(o.ang) * o.rad);
+    }
+    o.tour.rotation.y = tt * (c.id === 'venus' ? -.05 : c.gaz ? .5 : .3);
+    if (o.st) o.st.rotation.y = tt * .4;
+  });
+  CORPS.filter(c => c.parent).forEach(c => {
+    const o = sysO.corps[c.id], P = sysO.corps[c.parent], i = lunesDe(c.parent).indexOf(c), d = P.R + .38 + i * .34, an = tt * .5 / (i + 1) * (c.id === 'triton' ? -1 : 1) + i * 2.1;
+    o.g.position.set(P.g.position.x + Math.cos(an) * d, P.g.position.y, P.g.position.z + Math.sin(an) * d);
+  });
+  sysO.troyens.rotation.y = -sysO.corps.jupiter.ang;
+  sysO.soleil.rotation.y = tt * .05;
+  const now = performance.now(), boost = sysO.eruption ? Math.max(0, 1 - (now - sysO.eruption) / 2500) : 0;
+  sysO.halo.scale.setScalar((11 + Math.sin(tt * 1.3) * .4) * (1 - capture() * .6) * (1 + 2.5 * boost));
+  matBouclierL.opacity = .3 + .15 * Math.sin(tt * 3); matSiege.opacity = .45 + .35 * Math.sin(tt * 6);
+  CORPS.forEach(c => { const o = sysO.corps[c.id]; if (o.fx) o.fx.rotation.y = tt * .5; });
+  sysO.roues.forEach(r => { r.rotation.y += .02; });
+  sysO.convois.forEach(x => { const id = x.v.id, k = convoiK(x.v); sysO.kC[id] ??= Math.max(0, k - 1 / Math.max(1, x.v.arrivee - x.v.depart)); sysO.kC[id] += (k - sysO.kC[id]) * .04; x.m.position.lerpVectors(x.A, x.B, sysO.kC[id]); x.m.rotation.y = -Math.atan2(x.B.z - x.A.z, x.B.x - x.A.x); });
+  sysO.lagr.forEach(x => { x.m.rotation.y = tt; x.m.scale.setScalar(1.1 + .2 * Math.sin(tt * 3) + (E.selL === x.L.id ? .6 : 0)); });
+  if (sysO.arc) { sysO.arc.pt.position.copy(sysO.arc.courbe.getPoint((tt * .3) % 1)); sysO.arc.fantomes.forEach(m => { m.material.opacity = .25 + .15 * Math.sin(tt * 4); }); }
+  // les flottes avancent vers leur case, le nez dans le sens du trajet ; à l'arrêt, elles suivent l'orbite
+  sysO.dyn.children.forEach(g => {
+    const u = g.userData; if (!u.f) return;
+    const cible = hx(...u.f.pos).add(u.off), p = sysO.posF[u.f.id], d = cible.clone().sub(p);
+    p.lerp(cible, .1); g.position.copy(p); g.position.y += Math.sin(tt * 2 + u.f.id) * .05;
+    const cap = d.length() > .05 ? Math.atan2(d.z, d.x) : Math.atan2(p.z, p.x) + Math.PI / 2;
+    u.cap ??= cap; u.cap += (((cap - u.cap) % TAU + TAU + Math.PI) % TAU - Math.PI) * .1; u.modele.rotation.y = -u.cap;
+  });
+  const sp = pos(C[E.sel]); sysO.selM.position.copy(hx(...sp));
+  if (sysO.survol) { sysO.survolM.visible = true; sysO.survolM.position.copy(hx(...sysO.survol, .01)); } else sysO.survolM.visible = false;
+  // une comète sur une orbite très allongée, la queue toujours à l'opposé du Soleil
+  const th = tt * .04 % TAU, rc = 20 * (1 - .85 ** 2) / (1 + .85 * Math.cos(th)), hc = new V3(Math.cos(th + 2.4) * rc, .6, Math.sin(th + 2.4) * rc);
+  sysO.comete.position.copy(hc); const qa = sysO.queue.geometry.attributes.position; qa.setXYZ(0, hc.x, hc.y, hc.z); const qb = hc.clone().add(hc.clone().setY(0).normalize().multiplyScalar(clamp(30 / rc, .5, 6))); qa.setXYZ(1, qb.x, qb.y, qb.z); qa.needsUpdate = true;
+  rendu.render(sys, camSys);
+  CORPS.forEach(c => { const o = sysO.corps[c.id]; etiquette(o.el, o.g.position.clone().setY(o.g.position.y + (c.parent ? o.R + .35 : -o.R - .08)), !c.parent || vueSys.dist < 40 || E.sel === c.id); o.el.classList.toggle('sel', E.sel === c.id); });
+  sysO.dyn.children.forEach(g => { if (g.userData.el) etiquette(g.userData.el, g.position.clone().setY(g.position.y + .45)); });
+  sysO.lagr.forEach(x => etiquette(x.el, x.g.position.clone().setY(x.g.position.y + .6), vueSys.dist < 45 || E.selL === x.L.id));
+}
+
+// ----- globe 3D de la planète choisie -----
+const scene = new THREE.Scene();
+scene.add(new THREE.AmbientLight(0x9098c8, .9), etoiles(1200, 40, .18));
+const lumSoleil = new THREE.DirectionalLight(0xfff0d0, 2.8); lumSoleil.position.set(-4, 1.5, 3); scene.add(lumSoleil);
+const planete = new THREE.Group(); scene.add(planete);
+// bâtiments en unités de case (rayon 1), posés sur y = 0
+function modele(b, fc) {
+  const g = new THREE.Group(), P = (...a) => g.add(piece(...a));
+  switch (b) {
+    case 'habitat': [[-.3, -.15, .9, .28], [.22, .05, 1.4, .26], [-.05, .38, .55, .22]].forEach(([x, z, h, w]) => { P('boite', '#e9edf6', [x, 0, z], [w, h, w]); P('boite', fc, [x, h, z], [w + .04, .08, w + .04]); }); break;
+    case 'solaire': [-.22, .22].forEach(x => [-.2, .2].forEach(z => { P('boite', '#8a93b3', [x, 0, z], [.04, .16, .04]); P('boite', '#2a4596', [x, .16, z], [.38, .03, .3], { roughness: .2, metalness: .4 }, [-.45, 0, 0]); })); break;
+    case 'mine': P('boite', '#7a6352', [0, 0, 0], [.5, .22, .5]); P('boite', fc, [0, .22, 0], [.52, .05, .52]); P('cone4', '#3a2c22', [.05, .27, 0], [.32, .75, .32]); P('cone', '#9a8a7a', [-.42, 0, .3], [.36, .22, .36]); break;
+    case 'labo': P('cyl', '#5a6380', [0, 0, 0], [.75, .08, .75]); P('demi', '#a8dcff', [0, .08, 0], [1.2, 1.2, 1.2], verre); P('boule', fc, [0, .66, 0], [.12, .12, .12]); break;
+    case 'port': P('cyl', '#4c5470', [0, 0, 0], [1.1, .05, 1.1]); P('cyl', '#ffd166', [0, .05, 0], [.6, .01, .6]); P('cyl', '#f3f5fb', [0, .06, 0], [.16, .9, .16]); P('cone', fc, [0, .96, 0], [.17, .3, .17]); break;
+    case 'he3': P('cyl', '#c9ccd6', [-.15, 0, 0], [.5, .45, .5]); P('cyl', fc, [-.15, .45, 0], [.52, .05, .52]); P('boite', '#7ef0e0', [.2, .45, 0], [.6, .06, .06], lueur('#3aa89a'), [0, 0, -.5]); break;
+    case 'foreuse': P('boite', '#b0c4d6', [-.2, 0, 0], [.14, 1.2, .14]); P('boite', fc, [-.2, 1.2, 0], [.18, .08, .18]); P('cyl', '#6fb8ff', [.22, 0, .1], [.45, .4, .45]); break;
+    case 'raff': P('cyl', '#e08a3a', [-.2, 0, 0], [.4, .55, .4]); P('cyl', '#c9763a', [.25, 0, .15], [.32, .4, .32]); P('cyl', fc, [-.2, .55, 0], [.42, .04, .42]); break;
+    case 'cite': P('cyl', '#e6e0d0', [0, .5, 0], [1.1, .08, 1.1]); P('boite', '#ffffff', [-.15, .58, 0], [.2, .5, .2]); P('boite', '#f0f0f6', [.18, .58, .1], [.18, .32, .18]); P('boite', fc, [-.15, 1.08, 0], [.22, .05, .22]); P('demi', '#cfe9ff', [0, .58, 0], [1.05, 1.05, 1.05], verre); break;
+    case 'terra': P('boite', fc, [0, 0, 0], [.45, .12, .45]); P('cyl', '#cfd6e6', [0, .12, 0], [.22, 1.5, .22]); P('tore', '#96f0c8', [0, 1.45, 0], [.7, .7, .7], lueur('#4fd99a'), [Math.PI / 2, 0, 0]); break;
+    case 'fusion': P('cyl', '#9aa4c4', [0, 0, 0], [.8, .4, .8]); P('cyl', fc, [0, .4, 0], [.5, .06, .5]); P('tore', '#6ef0ff', [0, .25, 0], [1.25, 1.25, 1.25], lueur('#2fc6e6'), [Math.PI / 2, 0, 0]); break;
+    case 'defense': P('boite', '#6a7290', [0, 0, 0], [.45, .28, .45]); P('boule', fc, [0, .34, 0], [.36, .36, .36]); P('cyl', '#2a2f45', [.12, .38, 0], [.08, .5, .08], {}, [0, 0, -1.1]); break;
+  }
+  return g;
+}
+// vaisseaux, nez vers +x
+function vaisseau(type, fc) {
+  const g = new THREE.Group(), P = (...a) => g.add(piece(...a)), coque = '#c9d0e0', sombre = '#5a6278', axe = [0, 0, -Math.PI / 2], arriere = [0, 0, Math.PI / 2];
+  switch (type) {
+    case 'ch': // chasseur : fuselage effilé, ailes en flèche, un réacteur
+      P('cyl', coque, [-.25, 0, 0], [.12, .5, .12], {}, axe); P('cone', coque, [.25, 0, 0], [.12, .28, .12], {}, axe);
+      P('boite', sombre, [-.08, -.02, 0], [.26, .03, .55]); P('boite', fc, [-.18, .02, 0], [.12, .14, .03]);
+      P('boule', fc, [-.27, 0, 0], [.1, .1, .1], lueur(fc)); break;
+    case 'cr': // croiseur : longue coque, passerelle, tourelles, deux réacteurs
+      P('boite', coque, [0, -.08, 0], [1, .16, .22]); P('cone4', coque, [.5, 0, 0], [.24, .32, .16], {}, axe);
+      P('boite', sombre, [-.18, .08, 0], [.26, .14, .12]); P('boite', fc, [-.18, .22, 0], [.1, .02, .14]);
+      P('cyl', sombre, [.15, .08, 0], [.1, .05, .1]); P('cyl', sombre, [.32, .08, 0], [.08, .04, .08]);
+      [-.07, .07].forEach(z => { P('cyl', sombre, [-.5, 0, z], [.09, .1, .09], {}, arriere); P('boule', fc, [-.62, 0, z], [.09, .09, .09], lueur(fc)); }); break;
+    case 'pv': // porte-vaisseaux : pont d'envol, îlot, hangar, trois réacteurs
+      P('boite', coque, [0, -.1, 0], [1.6, .2, .5]); P('boite', '#3a4058', [.1, .1, 0], [1.1, .01, .12]); P('cone4', coque, [.8, 0, 0], [.4, .3, .25], {}, axe);
+      P('boite', sombre, [-.25, .1, .18], [.22, .28, .1]); P('boite', fc, [-.25, .38, .18], [.24, .03, .12]); P('boite', '#20263a', [.5, -.02, .25], [.4, .1, .02]);
+      [-.15, 0, .15].forEach(z => { P('cyl', sombre, [-.8, 0, z], [.1, .1, .1], {}, arriere); P('boule', fc, [-.92, 0, z], [.1, .1, .1], lueur(fc)); }); break;
+    case 'tr': // transport de troupes : coque massive, modules de largage
+      P('boite', coque, [0, -.1, 0], [.8, .22, .3]); P('cone4', coque, [.4, 0, 0], [.3, .25, .2], {}, axe);
+      [-.2, 0, .2].forEach(x => [-.17, .17].forEach(z => P('boite', fc, [x, -.06, z], [.12, .14, .06])));
+      P('boule', fc, [-.45, 0, 0], [.12, .12, .12], lueur(fc)); break;
+    case 'cargo': // cargo de convoi : conteneurs empilés
+      P('boite', sombre, [0, -.05, 0], [.9, .06, .08]); ['#c9763a', '#5a8fd6', '#d6c45a', '#7a9a6a'].forEach((col, i) => P('boite', col, [-.3 + i * .2, -.02, 0], [.17, .16, .2]));
+      P('cone4', coque, [.45, -.05, 0], [.14, .2, .1], {}, axe); P('boule', fc, [-.48, -.02, 0], [.09, .09, .09], lueur(fc)); break;
+    case 'se': // sentinelle des Veilleurs : cristal entouré d'anneaux
+      g.add(piece('octa', '#b98cff', [0, 0, 0], [2, 2.6, 2], lueur('#6a3cc8')));
+      P('tore', '#d9c4ff', [0, 0, 0], [1.1, 1.1, 1.1], lueur('#8a5ae0'), [Math.PI / 2, 0, 0]); P('tore', '#d9c4ff', [0, 0, 0], [.9, .9, .9], lueur('#8a5ae0'), [0, .6, 0]); break;
+  }
+  return g;
+}
+// une flotte = une petite formation : le plus gros vaisseau devant, les autres en V
+function flotteModele(f) {
+  const g = new THREE.Group(), liste = [], ECH = { pv: .55, cr: .42, se: .3, ch: .24, tr: .4 };
+  [['pv', 1], ['cr', 2], ['tr', 2], ['se', 3], ['ch', 3]].forEach(([k, max]) => { for (let i = 0; i < Math.min(max, f.nav[k] || 0); i++) liste.push(k); });
+  liste.forEach((k, i) => { const v = vaisseau(k, FAC[f.camp].c), rang = Math.ceil(i / 2); v.scale.setScalar(ECH[k]); v.position.set(-rang * .34, (i % 3) * .04, i ? (i % 2 ? 1 : -1) * rang * .28 : 0); g.add(v); });
+  return g;
+}
+function modeleOrb(t, fc) {
+  const g = new THREE.Group(), P = (...a) => g.add(piece(...a));
+  switch (t) {
+    case 'station': { // tore de Stanford : l'anneau habité tourne autour du moyeu
+      const roue = new THREE.Group(); roue.userData.tourne = true;
+      roue.add(piece('anneau', '#e3e8f3', [0, 0, 0], [1, 1, 1], {}, [Math.PI / 2, 0, 0]));
+      for (let i = 0; i < 16; i++) { const a = TAU * i / 16; roue.add(piece('boite', '#ffe2a0', [Math.cos(a), .13, Math.sin(a)], [.2, .05, .1], lueur('#ffcf6b'), [0, -a - Math.PI / 2, 0])); }
+      for (let i = 0; i < 4; i++) roue.add(piece('cyl', '#9aa4c4', [0, 0, 0], [.06, .9, .06], {}, [0, i * Math.PI / 2, -Math.PI / 2]));
+      g.add(roue);
+      P('cyl', '#c9d0e0', [0, -.35, 0], [.32, .7, .32]); P('cyl', '#8a93b3', [0, .35, 0], [.08, .5, .08]); P('cone', fc, [0, .85, 0], [.12, .2, .12]);
+      P('boite', '#2a4596', [0, -.5, 0], [2.8, .03, .5], { metalness: .4, roughness: .2 }); break;
+    }
+    case 'chantier': { P('boite', '#8a93b3', [0, -.6, 0], [1.8, 1.2, .9], { wireframe: true }); const v = vaisseau('cr', fc); v.scale.setScalar(1.3); v.position.y = -.1; g.add(v); break; } // un croiseur en construction
+    case 'ecope': P('cone', '#c9ccd6', [0, -.6, 0], [.7, 1.4, .7]); break;
+    case 'satdef': P('cyl', '#9aa4c4', [0, -.4, 0], [.5, .6, .5]); P('disque', '#dfe5f2', [0, .25, 0], [1.4, 1, 1.4], { metalness: .6 }, [.5, 0, 0]); P('boite', '#2a4596', [0, -.15, 0], [2, .04, .35]); break;
+    case 'bouclier': P('tore', '#7fe3ff', [0, 0, 0], [2.2, 2.2, 2.2], lueur('#2fb6d6'), [Math.PI / 2, 0, 0]); P('boule', '#dff8ff', [0, 0, 0], [.6, .6, .6], lueur('#7fe3ff')); break;
+    case 'arche': { const v = vaisseau('pv', fc); v.scale.setScalar(2.2); g.add(v); P('tore', '#e3e8f3', [-.4, 0, 0], [1.4, 1.4, 1.4], {}, [0, Math.PI / 2, 0]); break; }
+    case 'miroir': P('disque', '#f2f6ff', [0, 0, 0], [2.2, 1, 2.2], { metalness: .9, roughness: .1 }, [0, 0, Math.PI / 2]); break;
+    case 'parasol': P('disque', '#d9b25a', [0, 0, 0], [3.4, 1, 3.4], { metalness: .6, roughness: .3 }, [0, 0, Math.PI / 2]); break;
+  }
+  P('boule', fc, [0, .6, 0], [.35, .35, .35], lueur(fc));
+  return g;
+}
+const globe = { id: null, base: null, dyn: null, orbite: null, roues: [], naissants: [], poussiere: null, jet: [], jetDyn: [], sale: true, v: [0, 0], survol: -1 };
+function construireGlobe() {
+  const c = C[E.sel], st = s(c.id), cells = goldberg(st.f).cells, aff = globe.id === c.id ? globe.aff : null;
+  if (globe.dyn) { planete.remove(globe.dyn); globe.jetDyn.forEach(g => g.dispose()); globe.dyn = null; }
+  planete.clear(); globe.jet.forEach(g => g.dispose()); globe.jet = [];
+  const p = prismes(cells, k => hauteurT(c, k)); globe.jet.push(p.geo);
+  globe.base = new THREE.Mesh(p.geo, matSol);
+  planete.add(globe.base, new THREE.Mesh(G.noyau, mat('#151829')));
+  const halo = HALO[c.id] || (c.id === 'mars' && st.terra > 30 && '#9fd0ff');
+  if (halo) planete.add(new THREE.Mesh(G.halo, matHalo(halo)));
+  if (c.anneaux) { const a = new THREE.Group(); a.rotation.x = .35; anneauxSaturne(a, globe.jet); planete.add(a); }
+  Object.assign(globe, { id: c.id, cells, p, aff, sig: st.tuiles?.map(t => t.t).join(), R: cells.map(cl => cl.coins[0].distanceTo(cl.n)), sale: true, survol: -1 });
+}
+function repere(k, ox = 0, oz = 0, sc = 1) {
+  const cell = globe.cells[k], q = new THREE.Quaternion().setFromUnitVectors(Y, cell.n), R = globe.R[k] * .95;
+  return new THREE.Matrix4().compose(cell.n.clone().multiplyScalar(hauteurT(C[globe.id], k)), q, new V3(R, R, R)).multiply(new THREE.Matrix4().makeTranslation(ox, 0, oz)).multiply(new THREE.Matrix4().makeScale(sc, sc, sc));
+}
+// décor, bâtiments, frontières et orbite : refaits quand la partie change
+function reconstruire() {
+  if (globe.dyn) { planete.remove(globe.dyn); globe.jetDyn.forEach(g => g.dispose()); }
+  globe.jetDyn = [];
+  const c = C[globe.id], st = s(c.id), dyn = new THREE.Group(); globe.dyn = dyn; planete.add(dyn);
+  globe.coul = couleursCorps(c);
+  globe.naissants = [];
+  if (st.tuiles) {
+    const deco = { arbre: [], pic: [], plat: [], lave: [], nuage: [] }, now = performance.now();
+    st.tuiles.forEach((t, k) => {
+      if (t.b) {
+        const m = modele(t.b, FAC[t.o]?.c || '#cccccc'), t0 = naissances.get(c.id + ':' + k); m.applyMatrix4(repere(k)); dyn.add(m);
+        if (t0 && now - t0 < 1200) globe.naissants.push({ m, s: m.scale.clone(), t0 });
+        return;
+      }
+      const tg = tags(t.t);
+      if (t.t === 'foret') [[-.35, -.2], [.3, -.25], [0, .35]].forEach(([x, z]) => deco.arbre.push([repere(k, x, z, .8 + t.u * .4)]));
+      if (/^mont/.test(t.t)) deco.pic.push([repere(k, 0, 0, .9 + t.u * .3), new THREE.Color(TER[t.t][1]).multiplyScalar(1.15)]);
+      if (tg.includes('crat')) deco.plat.push([repere(k, 0, 0, .9)]);
+      if (t.t === 'lave' || t.t === 'faille') deco.lave.push([repere(k, (t.u - .5) * .4, 0, .7)]);
+      if (t.t === 'nuage' && t.u < .55) [[-.2, 0], [.22, .15]].forEach(([x, z], i) => deco.nuage.push([repere(k, x, z, .55 + ((t.u * 7 + i) % 1) * .3).multiply(new THREE.Matrix4().makeTranslation(0, .25, 0))]));
+    });
+    const inst = (geo, col, liste, o) => { if (!liste.length) return; const m = new THREE.InstancedMesh(geo, mat(col, o), liste.length); liste.forEach(([mx, cc], i) => { m.setMatrixAt(i, mx); if (cc) m.setColorAt(i, cc); }); dyn.add(m); };
+    inst(G.arbre, '#2c7a37', deco.arbre); inst(G.pic, '#ffffff', deco.pic); inst(G.plat, '#3a3c42', deco.plat);
+    inst(G.plat, '#ff8a3a', deco.lave, lueur('#ff5a1a')); inst(G.boule, '#fff3d6', deco.nuage, { roughness: 1 });
+    // frontières : un liseré de la couleur de la faction le long des arêtes du territoire
+    const fp = [], fcol = [];
+    st.tuiles.forEach((t, k) => {
+      if (!t.o) return;
+      const cell = globe.cells[k], top = globe.p.tops[k], ct = globe.p.cts[k], col = new THREE.Color(FAC[t.o].c), m = top.length;
+      for (let i = 0; i < m; i++) {
+        if (st.tuiles[cell.face[i]].o === t.o) continue;
+        const p1 = top[i].clone().multiplyScalar(1.003), p2 = top[(i + 1) % m].clone().multiplyScalar(1.003), q1 = p1.clone().lerp(ct, .24), q2 = p2.clone().lerp(ct, .24);
+        [p1, p2, q2, p1, q2, q1].forEach(p => { fp.push(p.x, p.y, p.z); fcol.push(col.r, col.g, col.b); });
+      }
+    });
+    if (fp.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(fp, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(fcol, 3)); globe.jetDyn.push(g); dyn.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }))); }
+  }
+  // structures en orbite, qui tournent autour de la planète
+  const orb = new THREE.Group(); orb.rotation.x = .3; dyn.add(orb); globe.orbite = orb;
+  const liste = st.orb.filter(o => o.t !== 'anneau');
+  globe.roues = [];
+  liste.forEach((o, i) => { const m = modeleOrb(o.t, FAC[o.o].c), an = TAU * i / liste.length; m.position.set(Math.cos(an) * 1.6, 0, Math.sin(an) * 1.6); m.scale.setScalar(o.t === 'station' ? .15 : o.t === 'chantier' || o.t === 'arche' ? .1 : .055); m.traverse(x => x.userData.tourne && globe.roues.push(x)); orb.add(m); });
+  // les flottes au port tournent elles aussi autour de la planète
+  E.flottes.filter(f => f.dock === c.id).forEach((f, i) => { const m = flotteModele(f), an = TAU * i / 3 + .5; m.scale.setScalar(.16); m.position.set(Math.cos(an) * 1.9, .06, Math.sin(an) * 1.9); m.rotation.y = Math.PI / 2 - an; orb.add(m); });
+  if (presents(c.id).some(f => nbOrb(c.id, 'bouclier', f))) dyn.add(bouclierMesh(1.25));
+  globe.poussiere = null;
+  if (c.id === 'mars' && E.effets.tempete >= E.tour) { globe.poussiere = new THREE.Mesh(G.voile, matPoussiere); dyn.add(globe.poussiere); }
+  st.orb.filter(o => o.t === 'anneau').forEach((o, i) => { const g = new THREE.TorusGeometry(1.32 + i * .08, .03, 8, 120); globe.jetDyn.push(g); const m = new THREE.Mesh(g, mat('#7be08a', lueur('#2e8a45'))); m.rotation.x = Math.PI / 2; orb.add(m); });
+  globe.sale = false;
+}
+function peindre(tt) {
+  // les couleurs de fond (terrain, territoire) glissent vers leur nouvelle valeur : prises, indépendances et terraformation se voient
+  const st = s(globe.id), blanc = new THREE.Color(1, 1, 1), or = new THREE.Color('#ffb547'), cible = E.carteBat;
+  const fond = globe.coul.map((base, k) => { const t = st.tuiles?.[k], cc = base.clone(); if (t?.o && !tags(t.t).includes('eau')) cc.lerp(new THREE.Color(FAC[t.o].c), .12); return cc; });
+  globe.aff ||= fond.map(cc => cc.clone());
+  teinter(globe.p, globe.aff.map((a, k) => {
+    a.lerp(fond[k], .06);
+    const t = st.tuiles?.[k], cc = a.clone();
+    if (cible && t && !t.b && t.o === E.j && peutConstruire(cible, t)) cc.lerp(blanc, .3 + .15 * Math.sin(tt * 4));
+    if (t && t === E.selTuile) cc.lerp(or, .6);
+    if (k === globe.survol) cc.lerp(blanc, .22);
+    return cc;
+  }));
+}
+function tourner(dx, dy) {
+  const k = .005 * (camera.position.z - 1) / 3;
+  planete.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(Y, dx * k).multiply(new THREE.Quaternion().setFromAxisAngle(new V3(1, 0, 0), dy * k)));
+}
+function dessinGlobe(tt) {
+  if (globe.id !== E.sel || globe.sale && s(E.sel).tuiles && s(E.sel).tuiles.map(t => t.t).join() !== globe.sig) construireGlobe();
+  if (globe.sale) reconstruire();
+  const now = performance.now();
+  globe.naissants.forEach(n => { const k = clamp((now - n.t0) / 900, 0, 1); n.m.scale.copy(n.s).multiplyScalar(Math.max(.001, 1 + 2.70158 * (k - 1) ** 3 + 1.70158 * (k - 1) ** 2)); });
+  matBouclierL.opacity = .3 + .15 * Math.sin(tt * 3);
+  if (globe.poussiere) globe.poussiere.rotation.y = tt * .3;
+  if (!drag && Math.hypot(...globe.v) > .05) { tourner(...globe.v); globe.v = globe.v.map(x => x * .92); } // élan après le glisser
+  if (!reduit) { globe.orbite.rotation.y += .003; globe.roues.forEach(r => { r.rotation.y += .012; }); }
+  peindre(tt);
+  rendu.render(scene, camera);
+}
+// ---------- Animations ----------
+const anims = [];
+function animer(dur, maj, fin) { if (reduit) { maj(1); fin?.(); return; } anims.push({ t0: performance.now(), dur, maj, fin }); }
+function majAnims() { const now = performance.now(); for (let i = anims.length - 1; i >= 0; i--) { const a = anims[i], k = Math.min(1, (now - a.t0) / a.dur); a.maj(k); if (k >= 1) { anims.splice(i, 1); a.fin?.(); } } }
+const matFx = col => new THREE.MeshBasicMaterial({ color: col, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+function fxExplosion(parent, p, col = '#ffb04a', r = .6, dur = 1000) {
+  const m = new THREE.Mesh(G.boule, matFx(col)), n = 26, g = new THREE.BufferGeometry(), dirs = Array.from({ length: n }, () => new V3(Math.random() - .5, Math.random() - .5, Math.random() - .5).normalize().multiplyScalar(.5 + Math.random()));
+  g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(n * 3), 3));
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({ color: col, size: r * .25, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  m.position.copy(p); parent.add(m, pts);
+  animer(dur, k => {
+    m.scale.setScalar(r * (.2 + Math.sqrt(k) * 1.8)); m.material.opacity = 1 - k;
+    const a = g.attributes.position; dirs.forEach((d, i) => a.setXYZ(i, p.x + d.x * k * r * 2.5, p.y + d.y * k * r * 2.5, p.z + d.z * k * r * 2.5)); a.needsUpdate = true; pts.material.opacity = 1 - k;
+  }, () => { parent.remove(m, pts); m.material.dispose(); g.dispose(); pts.material.dispose(); });
+}
+function fxAnneau(parent, p, col, r = 1.5, dur = 1200) {
+  const m = new THREE.Mesh(new THREE.RingGeometry(.8, 1, 48), matFx(col)); m.material.side = THREE.DoubleSide; m.rotation.x = -Math.PI / 2; m.position.copy(p); parent.add(m);
+  animer(dur, k => { m.scale.setScalar(.2 + k * r); m.material.opacity = 1 - k; }, () => { parent.remove(m); m.geometry.dispose(); m.material.dispose(); });
+}
+function fxTexte(p, texte, col) {
+  const el = document.createElement('span'); el.className = 'etiq gain'; el.style.color = col; el.textContent = texte; $('etiquettes').append(el);
+  animer(2000, k => { etiquette(el, p.clone().setY(p.y + .6 + k * 1.4)); el.style.opacity = 1 - k * k; }, () => el.remove());
+}
+function fxEcran(cls) { const f = $('flash'); f.className = ''; void f.offsetWidth; f.className = cls; }
+function banniere(titre, texte, k = '') { const el = document.createElement('div'); el.className = 'banniere ' + k; el.innerHTML = `<b>${titre}</b>${texte ? `<span>${texte}</span>` : ''}`; $('bannieres').append(el); setTimeout(() => el.remove(), 4300); }
+const toast = t => banniere(t, '', 'toast');
+const posCorpsSys = id => sysO.corps[id] ? sysO.corps[id].g.position.clone() : hx(...pos(C[id]), .5);
+function fxConvoi(v, type) {
+  if (!sysO.pret) return;
+  const p = hx(...v.a, .35).lerp(hx(...v.b, .35), convoiK(v));
+  if (type === 'detruit') fxExplosion(sys, p, '#ff7a3a', .7);
+  else if (type === 'escorte') fxAnneau(sys, p, '#7be08a', 1.6);
+  else { const t = posCorpsSys('terre'); fxAnneau(sys, t.clone().setY(.1), '#ffd166', 2.2); fxTexte(t, `+${v.me} métaux`, '#ffd166'); }
+}
+function fxLaser(id, f, col) {
+  if (!sysO.pret) return;
+  const a = posCorpsSys(id), b = (sysO.posF[f.id] || hx(...f.pos, .6)).clone(), g = new THREE.BufferGeometry().setFromPoints([a, b]), l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: col, transparent: true, blending: THREE.AdditiveBlending }));
+  sys.add(l);
+  animer(1400, k => { l.material.opacity = (1 - k) * (Math.sin(k * 60) > 0 ? 1 : .15); }, () => { sys.remove(l); g.dispose(); l.material.dispose(); fxExplosion(sys, b, col, .3, 500); });
+}
+function fxEruption() {
+  fxEcran('eruption'); sysO.eruption = performance.now();
+  if (!sysO.pret) return;
+  const m = new THREE.Mesh(G.boule, matFx('#ffb547')); sys.add(m);
+  animer(3500, k => { m.scale.setScalar(3 + k * 90); m.material.opacity = (1 - k) * .4; }, () => { sys.remove(m); m.material.dispose(); });
+}
+function fxComete(c, t, impact) {
+  if (sysO.pret) {
+    const cible = posCorpsSys(c.id), dep = cible.clone().setLength(cible.length() + 30).add(new V3(0, 10, 0));
+    const tete = new THREE.Mesh(G.boule, new THREE.MeshBasicMaterial({ color: '#eaf6ff' })), qg = new THREE.BufferGeometry().setFromPoints([dep, dep]);
+    const queue = new THREE.Line(qg, new THREE.LineBasicMaterial({ color: '#9fd8ff', transparent: true, blending: THREE.AdditiveBlending }));
+    tete.scale.setScalar(.35); sys.add(tete, queue);
+    animer(1800, k => {
+      const p = dep.clone().lerp(cible, k * k), qa = qg.attributes.position, qb = p.clone().add(dep.clone().sub(cible).setLength(3.5));
+      tete.position.copy(p); qa.setXYZ(0, p.x, p.y, p.z); qa.setXYZ(1, qb.x, qb.y, qb.z); qa.needsUpdate = true;
+    }, () => { sys.remove(tete, queue); qg.dispose(); if (impact) { fxExplosion(sys, cible, '#ffd08a', 1.3, 1300); if (E.vue === 'systeme') fxEcran('impact'); } else fxAnneau(sys, cible, '#7fe3ff', 2.5); });
+  }
+  if (E.vue !== 'planete' || globe.id !== c.id || !globe.cells) return;
+  const n = globe.cells[t.i].n, arr = n.clone().multiplyScalar(impact ? 1.04 : 1.35), dep = n.clone().multiplyScalar(5).add(new V3(2, 2, 0));
+  const tete = new THREE.Mesh(G.boule, new THREE.MeshBasicMaterial({ color: '#eaf6ff' })); tete.scale.setScalar(.07); planete.add(tete);
+  animer(1700, k => tete.position.lerpVectors(dep, arr, k * k), () => { planete.remove(tete); fxExplosion(planete, arr, impact ? '#ffd08a' : '#7fe3ff', impact ? .3 : .2, 1200); if (impact) fxEcran('impact'); });
+}
+// jets de particules (geysers) le long d'une direction
+function fxJets(parent, origines, col, dur = 3500, haut = 1.4, taille = .06) {
+  const n = origines.length * 24, g = new THREE.BufferGeometry(), sp = Array.from({ length: n }, (_, i) => ({ o: origines[i % origines.length], ec: new V3(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(.35), v: .6 + Math.random() * .8, d: Math.random() }));
+  g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(n * 3), 3));
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({ color: col, size: taille, transparent: true, depthWrite: false })); parent.add(pts);
+  animer(dur, k => {
+    const a = g.attributes.position;
+    sp.forEach((x, i) => { const r = (k * 3 * x.v + x.d) % 1, p = x.o.p.clone().addScaledVector(x.o.dir.clone().add(x.ec).normalize(), r * haut); a.setXYZ(i, p.x, p.y, p.z); });
+    a.needsUpdate = true; pts.material.opacity = Math.min(1, (1 - k) * 2);
+  }, () => { parent.remove(pts); g.dispose(); pts.material.dispose(); });
+}
+function fxGeyser() {
+  const o = sysO.corps.encelade;
+  if (o) fxJets(o.g, [{ p: new V3(0, -o.R, 0), dir: new V3(0, -1, 0) }], '#dff4ff', 3500, 1.2, .05);
+  if (E.vue === 'planete' && globe.id === 'encelade' && globe.cells) {
+    const sources = s('encelade').tuiles.filter(t => t.t === 'tigre').slice(0, 6).map(t => ({ p: globe.cells[t.i].n.clone().multiplyScalar(1.02), dir: globe.cells[t.i].n.clone() }));
+    if (sources.length) fxJets(planete, sources, '#e8f8ff', 4000, .9, .03);
+  }
+}
+function fxAurores() {
+  const o = sysO.corps.jupiter; if (!o) return;
+  [1, -1].forEach(sg => {
+    const m = new THREE.Mesh(new THREE.TorusGeometry(o.R * .55, o.R * .07, 8, 48), matFx(sg > 0 ? '#7bffb0' : '#c08cff'));
+    m.rotation.x = Math.PI / 2; m.position.y = sg * o.R * .8; o.g.children[0].add(m);
+    animer(4500, k => { m.material.opacity = Math.sin(k * Math.PI) * (.6 + .3 * Math.sin(k * 40)); m.scale.setScalar(1 + .15 * Math.sin(k * 12)); }, () => { m.parent.remove(m); m.geometry.dispose(); m.material.dispose(); });
+  });
+}
+function fxDebarquement(id, tuiles, fac) {
+  fxEcran('alerte');
+  if (sysO.pret) { const p = posCorpsSys(id); for (let i = 0; i < 6; i++) setTimeout(() => fxExplosion(sys, p.clone().add(new V3((Math.random() - .5) * .9, .4, (Math.random() - .5) * .9)), FAC[fac].c, .25, 600), i * 180); }
+  if (E.vue !== 'planete' || globe.id !== id || !globe.cells) return;
+  tuiles.slice(0, 18).forEach((k, i) => {
+    const n = globe.cells[k].n, arr = n.clone().multiplyScalar(1.03), dep = n.clone().multiplyScalar(2.3).add(new V3(0, .5, 0)), m = vaisseau('tr', FAC[fac].c), retard = i * 110;
+    m.scale.setScalar(.06); m.quaternion.setFromUnitVectors(new V3(1, 0, 0), arr.clone().sub(dep).normalize()); m.position.copy(dep); planete.add(m);
+    animer(1500 + retard, kk => { const e = clamp((kk * (1500 + retard) - retard) / 1500, 0, 1); m.position.lerpVectors(dep, arr, e * e); }, () => { planete.remove(m); fxExplosion(planete, arr, '#ffe6a0', .05, 500); });
+  });
+}
+function fxFete(id) {
+  if (!sysO.pret) return;
+  const p = posCorpsSys(id);
+  ['#ffd166', '#7be08a', '#ff8ac8', '#7fe3ff', '#ffb547'].forEach((col, i) => setTimeout(() => fxExplosion(sys, p.clone().add(new V3((Math.random() - .5) * 1.4, .6 + Math.random() * .6, (Math.random() - .5) * 1.4)), col, .3, 900), i * 250));
+}
+function fxLancementArche() {
+  if (!sysO.pret) return;
+  const c = CORPS.find(x => nbOrb(x.id, 'arche', E.j)) || C.terre, A = posCorpsSys(c.id), B = A.clone().setLength(80).setY(8), m = vaisseau('pv', FAC[E.j].c);
+  const tr = new THREE.Line(new THREE.BufferGeometry().setFromPoints([A, A]), new THREE.LineBasicMaterial({ color: FAC[E.j].c, transparent: true, blending: THREE.AdditiveBlending }));
+  m.scale.setScalar(1.2); m.quaternion.setFromUnitVectors(new V3(1, 0, 0), B.clone().sub(A).normalize()); sys.add(m, tr);
+  animer(3000, k => { const p = A.clone().lerp(B, k * k), pa = tr.geometry.attributes.position; m.position.copy(p); pa.setXYZ(1, p.x, p.y, p.z); pa.needsUpdate = true; }, () => { sys.remove(m, tr); tr.geometry.dispose(); });
+  banniere('Départ de l\'arche', 'Cap sur Alpha du Centaure.', 'bon');
+}
+// écran de fin : feu d'artifice pour une victoire, cendres pour une défaite
+function montrerFin(fin) {
+  const nbCol = CORPS.filter(c => present(c.id)).length, pop = CORPS.reduce((n, c) => n + (s(c.id).pop[E.j] || 0), 0);
+  $('fTitre').textContent = (fin.v ? 'Victoire : ' : 'Défaite : ') + fin.titre; $('fTexte').textContent = fin.texte;
+  $('fStats').innerHTML = `<dt>Durée</dt><dd>${E.tour} mois (${dateTxt()})</dd><dt>Corps colonisés</dt><dd>${nbCol}</dd><dt>Population</dt><dd>${fmt(pop)} M</dd><dt>Sphère de Dyson</dt><dd>${E.dyson} / 20</dd>`;
+  $('fActions').innerHTML = (fin.v ? '<button class="btn" data-a="fin:continuer">Continuer à jouer</button>' : '') + '<button class="btn or" data-a="fin:nouvelle">Nouvelle partie</button>';
+  const m = $('fin'), cv = $('feu'), x = cv.getContext('2d'), parts = [];
+  m.classList.toggle('defaite', !fin.v); m.hidden = false;
+  cv.width = cv.clientWidth; cv.height = cv.clientHeight;
+  let suivant = 0;
+  const pas = t => {
+    if (m.hidden) return;
+    x.fillStyle = 'rgba(3,5,13,.22)'; x.fillRect(0, 0, cv.width, cv.height);
+    if (t > suivant) {
+      suivant = t + (fin.v ? 450 : 60);
+      if (fin.v) { const cx = Math.random() * cv.width, cy = Math.random() * cv.height * .6, col = pick(['#ffd166', '#7be08a', '#ff8ac8', '#7fe3ff', '#ffb547', '#b98cff']); for (let i = 0; i < 70; i++) { const a = Math.random() * TAU, v = 1 + Math.random() * 4; parts.push({ x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vie: 1, col }); } }
+      else parts.push({ x: Math.random() * cv.width, y: -10, vx: (Math.random() - .5) * .4, vy: .6 + Math.random(), vie: 1, col: pick(['#ff6b6b', '#7f88b8', '#ffb547']) });
+    }
+    for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.x += p.vx; p.y += p.vy; p.vy += fin.v ? .05 : 0; p.vie -= fin.v ? .012 : .003; if (p.vie <= 0 || p.y > cv.height + 10) { parts.splice(i, 1); continue; } x.globalAlpha = p.vie; x.fillStyle = p.col; x.fillRect(p.x, p.y, fin.v ? 2.5 : 2, fin.v ? 2.5 : 3); }
+    x.globalAlpha = 1;
+    if (!reduit) requestAnimationFrame(pas);
+  };
+  requestAnimationFrame(pas);
+}
+
+function boucle(t) {
+  const tt = reduit ? 0 : t / 1000;
+  majAnims();
+  if (E.j && W) E.vue === 'systeme' ? dessinSysteme(tt) : dessinGlobe(tt);
+  requestAnimationFrame(boucle);
+}
+
+// ---------- Sélection à la souris / au doigt ----------
+const ray = new THREE.Raycaster(), plan = new THREE.Plane(new V3(0, 1, 0), 0);
+const viser = (x, y, cam) => ray.setFromCamera(new THREE.Vector2(x / W * 2 - 1, 1 - y / H * 2), cam);
+function hexSous() { const p = new V3(); if (!ray.ray.intersectPlane(plan, p)) return null; const h = hexRound(SQ3 / 3 * p.x - p.z / 3, 2 / 3 * p.z); return dist(h, [0, 0]) <= RMAX ? h : null; }
+const corpsVise = () => ray.intersectObjects(sysO.piqueCorps)[0]?.object.userData.c;
+function tuileSous(x, y) { if (!globe.base) return -1; viser(x, y, camera); const h = ray.intersectObject(globe.base)[0]; return h ? globe.p.tri[h.faceIndex] : -1; }
+function clic(x, y) {
+  if (E.vue === 'systeme') {
+    viser(x, y, camSys);
+    const fl = ray.intersectObjects(sysO.piqueFlottes)[0]?.object.userData.f;
+    if (fl) { E.selFlotte = fl.camp === E.j && fl !== E.selFlotte ? fl : null; if (fl.camp !== E.j) journal(`${fl.nom} (${FAC[fl.camp].nom}) : puissance ${fmt(puissance(fl))}.`, fl.camp === 'vei' ? 'alien' : ''); E.onglet = 'flottes'; rendrePanneau(); rendreHUD(); return; }
+    const L = ray.intersectObjects(sysO.piqueL)[0]?.object.userData.L, c = corpsVise(), h = hexSous(), cible = L ? posL(L) : c ? pos(c) : h;
+    if (E.selFlotte && cible && atteignables().some(p => p[0] === cible[0] && p[1] === cible[1])) { bouger(E.selFlotte, cible); return; }
+    if (L) { E.selL = L.id; E.onglet = 'corps'; E.selFlotte = null; rendrePanneau(); rendreHUD(); return; }
+    if (c) { E.selL = null; if (E.sel === c.id && !E.selFlotte) { allerSurface(); return; } E.sel = c.id; E.onglet = 'corps'; E.selFlotte = null; }
+    else if (h && dist(h, [0, 0]) === 0) { E.onglet = 'soleil'; }
+    else E.selFlotte = null;
+    rendrePanneau(); rendreHUD();
+  } else {
+    const t = s(E.sel).tuiles?.[tuileSous(x, y)];
+    if (!t) { E.selTuile = null; rendrePanneau(); return; }
+    if (E.carteBat) {
+      const b = E.carteBat, k = remiseBat(b);
+      if (t.o !== E.j) journal('Hors de votre territoire : construisez au bord pour l\'agrandir.', 'mal');
+      else if (t.b) journal('Case déjà occupée.', 'mal');
+      else if (!peutConstruire(b, t)) journal(`${BAT[b].n} impossible sur ${TER[t.t][0].toLowerCase()}.`, 'mal');
+      else if (!peutPayer(BAT[b].cout, k)) journal('Pas assez de crédits ou de métaux.', 'mal');
+      else { payer(BAT[b].cout, k); t.b = b; globe.sale = true; naissance(E.sel, t.i); fxExplosion(planete, globe.cells[t.i].n.clone().multiplyScalar(1.03), '#e8d8b8', .06, 700); revendiquer(s(E.sel), t, 1, E.j); journal(`${C[E.sel].nom} : ${BAT[b].n.toLowerCase()} construit. Le territoire s'agrandit.`, 'bon'); if (!peutPayer(BAT[b].cout, k)) E.carteBat = null; }
+      rendreHUD();
+    }
+    E.selTuile = t; E.onglet = 'corps'; rendrePanneau();
+  }
+}
+function bouger(f, h) {
+  f.mvt -= dist(f.pos, h); f.pos = h;
+  const corps = CORPS.find(c => !c.parent && dist(pos(c), h) === 0); f.dock = corps ? corps.id : null;
+  const ennemi = E.flottes.find(g => g !== f && dist(g.pos, h) === 0 && hostile(f.camp, g.camp));
+  if (!f.mvt) E.selFlotte = null;
+  // fronde : frôler une géante donne de l'élan pour le mois suivant
+  const geante = [C.jupiter, C.saturne].find(g => dist(pos(g), h) <= 1);
+  if (geante && f.camp === E.j && !f.elan) { f.elan = true; journal(`${f.nom} frôle ${geante.nom} : élan gravitationnel, +3 cases le mois prochain.`, 'bon'); if (sysO.pret) { fxAnneau(sys, posCorpsSys(geante.id).setY(.2), '#ffb547', 3.5, 1600); setTimeout(() => fxAnneau(sys, posCorpsSys(geante.id).setY(.2), '#ffb547', 2.5, 1400), 300); } }
+  if (ennemi) { E.combats.push({ a: f, b: ennemi }); suiteCombats(); }
+  rendrePanneau(); rendreHUD();
+}
+function allerSurface() { E.vue = 'planete'; E.selTuile = null; E.carteBat = null; recentrer(); rendreHUD(); rendrePanneau(); }
+
+const ptrs = new Map(); let drag = null;
+const rel = e => { const r = toile.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+const zoomer = k => { if (E.vue === 'systeme') vueSys.dist = clamp(vueSys.dist / k, 5, 150); else camera.position.z = clamp(camera.position.z / k, 1.25, 12); };
+function glisserSys(dx, dy) {
+  const { az, tilt } = vueSys, k = vueSys.dist * 2 * Math.tan(20 * Math.PI / 180) / H, k2 = k / Math.sin(tilt), c = vueSys.cible;
+  c.x += -Math.cos(az) * dx * k - Math.sin(az) * dy * k2; c.z += Math.sin(az) * dx * k - Math.cos(az) * dy * k2;
+  if (c.length() > 60) c.setLength(60);
+}
+toile.addEventListener('pointerdown', e => { toile.setPointerCapture(e.pointerId); const p = rel(e); ptrs.set(e.pointerId, p); const v = [...ptrs.values()]; drag = { p, moved: 0, d: v.length === 2 ? Math.hypot(v[0][0] - v[1][0], v[0][1] - v[1][1]) : 0, sd: vueSys.dist, cz: camera.position.z }; globe.v = [0, 0]; });
+toile.addEventListener('pointermove', e => {
+  const p = rel(e);
+  if (!ptrs.has(e.pointerId)) { survoler(p, e); return; }
+  ptrs.set(e.pointerId, p); const v = [...ptrs.values()];
+  if (v.length === 2 && drag.d) { const k = Math.hypot(v[0][0] - v[1][0], v[0][1] - v[1][1]) / drag.d; if (E.vue === 'systeme') vueSys.dist = clamp(drag.sd / k, 5, 150); else camera.position.z = clamp(drag.cz / k, 1.25, 12); drag.moved = 99; return; }
+  const dx = p[0] - drag.p[0], dy = p[1] - drag.p[1]; drag.moved += Math.abs(dx) + Math.abs(dy); drag.p = p;
+  if (drag.moved <= 6) return;
+  if (E.vue === 'systeme') glisserSys(dx, dy); else { tourner(dx, dy); globe.v = [dx, dy]; }
+});
+toile.addEventListener('pointerup', e => { if (drag && drag.moved <= 6 && ptrs.size === 1) clic(...rel(e)); ptrs.delete(e.pointerId); if (!ptrs.size) drag = null; });
+toile.addEventListener('pointercancel', e => { ptrs.delete(e.pointerId); drag = null; });
+toile.addEventListener('pointerleave', () => { $('bulle').hidden = true; sysO.survol = null; globe.survol = -1; });
+toile.addEventListener('wheel', e => { e.preventDefault(); zoomer(Math.exp(-e.deltaY * .0015)); }, { passive: false });
+function survoler(p, e) {
+  const b = $('bulle'); if (!E.j) return;
+  if (E.vue === 'systeme') {
+    if (!sysO.pret) return;
+    viser(...p, camSys); sysO.survol = hexSous();
+    const c = corpsVise(), h = sysO.survol;
+    if (c) { b.hidden = false; b.innerHTML = `<b>${c.nom}</b><br>${kelvin(temp(c))} · ${presents(c.id).map(f => FAC[f].nom).join(', ') || 'inoccupé'}`; }
+    else if (h && dist(h, [0, 0]) === 0) { b.hidden = false; b.innerHTML = `<b>Soleil</b><br>Sphère de Dyson : ${E.dyson} / 20 segments`; }
+    else b.hidden = true;
+  } else {
+    globe.survol = tuileSous(...p); const t = s(E.sel).tuiles?.[globe.survol];
+    if (t) { b.hidden = false; b.innerHTML = `<b>${TER[t.t][0]}</b><br>${t.b ? BAT[t.b].n + ' · ' : ''}${t.o ? FAC[t.o].nom : 'libre'}`; } else b.hidden = true;
+  }
+  b.style.left = (e.clientX + 14) + 'px'; b.style.top = (e.clientY + 14) + 'px';
+}
+
+// ---------- Interface ----------
+function rendreHUD() {
+  if (!E.j) return;
+  const b = bilan(), an = 2081 + Math.floor(E.tour / 12);
+  $('date').innerHTML = `${MOIS[E.tour % 12]} ${an}<small>TOUR ${E.tour + 1}</small>`;
+  const val = { cr: [E.res.cr, b.cr], me: [E.res.me, b.me], he: [E.res.he, b.he], sc: [E.prog, b.sc], en: [null, b.en], pop: [b.pop, null] };
+  $('ressources').innerHTML = RES.map(([k, n, col]) => {
+    const [v, d] = val[k];
+    const txt = k === 'en' ? `<span class="${d < 0 ? 'neg' : 'pos'}">${signe(d)}</span><small>/mois</small>` : k === 'pop' ? (v >= 1000 ? fmt(v / 1000, 2) + ' Md' : fmt(v) + ' M') : `${fmt(v)} <small class="${d < 0 ? 'neg' : ''}">${signe(d)}</small>`;
+    return `<div class="pill" title="${n}"><i style="background:${col}"></i>${txt}</div>`;
+  }).join('');
+  const ch = 1 - capture();
+  $('jaugeChaleur').style.width = ch * 100 + '%'; $('txtChaleur').textContent = fmt(ch * 100) + ' %';
+  globe.sale = sysO.sale = true; $('bulle').hidden = true; $('etiquettes').hidden = E.vue !== 'systeme';
+  $('vSys').classList.toggle('actif', E.vue === 'systeme'); $('vPla').classList.toggle('actif', E.vue === 'planete');
+  $('vPla').textContent = 'Surface : ' + C[E.sel].nom;
+  $('journal').innerHTML = E.journal.slice(0, 4).map(j => `<p class="${j.k}">${j.txt}</p>`).join('');
+  $('journal').classList.toggle('haut', E.vue === 'planete');
+  const aide = $('aide');
+  aide.hidden = false;
+  if (E.vue === 'systeme') aide.textContent = E.selFlotte ? `${E.selFlotte.nom} : ${E.selFlotte.mvt} hex de mouvement. Touchez une case en surbrillance.` : 'Touchez une planète pour la gérer, encore une fois pour sa surface. Glissez pour vous déplacer, pincez pour zoomer.';
+  else aide.textContent = E.carteBat ? `${BAT[E.carteBat].n} : touchez une case verte de votre territoire.` : C[E.sel].gaz ? 'Géante gazeuse : pas de sol. Construisez en orbite depuis l\'onglet Corps. Glissez pour la faire tourner.' : `${C[E.sel].nom} · ${kelvin(temp(C[E.sel]))} · habitabilité ${fmt(habitabilite(C[E.sel]) * 100)} % · glissez pour faire tourner`;
+  rendreChantier();
+}
+function rendreChantier() {
+  const el = $('chantier'), c = C[E.sel];
+  el.hidden = E.vue !== 'planete';
+  if (el.hidden) return;
+  if (c.gaz) { el.innerHTML = '<div class="vide">Pas de surface constructible. Écopes, stations et anneaux se construisent en orbite (onglet Corps).</div>'; return; }
+  if (!present(c.id)) { el.innerHTML = `<div class="vide">Vous n'avez pas encore de colonie sur ${c.nom}. Lancez une mission depuis l'onglet Corps.</div>`; return; }
+  const types = Object.keys(BAT).filter(b => (!BAT[b].tech || E.techs.has(BAT[b].tech)) && (!BAT[b].corps || BAT[b].corps.includes(c.id)) && s(c.id).tuiles.some(t => peutConstruire(b, t)));
+  el.innerHTML = types.map(b => { const B = BAT[b], k = remiseBat(b); return `<button class="carte-c${E.carteBat === b ? ' actif' : ''}" data-a="carte:${b}" ${peutPayer(B.cout, k) ? '' : 'disabled'} title="${B.d}"><span class="pastille" style="background:${couleurBat(b)}"></span><b>${B.n}</b><span>${fmt(B.cout.cr * k)} ₡ · ${fmt(B.cout.me * k)} mét.</span></button>`; }).join('');
+}
+const couleurBat = b => ({ habitat: '#e9edf6', solaire: '#4a6cd6', mine: '#9a7a5a', labo: '#7ac0ff', port: '#ffd166', he3: '#7ef0e0', foreuse: '#6fb8ff', raff: '#e08a3a', cite: '#f5f0e2', terra: '#96f0c8', fusion: '#6ef0ff', defense: '#8a93b3' })[b];
+
+function chipFac(f) { return `<span class="chip fac" style="background:${FAC[f].c}">${FAC[f].nom}</span>`; }
+function rendrePanneau() {
+  document.querySelectorAll('#onglets button').forEach(b => b.classList.toggle('actif', b.dataset.a === 'tab:' + E.onglet));
+  if (!E.j) return;
+  $('panneau').innerHTML = (E.onglet === 'corps' && E.selL ? panLagrange : { corps: panCorps, flottes: panFlottes, soleil: panSoleil, recherche: panRecherche, factions: panFactions, objectifs: panObjectifs, idees: panIdees }[E.onglet])();
+}
+function panCorps() {
+  const c = C[E.sel], st = s(c.id), facs = presents(c.id), moi = facs.includes(E.j), T = temp(c), hab = habitabilite(c);
+  let h = `<h2>${c.nom}</h2><p class="sous">${c.gaz ? 'Géante gazeuse' : c.parent ? 'Lune de ' + C[c.parent].nom : c.id === 'ceres' || c.id === 'pluton' ? 'Planète naine' : 'Planète tellurique'} · ${fmt(c.ua, 2)} ua du Soleil · orbite à ${(c.parent ? C[c.parent] : c).anneau} cases</p>`;
+  h += `<div class="chips">${facs.map(chipFac).join('') || '<span class="chip">Inoccupé</span>'}</div><p>${c.desc}</p>`;
+  h += `<div class="chips">${c.specs.map(x => `<span class="chip">${x}</span>`).join('')}</div>`;
+  const lunes = CORPS.filter(o => o.parent === c.id || c.parent && (o.id === c.parent || o.parent === c.parent && o !== c));
+  if (lunes.length) h += `<div class="lunes">${lunes.map(o => `<button class="btn petit" data-a="sel:${o.id}">${o.parent ? 'Lune' : 'Planète'} : ${o.nom}</button>`).join('')}</div>`;
+  h += `<h3>Climat</h3><dl class="grille"><dt>Température</dt><dd>${kelvin(T)}${Math.abs(T - c.T0) > 1 ? ` <small style="color:var(--doux)">(${signe(T - c.T0)} °C)</small>` : ''}</dd><dt>Lumière reçue</dt><dd>${fmt(lumiere(c) * 100)} % de la Terre</dd><dt>Gravité</dt><dd>${fmt(c.g, 2)} g</dd>`;
+  if ((c.parent || c.id) !== 'terre') { const d = distReelle(c, C.terre), mn = d * 8.317; h += `<dt>Distance de la Terre</dt><dd>${fmt(d * 149.6)} M km</dd><dt>Délai radio</dt><dd>${mn < 60 ? fmt(mn) + ' min' : fmt(mn / 60, 1) + ' h'}</dd>`; }
+  h += `</dl>`;
+  if (c.id === 'mars' || c.id === 'venus') h += `<h3>Terraformation · ${fmt(st.terra)} %</h3><div class="etapes">${ETAPES[c.id].map(([n, d], i) => `<div class="etape ${st.terra >= (i + 1) * 25 ? 'faite' : st.terra >= i * 25 && st.terra > 0 ? 'cours' : ''}"><b>${i + 1}. ${n}</b><small>${d}</small></div>`).join('')}</div>`;
+  if (!c.gaz) h += `<p class="sous" style="margin-top:8px">Habitabilité ${fmt(hab * 100)} %${hab <= .2 ? ' (sous dôme)' : ''}</p><div class="barre-p"><b style="width:${hab * 100}%"></b></div>`;
+  if (moi) {
+    const nb = st.tuiles?.filter(t => t.o === E.j && t.b).length || 0;
+    h += `<h3>Votre colonie</h3><dl class="grille"><dt>Population</dt><dd>${fmt(st.pop[E.j] || 0)} M / ${fmt(capacite(c, E.j))} M</dd><dt>Bâtiments</dt><dd>${nb}</dd><dt>Structures en orbite</dt><dd>${st.orb.filter(o => o.o === E.j).length}</dd></dl>`;
+    if (!c.gaz) h += `<p><button class="btn j" data-a="surface:${c.id}">Construire sur la surface</button></p>`;
+    if (c.id !== 'terre') {
+      const bs = besoins(c), m = Math.round(st.moral);
+      h += `<h3>Besoins vitaux</h3>` + (bs.libre ? '<p class="sous">L\'air et l\'eau sont libres ici : aucun besoin.</p>' : VITAUX.map(([k, n, col]) => { const r = bs.n ? Math.min(1, bs.pr[k] / bs.n) : 1; return `<div class="ligne"><div style="flex:1">${n}<small>${fmt(bs.pr[k], 1)} produits · ${fmt(bs.n, 1)} consommés</small><div class="barre-p anim"><b style="width:${r * 100}%;background:${r < 1 ? 'var(--rouge)' : col}"></b></div></div></div>`; }).join('') + (bs.ratio < 1 ? '<p class="sous" style="color:var(--rouge)">Pénurie : la population diminue. Construisez serres, recycleurs ou foreuses.</p>' : `<p class="sous">De quoi faire vivre ${fmt(bs.limite)} M d'habitants.</p>`));
+      h += `<h3>Moral</h3><div class="barre-p anim"><b style="width:${m}%;background:${m < 25 ? 'var(--rouge)' : m < 45 ? 'var(--soleil)' : 'var(--vert)'}"></b></div><p class="sous">${m} % · tend vers ${fmt(moralCible(c))} %${st.revolte ? ` · révolte depuis ${st.revolte} mois (indépendance à 4)` : ''}. L'éloignement, les pénuries, les raids et les sièges le font baisser ; défenses et stations le soutiennent.</p>`;
+      h += `<button class="btn petit" data-a="fete:${c.id}" ${E.res.cr >= 100 && !(st.fete > E.tour) ? '' : 'disabled'}>${st.fete > E.tour ? 'Festivités en cours' : 'Organiser des festivités (100 ₡, +25 de moral pendant 6 mois)'}</button>`;
+      if (!surTerre(c)) { const v = E.convois.find(x => x.camp === E.j && x.de === c.id); h += `<h3>Convois</h3><p class="sous">Stock local : ${fmt(st.stock.me)} métaux, ${fmt(st.stock.he)} hélium-3. ${v ? `Convoi en route : ${v.me} métaux, arrivée dans ${v.arrivee - E.tour} mois.` : 'Un convoi part vers la Terre dès 15 unités en stock.'} Une flotte en rôle « escorte » à 2 cases le protège des pirates.</p>`; }
+    }
+  } else {
+    const m = E.missions.find(x => x.camp === E.j && x.vers === c.id);
+    h += `<h3>Colonisation</h3>`;
+    if (m) h += `<div class="carte-p">Mission en route : arrivée dans ${m.arrivee - E.tour} mois.</div>`;
+    else {
+      const info = infoMission(c);
+      if (!info) h += `<p class="sous">Il vous faut un spatioport, une cité flottante ou une station pour lancer une mission.</p>`;
+      else {
+        h += `<div class="carte-p"><dl class="grille"><dt>Départ</dt><dd>${info.o.nom}</dd><dt>Distance</dt><dd>${info.d} hex</dd><dt>Durée</dt><dd>${info.duree} mois</dd><dt>Coût</dt><dd>${coutTxt(info.cout)}</dd></dl>`;
+        const mx = Math.max(...info.courbe, 1);
+        h += `<div class="courbe">${info.courbe.map((d, t) => `<i style="height:${8 + d / mx * 52}px;animation-delay:${t * 20}ms" class="${t === info.fen.t ? 'best' : t === 0 ? 'now' : ''}" title="Dans ${t} mois : ${d} cases"></i>`).join('')}</div>`;
+        h += `<p class="sous">${info.fen.t ? `Fenêtre de lancement : dans ${info.fen.t} mois la distance tombe à ${info.fen.d} cases.` : 'Fenêtre de lancement ouverte : c\'est le meilleur moment.'} Barres : distance au départ sur 24 mois. La trajectoire est tracée sur la carte.${info.o.g < 1 ? ` Départ depuis ${info.o.nom} : gravité faible, mission moins chère.` : ''}</p>`;
+        if (info.fronde) h += `<p class="sous" style="color:var(--soleil)">Fronde gravitationnelle autour de Jupiter : durée −40 %.</p>`;
+        const bloque = assiege(info.o.id, E.j);
+        h += `<button class="btn j" data-a="coloniser:${c.id}" ${peutPayer(info.cout) && !bloque ? '' : 'disabled'}>${bloque ? 'Départ bloqué par un siège' : 'Lancer la mission'}</button></div>`;
+      }
+    }
+    if (!c.gaz) h += `<p><button class="btn petit" data-a="surface:${c.id}">Voir la surface</button></p>`;
+  }
+  const fs = E.flottes.find(f => f.camp === E.j && f.siege && dist(f.pos, pos(c)) === 0 && present(c.id, f.siege.fac));
+  if (fs) h += `<h3>Siège</h3><div class="carte-p"><p>${fs.nom} assiège ${FAC[fs.siege.fac].le} : ${fmt(fs.siege.prog)} %.</p><div class="barre-p anim"><b style="width:${fs.siege.prog}%;background:var(--rouge)"></b></div><button class="btn rouge petit" data-a="debarquer:${c.id}" ${fs.siege.prog >= 100 && fs.nav.tr ? '' : 'disabled'}>Débarquer (${fmt((fs.nav.tr || 0) * 10)} troupes contre ${fmt(garnison(c, fs.siege.fac))})</button><p class="sous">Il faut un blocus complet et des transports de troupes (10 troupes chacun).</p></div>`;
+  const es = assiege(c.id, E.j);
+  if (es) h += `<div class="carte-p" style="border-color:var(--rouge)"><b>Sous blocus</b><p class="sous">${es.nom} ${FAC[es.camp].du} : ${fmt(es.siege.prog)} %. Production divisée par deux, aucun départ possible. Satellites de défense et bouclier ralentissent le siège.</p></div>`;
+  h += `<h3>Orbite</h3>`;
+  h += st.orb.length ? st.orb.map(o => `<div class="ligne"><div>${ORB[o.t].n}<small>${FAC[o.o].nom}</small></div><span class="chip fac" style="background:${FAC[o.o].c}">${o.o === E.j ? 'à vous' : 'rival'}</span></div>`).join('') : '<p class="sous">Rien en orbite.</p>';
+  const lanceur = moi && (c.gaz ? nbOrb(c.id, 'station', E.j) : st.tuiles.some(t => t.o === E.j && (t.b === 'port' || t.b === 'cite')));
+  if (moi) {
+    if (!lanceur) h += `<p class="sous">Construisez un spatioport pour bâtir en orbite.</p>`;
+    else Object.entries(ORB).forEach(([k, O]) => {
+      if (O.gaz && !c.gaz || O.solide && c.gaz || O.corps && !O.corps.includes(c.id)) return;
+      const verrou = O.tech && !E.techs.has(O.tech), manque = O.req && !nbOrb(c.id, O.req, E.j), deja = k === 'arche' && E.arche;
+      h += `<div class="ligne"><div>${O.n}<small>${verrou ? 'Recherche : ' + TECH[O.tech].n : manque ? 'Requiert un chantier naval ici' : O.d}</small><small>${coutTxt(O.cout)}</small></div><button class="btn petit" data-a="orb:${k}" ${verrou || manque || deja || !peutPayer(O.cout) ? 'disabled' : ''}>${deja ? 'En cours' : 'Bâtir'}</button></div>`;
+    });
+    if (nbOrb(c.id, 'chantier', E.j)) {
+      const k = remiseChantier(c);
+      h += `<h3>Chantier naval${k < 1 ? ` (−${fmt((1 - k) * 100)} %, gravité faible)` : ''}</h3>`;
+      Object.entries(NAV).filter(([n]) => n !== 'se').forEach(([n, V]) => { const verrou = V.tech && !E.techs.has(V.tech); h += `<div class="ligne"><div>${V.n}<small>Puissance ${V.pw} · ${coutTxt(V.cout, k)}</small></div><button class="btn petit" data-a="nav:${n}" ${verrou || !peutPayer(V.cout, k) ? 'disabled' : ''}>${verrou ? 'Verrouillé' : 'Construire'}</button></div>`; });
+    }
+  }
+  const t = E.selTuile;
+  if (E.vue === 'planete' && t && st.tuiles?.includes(t)) {
+    h += `<h3>Case choisie</h3><div class="carte-p"><dl class="grille"><dt>Terrain</dt><dd>${TER[t.t][0]}</dd><dt>Territoire</dt><dd>${t.o ? FAC[t.o].nom : 'libre'}</dd><dt>Bâtiment</dt><dd>${t.b ? BAT[t.b].n : '—'}</dd></dl>`;
+    if (t.b) h += `<p class="sous">${BAT[t.b].d}</p>`;
+    if (t.b && t.o === E.j) h += `<button class="btn petit rouge" data-a="demolir">Démolir (rembourse la moitié)</button>`;
+    h += `</div>`;
+  }
+  return h;
+}
+const ROLES = { patrouille: 'Patrouille', escorte: 'Escorte de convois', raid: 'Raid (pille les convois)', siege: 'Siège (blocus d\'une colonie)' };
+function panFlottes() {
+  const mes = E.flottes.filter(f => f.camp === E.j), autres = E.flottes.filter(f => f.camp !== E.j);
+  let h = `<h2>Flottes</h2><p class="sous">Portée : ${portee()} cases par mois. Solde des équipages : ${fmt(mes.reduce((n, f) => n + puissance(f), 0) * .15, 1)} ₡ par mois.</p>`;
+  h += mes.map(f => {
+    const voisines = mes.filter(g => g !== f && dist(g.pos, f.pos) === 0).length;
+    return `<div class="carte-p" ${f === E.selFlotte ? 'style="border-color:var(--soleil)"' : ''}>
+      <input class="nom-flotte" id="nom-${f.id}" data-nom="${f.id}" value="${f.nom.replace(/"/g, '&quot;')}" aria-label="Nom de la flotte" maxlength="40">
+      <p class="sous">${f.dock ? 'En orbite de ' + C[f.dock].nom : 'Espace profond'} · ${f.mvt} cases restantes${f.elan ? ' · élan gravitationnel' : ''}</p>
+      <div class="chips">${Object.entries(f.nav).filter(([, n]) => n).map(([k, n]) => `<span class="chip">${n} ${NAV[k].n.toLowerCase()}${n > 1 ? 's' : ''}</span>`).join('')}<span class="chip">Puissance ${fmt(puissance(f))}</span></div>
+      <label class="role" for="role-${f.id}">Rôle <select id="role-${f.id}" data-role="${f.id}">${Object.entries(ROLES).map(([k, n]) => `<option value="${k}" ${f.role === k ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+      ${f.siege ? `<p class="sous">Siège de ${FAC[f.siege.fac].le} : ${fmt(f.siege.prog)} %</p><div class="barre-p anim"><b style="width:${f.siege.prog}%;background:var(--rouge)"></b></div>` : ''}
+      <div class="actions" style="justify-content:flex-start;margin-top:8px"><button class="btn petit ${f === E.selFlotte ? 'or' : 'j'}" data-a="flotte:${f.id}">${f === E.selFlotte ? 'Choisie' : 'Déplacer'}</button><button class="btn petit" data-a="scinder:${f.id}" ${nbNav(f) > 1 ? '' : 'disabled'}>Scinder</button><button class="btn petit" data-a="fusionner:${f.id}" ${voisines ? '' : 'disabled'}>Fusionner${voisines ? ' (' + voisines + ')' : ''}</button></div></div>`;
+  }).join('') || '<p class="sous">Aucune flotte. Construisez des vaisseaux dans un chantier naval.</p>';
+  const cv = E.convois.filter(v => v.camp === E.j);
+  h += `<h3>Convois en route</h3>` + (cv.length ? cv.map(v => `<div class="ligne"><div>${C[v.de].nom} → Terre<small>${v.me} métaux, ${v.he} hélium-3 · arrivée dans ${v.arrivee - E.tour} mois</small></div></div>`).join('') : '<p class="sous">Aucun convoi. Les colonies lointaines en envoient dès 15 unités en stock.</p>');
+  h += `<h3>Flottes repérées</h3>` + autres.map(f => `<div class="ligne"><div><span style="color:${FAC[f.camp].c}">${f.nom}</span><small>${f.dock ? C[f.dock].nom : 'Espace profond'} · ${hostile(E.j, f.camp) ? 'hostile' : 'neutre'}${f.role && f.role !== 'patrouille' ? ' · ' + ROLES[f.role].toLowerCase() : ''}</small></div><b>${fmt(puissance(f))}</b></div>`).join('');
+  h += `<div class="carte-p note"><b>Rôles</b><p class="sous">Escorte : protège les convois à 2 cases. Raid : pille les convois ennemis à 1 case. Siège : posée sur une colonie ennemie, bloque sa production et ses départs, puis permet le débarquement. Frôler Jupiter ou Saturne donne +3 cases le mois suivant.</p></div>`;
+  return h;
+}
+function panLagrange() {
+  const L = LAGRANGE.find(x => x.id === E.selL), o = E.lagrange[L.id], ici = E.flottes.find(f => f.camp === E.j && dist(f.pos, posL(L)) === 0);
+  let h = `<h2>${L.nom}</h2><p class="sous">Point de Lagrange · suit ${C[L.p].nom} sur son orbite</p><div class="chips">${o ? chipFac(o) : '<span class="chip">Libre</span>'}</div><p>${L.effet}.</p>`;
+  if (!o) h += ici ? `<button class="btn j" data-a="lagr:${L.id}" ${peutPayer(COUT_LAGRANGE) ? '' : 'disabled'}>Construire un poste (${coutTxt(COUT_LAGRANGE)})</button>` : '<p class="sous">Amenez une flotte sur ce point pour y construire un poste.</p>';
+  else if (o !== E.j) h += `<p class="sous">${hostile(E.j, o) ? 'Une de vos flottes sur ce point détruira le poste au prochain mois.' : 'En guerre, une de vos flottes sur ce point détruirait le poste.'}</p>`;
+  h += `<div class="carte-p note"><b>Pourquoi ici ?</b><p class="sous">Aux points de Lagrange, l'attraction du Soleil et celle de la planète s'équilibrent : un objet y reste immobile par rapport à elle. Les astéroïdes troyens de Jupiter s'y accumulent depuis 4 milliards d'années.</p></div>`;
+  return h;
+}
+function panObjectifs() {
+  const k = E.compteurs;
+  let h = `<h2>Objectifs</h2><p class="sous">Une seule victoire suffit. La partie est sauvegardée à chaque mois.</p>`;
+  h += objectifs().map(o => `<div class="objectif"><div class="ligne" style="border:0;padding:0"><b style="font:600 15px var(--titre)">${o.n}</b><b>${fmt(o.p * 100)} %</b></div><p class="sous">${o.d}</p><div class="barre-p anim"><b style="width:${o.p * 100}%;background:var(--soleil)"></b></div></div>`).join('');
+  h += `<h3>Défaites possibles</h3>` + [['Capitale perdue', 'Si un rival débarque sur votre territoire terrestre.', capitalePrise(E.j) ? 1 : 0], ['Faillite', `Crédits négatifs pendant 6 mois (${k.faillite}/6). La solde des flottes coûte cher.`, k.faillite / 6], ['Terre gelée', `Terre sous −15 °C pendant 12 mois (${k.gel}/12).`, k.gel / 12]].map(([n, d, p]) => `<div class="ligne"><div>${n}<small>${d}</small></div><b style="color:${p > .5 ? 'var(--rouge)' : 'var(--doux)'}">${fmt(p * 100)} %</b></div>`).join('');
+  h += `<div class="actions" style="justify-content:flex-start"><button class="btn petit" data-a="sauver">Sauvegarder maintenant</button><button class="btn petit rouge" data-a="fin:nouvelle">Abandonner et recommencer</button></div>`;
+  return h;
+}
+function panSoleil() {
+  const cap = capture(), k = coutDyson(), dispo = E.techs.has('dyson');
+  let h = `<h2>Soleil</h2><p class="sous">Étoile de type G2 · 3,8 × 10²⁶ W</p>`;
+  h += `<h3>Sphère de Dyson</h3><dl class="grille"><dt>Segments</dt><dd>${E.dyson} / 20</dd><dt>Lumière captée</dt><dd>${fmt(cap * 100)} %</dd><dt>Énergie produite</dt><dd>+${fmt(E.dyson * 40)} /mois</dd><dt>Coût d'un segment</dt><dd>${coutTxt(COUT_DYSON, k)}</dd></dl>`;
+  h += `<div class="actions" style="justify-content:flex-start"><button class="btn or" data-a="dyson:+" ${dispo && E.dyson < 20 && peutPayer(COUT_DYSON, k) ? '' : 'disabled'}>Construire un segment</button><button class="btn" data-a="dyson:-" ${E.dyson ? '' : 'disabled'}>Démanteler</button></div>`;
+  if (!dispo) h += `<p class="sous">Recherche nécessaire : ${TECH.dyson.n} (après ${TECH.mega.n}).</p>`;
+  h += `<p class="sous">Chaque segment capte 4 % de la lumière (80 % pour une sphère complète). La température des planètes suit la racine quatrième de la lumière reçue : dès 5 segments, la Terre passe sous 0 °C. Miroirs orbitaux et anneaux de vie compensent.</p>`;
+  // graphique : température de la Terre selon le nombre de segments
+  const X = n => 34 + n * 13.3, Y = T => 10 + (30 - (T - 273)) / 100 * 130, pts = Array.from({ length: 21 }, (_, n) => [X(n), Math.min(150, Y(288 * Math.pow(1 - n * .04, .25) + nbOrb('terre', 'miroir') * 15))]);
+  h += `<svg class="graph" viewBox="0 0 310 168" role="img" aria-label="Température de la Terre selon le nombre de segments">
+    ${[20, 0, -20, -40, -60].map(t => `<line x1="34" x2="300" y1="${Y(t + 273)}" y2="${Y(t + 273)}" stroke="${t === 0 ? '#59d3ff' : '#2a3366'}" stroke-width="${t === 0 ? 1.5 : 1}" ${t === 0 ? 'stroke-dasharray="4 3"' : ''}/><text x="28" y="${Y(t + 273) + 4}" fill="#a7afd9" font-size="10" text-anchor="end">${t}°</text>`).join('')}
+    ${[0, 5, 10, 15, 20].map(n => `<text x="${X(n)}" y="162" fill="#a7afd9" font-size="10" text-anchor="middle">${n}</text>`).join('')}
+    <polyline points="${pts.map(p => p.join(',')).join(' ')}" fill="none" stroke="#ffb547" stroke-width="2.5"/>
+    <circle cx="${pts[E.dyson][0]}" cy="${pts[E.dyson][1]}" r="5" fill="#ffb547" stroke="#03050d" stroke-width="2"/>
+    <text x="300" y="${Y(273) - 5}" fill="#59d3ff" font-size="10" text-anchor="end">gel de l'eau</text>
+  </svg><p class="sous" style="text-align:center">Température moyenne de la Terre selon le nombre de segments</p>`;
+  h += `<h3>Effet sur chaque corps</h3>` + CORPS.filter(c => !c.gaz).map(c => { const T = temp(c), d = T - c.T0; const effet = c.id === 'terre' ? (T < 273 ? 'Glaciation : habitats vidés' : T < 280 ? 'Hivers rudes' : 'Climat normal') : c.id === 'venus' ? (d < -20 ? 'Se refroidit : terraformation facilitée' : 'Fournaise') : c.id === 'mercure' ? (d < -10 ? 'Plus supportable' : 'Brûlante') : c.id === 'mars' ? (d < -5 ? 'Terraformation ralentie' : 'Froide') : 'Gelé'; return `<div class="ligne"><div>${c.nom}<small>${effet}</small></div><b>${kelvin(T)}${Math.abs(d) >= 1 ? ` <small style="display:inline;color:var(--doux)">${signe(d)}</small>` : ''}</b></div>`; }).join('');
+  h += `<div class="carte-p note"><b>Signature infrarouge</b><p class="sous">Une sphère rayonne sa chaleur perdue : elle se voit de loin. Chaque segment fait venir les Veilleurs 2 mois plus tôt, et en plus grand nombre.</p></div>`;
+  return h;
+}
+function dispoTech(k) { return !E.techs.has(k) && TECH[k].req.every(r => E.techs.has(r)); }
+function panRecherche() {
+  const b = bilan();
+  let h = `<h2>Recherche</h2><p class="sous">+${fmt(b.sc, 1)} science par mois${E.recherche ? ` · ${TECH[E.recherche].n} dans ${Math.ceil((coutTech(E.recherche) - E.prog) / Math.max(.1, b.sc))} mois` : ''}</p>`;
+  const branches = [...new Set(Object.values(TECH).map(t => t.b))];
+  branches.forEach(br => {
+    h += `<h3>${br}</h3>`;
+    Object.entries(TECH).filter(([, t]) => t.b === br).forEach(([k, t]) => {
+      const fait = E.techs.has(k), cours = E.recherche === k, ok = dispoTech(k);
+      h += `<div class="ligne"><div>${t.n}<small>${t.d}${!fait && !ok ? ' · requiert ' + t.req.map(r => TECH[r].n).join(', ') : ''}</small>${cours ? `<div class="barre-p" style="margin:4px 0 0"><b style="width:${E.prog / coutTech(k) * 100}%;background:var(--violet)"></b></div>` : ''}</div>` +
+        (fait ? '<span class="chip paix">Acquise</span>' : cours ? '<span class="chip inconnu">En cours</span>' : `<button class="btn petit" data-a="tech:${k}" ${ok ? '' : 'disabled'}>${fmt(coutTech(k))} sc.</button>`) + `</div>`;
+    });
+  });
+  return h;
+}
+function panFactions() {
+  let h = `<h2>Factions</h2><p class="sous">La tension monte quand vous colonisez beaucoup et quand votre sphère de Dyson refroidit la Terre qu'ils habitent aussi.</p>`;
+  [...E.rivaux, ...Object.keys(E.reps)].forEach(r => {
+    const cols = CORPS.filter(c => present(c.id, r)).map(c => c.nom), fl = E.flottes.find(f => f.camp === r), rel = E.rel[r], rival = E.rivaux.includes(r);
+    h += `<div class="carte-p"><b style="color:${FAC[r].c};font:600 16px var(--titre)">${FAC[r].nom}</b> <span class="chip ${rel}">${{ paix: 'Paix', guerre: 'Guerre', pacte: 'Pacte' }[rel]}</span><p class="sous">${FAC[r].desc}${rival ? ` Bonus : ${FAC[r].bonus}.${capitalePrise(r) ? ' Sa capitale est tombée.' : ''}` : ''}</p>`;
+    h += `<dl class="grille"><dt>Présence</dt><dd>${cols.join(', ') || '—'}</dd><dt>Flotte</dt><dd>${fl ? fmt(puissance(fl)) : 'détruite'}</dd><dt>Tension</dt><dd>${fmt(E.tension[r])} / 100</dd></dl><div class="barre-p"><b style="width:${E.tension[r]}%;background:${E.tension[r] > 70 ? 'var(--rouge)' : 'var(--soleil)'}"></b></div><div class="actions" style="justify-content:flex-start">`;
+    if (rel === 'guerre') h += `<button class="btn petit" data-a="dip:${r}:paix" ${E.res.cr >= 150 ? '' : 'disabled'}>Proposer la paix (150 ₡)</button>`;
+    else { if (rel === 'paix') h += `<button class="btn petit" data-a="dip:${r}:pacte" ${E.tension[r] < 50 ? '' : 'disabled'}>Pacte commercial</button>`; h += `<button class="btn petit rouge" data-a="dip:${r}:guerre">Déclarer la guerre</button>`; }
+    h += `</div></div>`;
+  });
+  const v = E.rel.vei;
+  h += `<div class="carte-p note"><b style="color:var(--violet);font:600 16px var(--titre)">Les Veilleurs</b> <span class="chip inconnu">${{ inconnu: 'Inconnus', hostile: 'Hostiles', paix: 'Trêve' }[v]}</span>`;
+  h += `<p class="sous">${v === 'inconnu' ? `Les sondes de Neptune captent un signal régulier. Arrivée estimée : ${Math.max(5, 16 - 2 * E.dyson) - E.tour > 0 ? 'dans ' + (Math.max(5, 16 - 2 * E.dyson) - E.tour) + ' mois' : 'imminente'}.` : v === 'hostile' ? 'Ils attaquent toutes les colonies, rivales comprises. Ils semblent réagir à la chaleur de la sphère de Dyson.' : 'Trêve fragile : ils exigent que la sphère reste sous 5 segments.'}</p>`;
+  if (v === 'hostile') h += `<button class="btn petit" data-a="dip:vei:parler" ${E.techs.has('xeno') ? '' : 'disabled'}>${E.techs.has('xeno') ? 'Tenter le contact' : 'Recherche : Xénolinguistique'}</button>`;
+  h += `</div>`;
+  return h;
+}
+const IDEES = [
+  ['Distances à l\'échelle', 'Le rayon des orbites en cases suit la racine carrée de la vraie distance : le système intérieur reste serré, Jupiter est à 11 cases et Neptune à 27. Les distances réelles et le délai radio sont affichés.', true],
+  ['Fenêtres de lancement', 'Les planètes tournent à leur vraie vitesse : la distance Terre-Mars varie du simple au quintuple. Partir au bon moment divise la durée du voyage.', true],
+  ['La sphère de Dyson comme arme climatique', 'Capter le Soleil refroidit tout le système. Cela gèle la Terre des rivaux, mais rend Vénus terraformable et Mercure vivable. Un vrai dilemme diplomatique.', true],
+  ['Signature infrarouge', 'Plus la sphère est grande, plus elle est visible de loin : les Veilleurs arrivent plus tôt et en nombre.', true],
+  ['Gravité et coût de lancement', 'Décoller de la Terre coûte cher, de la Lune ou de Cérès presque rien. La Lune devient naturellement le port industriel. Un ascenseur spatial terrestre changerait la donne.', true],
+  ['Territoire par expansion', 'Comme dans Imagine Earth : chaque bâtiment agrandit le territoire autour de lui. Sur Terre, les frontières des trois factions se touchent.', true],
+  ['Troyens et points de Lagrange', 'Des cases fixes stratégiques (L1 à L5) entre la Terre et la Lune ou près de Jupiter, où les stations ne dérivent pas. Contrôle des routes.', true],
+  ['Astéroïdes détournés', 'Pousser un astéroïde de la ceinture vers Mars pour y apporter de l\'eau (terraformation), ou vers une colonie rivale comme bombardement cinétique. Il faut alors une défense planétaire.', false],
+  ['Indépendance des colonies', 'Une colonie lointaine et négligée réclame son autonomie. Si elle fait sécession, elle devient une nouvelle faction avec votre ancienne flotte locale.', true],
+  ['Ruines des Veilleurs', 'Sous la glace d\'Europe ou dans les lacs de Titan, des vestiges à fouiller donnent des technologies uniques et un indice sur ce que veulent les Veilleurs.', false],
+  ['Fronde gravitationnelle', 'Passer près de Jupiter donne un bonus de vitesse : les trajets vers le système extérieur deviennent un puzzle de trajectoires.', true],
+  ['Éruptions solaires et météo spatiale', 'Prévisibles quelques tours à l\'avance avec un observatoire. Les flottes en transit sans blindage subissent des dégâts, les réseaux électriques sautent.', true],
+  ['Routes commerciales et convois', 'Les métaux de Cérès et l\'hélium-3 de Jupiter voyagent en convois visibles sur la carte, que les rivaux peuvent intercepter.', true],
+  ['Conseil terrien', 'Les trois factions votent des lois communes : limite de segments de Dyson, zones démilitarisées, partage de la Lune. Violer un vote fait monter la tension de tous.', false],
+  ['Plusieurs victoires', 'Domination militaire, victoire scientifique (vaisseau vers Alpha du Centaure), victoire énergétique (sphère complète sans geler la Terre grâce aux anneaux de vie), ou contact pacifique avec les Veilleurs.', true],
+  ['Brouillard de guerre', 'Au-delà de Mars, on ne voit que ce que montrent les télescopes et les sondes. Les Veilleurs restent invisibles jusqu\'au premier contact.', false],
+];
+function panIdees() {
+  return `<h2>Idées de gameplay</h2><p class="sous">Celles marquées « dans la maquette » sont déjà jouables ici.</p>` +
+    IDEES.map(([t, d, ok]) => `<div class="idee"><b>${t}</b><span class="etat ${ok ? 'oui' : 'non'}">${ok ? 'DANS LA MAQUETTE' : 'À EXPLORER'}</span><p>${d}</p></div>`).join('');
+}
+
+// ---------- Actions ----------
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-a]'); if (!el || el.disabled) return;
+  const [a, x, y] = el.dataset.a.split(':');
+  const c = C[E.sel];
+  switch (a) {
+    case 'faction': initPartie(x); return;
+    case 'tour': tourSuivant(); return;
+    case 'tab': E.onglet = x; break;
+    case 'vue': if (x === 'planete') { allerSurface(); return; } E.vue = 'systeme'; E.carteBat = null; recentrer(); break;
+    case 'zoom': if (x === '0') recentrer(); else zoomer(x === '+' ? 1.25 : .8); break;
+    case 'pivot': if (E.vue === 'systeme') vueSys.az += x * Math.PI / 8; else tourner(x * -90, 0); break;
+    case 'sel': E.sel = x; E.selL = null; E.selTuile = null; E.carteBat = null; if (E.vue === 'planete') recentrer(); break;
+    case 'surface': E.sel = x; allerSurface(); return;
+    case 'coloniser': { const info = infoMission(C[x]); if (!info || !peutPayer(info.cout)) break; payer(info.cout); E.missions.push({ camp: E.j, de: info.o.id, vers: x, depart: E.tour, arrivee: E.tour + info.duree, fronde: info.fronde }); journal(`Mission vers ${C[x].nom} lancée depuis ${info.o.nom} : ${info.duree} mois de voyage.`, 'bon'); break; }
+    case 'orb': { const O = ORB[x]; if (!peutPayer(O.cout)) break; payer(O.cout); s(c.id).orb.push({ t: x, o: E.j }); journal(`${c.nom} : ${O.n.toLowerCase()} en orbite.`, 'bon'); if (x === 'arche') { E.arche = E.tour + 6; banniere('Vaisseau-arche', 'Assemblage en orbite : départ dans 6 mois.', 'bon'); } if (x === 'bouclier') banniere('Bouclier orbital', `${c.nom} est protégée.`, 'bon'); break; }
+    case 'nav': { const k = remiseChantier(c), V = NAV[x]; if (!peutPayer(V.cout, k)) break; payer(V.cout, k); const hote = c.parent ? C[c.parent] : c; let f = E.flottes.find(g => g.camp === E.j && g.dock === hote.id); if (!f) { f = { id: nid(), nom: 'Flotte ' + hote.nom, camp: E.j, nav: { ch: 0, cr: 0, pv: 0, tr: 0 }, dock: hote.id, pos: pos(hote), mvt: 0, role: 'patrouille' }; E.flottes.push(f); } f.nav[x] = (f.nav[x] || 0) + 1; journal(`${V.n} lancé depuis ${c.nom}.`, 'bon'); break; }
+    case 'flotte': { const f = E.flottes.find(g => g.id == x); E.selFlotte = E.selFlotte === f ? null : f; if (E.vue !== 'systeme') { E.vue = 'systeme'; recentrer(); } break; }
+    case 'dyson': { const k = coutDyson(); if (x === '+' && peutPayer(COUT_DYSON, k)) { payer(COUT_DYSON, k); E.dyson++; journal(`Segment ${E.dyson} de la sphère de Dyson en place. La Terre descend à ${kelvin(temp(C.terre))}.`, E.dyson > 4 ? 'mal' : 'bon'); if (E.rel.vei === 'paix' && E.dyson >= 5) { E.rel.vei = 'hostile'; journal('Les Veilleurs rompent la trêve !', 'alien'); } } if (x === '-' && E.dyson) { E.dyson--; E.res.me += 75; journal('Segment démantelé, 75 métaux récupérés.'); } break; }
+    case 'tech': E.recherche = x; E.prog = 0; break;
+    case 'dip':
+      if (x === 'vei') { if (E.dyson < 5) { E.rel.vei = 'paix'; journal('Trêve avec les Veilleurs, tant que la sphère reste sous 5 segments.', 'alien'); } else journal('Les Veilleurs refusent : démantelez d\'abord votre sphère sous 5 segments.', 'alien'); break; }
+      if (y === 'paix') { E.res.cr -= 150; E.rel[x] = 'paix'; E.tension[x] = 40; journal(`Paix signée avec ${FAC[x].le}.`, 'bon'); }
+      if (y === 'pacte') { E.rel[x] = 'pacte'; journal(`Pacte commercial avec ${FAC[x].le} : +6 ₡ par mois.`, 'bon'); }
+      if (y === 'guerre') { E.rel[x] = 'guerre'; E.tension[x] = 100; journal(`Vous déclarez la guerre ${FAC[x].le.startsWith('le ') ? 'au ' + FAC[x].le.slice(3) : 'à ' + FAC[x].le}.`, 'mal'); }
+      break;
+    case 'carte': E.carteBat = E.carteBat === x ? null : x; break;
+    case 'demolir': { const t = E.selTuile; if (t?.b && t.o === E.j) { E.res.cr += BAT[t.b].cout.cr / 2; E.res.me += BAT[t.b].cout.me / 2; journal(`${BAT[t.b].n} démoli.`); t.b = null; } break; }
+    case 'combat': actionCombat(x); return;
+    case 'offre': repondreOffre(x === 'oui'); return;
+    case 'fin': $('fin').hidden = true; if (x === 'nouvelle') { try { localStorage.removeItem(CLE); } catch { /* stockage indisponible */ } $('reprise').innerHTML = ''; $('accueil').hidden = false; } return;
+    case 'reprendre': { const d = lireSauvegarde(); if (d) charger(d); return; }
+    case 'sauver': sauver(); return;
+    case 'lagr': { const L = LAGRANGE.find(l => l.id === x); if (!peutPayer(COUT_LAGRANGE)) break; payer(COUT_LAGRANGE); E.lagrange[x] = E.j; journal(`Poste construit au point ${L.nom}.`, 'bon'); banniere(L.nom, L.effet, 'bon'); if (sysO.pret) fxAnneau(sys, hx(...posL(L), .5), FAC[E.j].c, 2.5); break; }
+    case 'fete': { const st = s(x); E.res.cr -= 100; st.fete = E.tour + 6; journal(`Festivités sur ${C[x].nom} : le moral remonte.`, 'bon'); banniere(`Festivités sur ${C[x].nom}`, '+25 de moral pendant 6 mois.', 'bon'); fxFete(x); break; }
+    case 'debarquer': { const fs = E.flottes.find(f => f.camp === E.j && f.siege && dist(f.pos, pos(C[x])) === 0 && present(x, f.siege.fac)); if (fs?.siege.prog >= 100) { debarquer(fs, C[x], fs.siege.fac); verifierFin(false); suiteOffres(); } break; }
+    case 'scinder': {
+      const f = E.flottes.find(g => g.id == x), moitie = {};
+      for (const k in f.nav) { moitie[k] = Math.floor(f.nav[k] / 2); f.nav[k] -= moitie[k]; }
+      if (!nbNav({ nav: moitie })) { const k = Object.keys(f.nav).find(k => f.nav[k] > 0); moitie[k] = 1; f.nav[k]--; }
+      const g = { ...f, id: nid(), nom: f.nom + ' bis', nav: moitie, siege: null }; E.flottes.push(g);
+      if (sysO.posF[f.id]) sysO.posF[g.id] = sysO.posF[f.id].clone(); // la nouvelle flotte part de la même place et glisse à côté
+      journal(`${f.nom} se scinde : ${g.nom} prend le large.`); break;
+    }
+    case 'fusionner': {
+      const f = E.flottes.find(g => g.id == x), autres = E.flottes.filter(g => g !== f && g.camp === E.j && dist(g.pos, f.pos) === 0);
+      autres.forEach(g => { for (const k in g.nav) f.nav[k] = (f.nav[k] || 0) + g.nav[k]; f.mvt = Math.min(f.mvt, g.mvt); });
+      E.flottes = E.flottes.filter(g => !autres.includes(g)); if (autres.includes(E.selFlotte)) E.selFlotte = f;
+      journal(`${f.nom} rassemble ${autres.length} flotte${autres.length > 1 ? 's' : ''}.`, 'bon'); if (sysO.pret) fxAnneau(sys, (sysO.posF[f.id] || hx(...f.pos)).clone(), FAC[E.j].c, 1.8); break;
+    }
+  }
+  rendreHUD(); rendrePanneau();
+});
+document.addEventListener('change', e => {
+  const r = e.target.dataset.role, n = e.target.dataset.nom;
+  if (r) { const f = E.flottes.find(g => g.id == r); f.role = e.target.value; if (f.role !== 'siege') f.siege = null; journal(`${f.nom} : rôle ${ROLES[f.role].toLowerCase()}.`); rendreHUD(); rendrePanneau(); }
+  if (n) { const f = E.flottes.find(g => g.id == n); f.nom = e.target.value.trim().slice(0, 40) || f.nom; rendrePanneau(); }
+});
+addEventListener('keydown', e => { if (e.target.closest('input,textarea,select') || !E.j) return; if (e.key === 'Enter' || e.key === ' ') { if (e.target === document.body) { e.preventDefault(); tourSuivant(); } } if (e.key === 'Escape') { E.carteBat = null; E.selFlotte = null; rendreHUD(); } if (e.key === '1') { E.vue = 'systeme'; recentrer(); rendreHUD(); } if (e.key === '2') allerSurface(); });
+
+// ---------- Démarrage ----------
+$('choixFaction').innerHTML = ['atl', 'hel', 'pac'].map(f => `<button data-a="faction:${f}" style="border-color:${FAC[f].c}"><b style="color:${FAC[f].c}">${FAC[f].nom}</b><span>${FAC[f].desc}</span><em style="background:${FAC[f].c}">${FAC[f].bonus}</em></button>`).join('');
+taille();
+// Fond de l'écran d'accueil : la partie de démonstration tourne déjà derrière
+initPartie('atl'); $('accueil').hidden = false; E.journal = []; journal('Choisissez votre faction pour commencer.');
+document.querySelectorAll('#choixFaction button').forEach(b => b.addEventListener('click', () => { Object.keys(FAC).filter(k => k.startsWith('rep_')).forEach(k => delete FAC[k]); Object.assign(E, etatNeuf()); sysO.posF = {}; sysO.kC = {}; globe.id = null; finAttente = null; }, { capture: true }));
+const sauvegarde = lireSauvegarde();
+if (sauvegarde?.j) $('reprise').innerHTML = `<button class="btn or" data-a="reprendre" style="width:100%;margin-top:12px">Continuer la partie · ${FAC[sauvegarde.j].nom} · ${MOIS[sauvegarde.tour % 12]} ${2081 + Math.floor(sauvegarde.tour / 12)}</button><p class="sous" style="text-align:center;margin-top:8px">ou choisissez une faction pour une nouvelle partie :</p>`;
+rendreHUD(); rendrePanneau();
+window.maquette = { E, allerSurface, vueSys, hx, pos, C, declencher, debarquer, independance, verifierFin, suiteOffres, montrerFin, sauver, lireSauvegarde, charger }; // accès depuis la console, pour déboguer
+requestAnimationFrame(boucle);
+</script>
+</body>
+</html>

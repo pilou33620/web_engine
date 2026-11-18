@@ -1,0 +1,14 @@
+[package]
+name = "royaumes"
+version = "0.1.0"
+edition = "2021"
+description = "Royaumes des Rives : le moteur du jeu (tour par tour, 1700-1850) et son serveur local"
+
+[lib]
+doctest = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+# Serveur HTTP/HTTPS et appairage : communs aux web tools (dépôt web_suite)
+web_tools_commun = { git = "https://github.com/pilou33620/web_suite", rev = "f4165391c090bdb8670d72eedef7b486f2e6afa1" }
