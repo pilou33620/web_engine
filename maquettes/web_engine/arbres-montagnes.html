@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Arbres et montagnes</title>
-<link rel="stylesheet" href="../../lib/royaumes/rendu.css">
+<link rel="stylesheet" href="../../lib/rendu/rendu.css">
 <link rel="stylesheet" href="../../galerie/visionneuse.css">
 <style>
   #etiquettes span.titre { font-size: 13px; font-weight: 600; background: rgba(20, 26, 19, .82); }
@@ -25,8 +25,8 @@
 <script type="module">
 // Les variantes sont écrites dans les conventions de decor() de plateau.js (tailles × S0, contour EP, hache pour le hasard)
 // pour que celle qui sera retenue y passe telle quelle.
-import { THREE, scene, cam, camera, apresCamera, hache, lumiere } from '../../lib/royaumes/scene.js';
-import { lot, put, fige, jeter, boite, cyl, cone, sphere } from '../../lib/royaumes/toon.js';
+import { THREE, scene, cam, camera, apresCamera, hache, lumiere } from '../../lib/rendu/scene.js';
+import { lot, put, fige, jeter, boite, cyl, cone, sphere } from '../../lib/rendu/toon.js';
 
 const S0 = 0.11, EP = 0.022, R = 1;
 const p = (L, g, col, x, y, z, ry = 0, ep = EP) => put(L, g, col, x, y, z, ry, ep);

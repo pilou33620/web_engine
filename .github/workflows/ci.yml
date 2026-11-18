@@ -19,7 +19,7 @@ jobs:
       - name: Installateur (parties et dépendances)
         run: bash outils/tester-installateur.sh
       - name: Modules de la bibliothèque (syntaxe)
-        run: for f in lib/royaumes/*.js lib/pont/pont.js; do node --check "$f" || exit 1; done
+        run: for f in lib/rendu/*.js; do node --check "$f" || exit 1; done
       - name: Chromium
         run: npm i --no-save playwright && npx playwright install --with-deps chromium
       - name: Pages

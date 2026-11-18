@@ -23,11 +23,11 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 Object.assign(window, { THREE, mergeGeometries });
 </script>
-<!-- graphismes de web_power (lib/power : outils, moteur 3D, modèles) ; catalogue et époques : données du jeu (sources/web_power/js) -->
-<script defer src="../../lib/power/01-outils.js"></script>
+<!-- le rendu propre du jeu web_power (sa copie : sources/web_power/graphismes/power : outils, moteur 3D, modèles) ; catalogue et époques : données du jeu (sources/web_power/js) -->
+<script defer src="../../sources/web_power/graphismes/power/01-outils.js"></script>
 <script defer src="../../sources/web_power/js/02-terrain.js"></script>
-<script defer src="../../lib/power/03-moteur-3d.js"></script>
-<script defer src="../../lib/power/04-modeles.js"></script>
+<script defer src="../../sources/web_power/graphismes/power/03-moteur-3d.js"></script>
+<script defer src="../../sources/web_power/graphismes/power/04-modeles.js"></script>
 <script defer src="../../sources/web_power/js/05-catalogue.js"></script>
 <script defer src="../../sources/web_power/js/06-eau.js"></script>
 <script defer src="../../sources/web_power/js/06b-dechets.js"></script>

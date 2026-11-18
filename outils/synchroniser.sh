@@ -83,16 +83,8 @@ pathlib.Path('sources/INVENTAIRE.md').write_text('\n'.join(lignes) + '\n', encod
 print('INVENTAIRE.md :', sum(l.startswith('| `') for l in lignes), 'fichiers')
 PY
 
-# Les graphismes des jeux face à lib/ : un jeu qui a basculé sur la bibliothèque a graphismes/VERSION.json ;
-# un jeu qui garde encore ses propres fichiers de rendu ne doit pas diverger de lib/ (sinon : à reporter dans lib/).
+# La version de la bibliothèque que chaque jeu a installée (graphismes/VERSION.json) ; sa CI vérifie qu'il n'a rien modifié.
 echo "graphismes des jeux face à lib/ $(python3 -c "import json; print(json.load(open('lib/package.json'))['version'])") :"
 for v in sources/web_royaumes/web/graphismes/VERSION.json sources/web_power/graphismes/VERSION.json; do
   [ -f "$v" ] && echo "  $(dirname "$v") : bibliothèque $(python3 -c "import json; d=json.load(open('$v')); print(d['version'], d['commit'][:7])")"
 done
-ecarts() {  # $1 dossier du jeu, $2 dossier de lib, $3… fichiers
-  local jeu=$1 bib=$2; shift 2
-  for f in "$@"; do [ -f "$jeu/$f" ] && ! diff -q <(sed "s#'../../vendor/three/#'../three/#" "$jeu/$f") "$bib/$f" >/dev/null && echo "  À REPORTER dans $bib : $jeu/$f"; done; return 0
-}
-[ -d sources/web_royaumes/web/js/rendu ] && ecarts sources/web_royaumes/web/js/rendu lib/royaumes $(cd lib/royaumes && ls *.js)
-for d in img icons; do [ -d sources/web_royaumes/web/$d ] && ecarts sources/web_royaumes/web/$d lib/royaumes/$d $(cd lib/royaumes/$d && ls); done
-[ -f sources/web_power/js/04-modeles.js ] && ecarts sources/web_power/js lib/power 01-outils.js 03-moteur-3d.js 04-modeles.js 23-ambiance.js 24-ciel.js

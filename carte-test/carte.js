@@ -2,23 +2,21 @@
 // et tous les bâtiments de l'époque choisie sur la frise, de 1700 à 2035 :
 //  - époques de web_royaumes : l'état de partie du moteur Rust, retouché (époque, saison…), passé au pipeline du jeu ;
 //  - époques de web_power : ses quartiers, ses fermes et chacune de ses installations de l'époque, dessinés par ses propres
-//    modèles (lib/pont/pont.js) et posés sur le même plateau, avec leurs fumées et leurs éoliennes.
-import { THREE, scene, cam, posCase, voisins, viser, chaqueImage } from '../lib/royaumes/scene.js';
-import * as plateau from '../lib/royaumes/plateau.js';
-import { initMonde, synchroniser } from '../lib/royaumes/monde.js';
-import { majVie, bouffee } from '../lib/royaumes/vie.js';
-import { majQuartiers } from '../lib/royaumes/quartiers.js';
-import { majBrouillard } from '../lib/royaumes/brouillard.js';
-import { majMarine } from '../lib/royaumes/marine.js';
-import { majEspions } from '../lib/royaumes/espions.js';
-import { appliquerMeteo, forcerHeure, forcerMarche } from '../lib/royaumes/meteo.js';
-import { majRoutes, niveauRoutes } from '../lib/royaumes/routes.js';
-import { TECHS_PALIER } from '../lib/royaumes/modeles.js';
-import { jeter } from '../lib/royaumes/toon.js';
-import { chargerPower, modele } from '../lib/pont/pont.js';
+//    modèles (lib/rendu/modernes.js) et posés sur le même plateau, avec leurs fumées et leurs éoliennes.
+import { THREE, scene, cam, posCase, voisins, viser, chaqueImage } from '../lib/rendu/scene.js';
+import * as plateau from '../lib/rendu/plateau.js';
+import { initMonde, synchroniser } from '../lib/rendu/monde.js';
+import { majVie, bouffee } from '../lib/rendu/vie.js';
+import { majQuartiers } from '../lib/rendu/quartiers.js';
+import { majBrouillard } from '../lib/rendu/brouillard.js';
+import { majMarine } from '../lib/rendu/marine.js';
+import { majEspions } from '../lib/rendu/espions.js';
+import { appliquerMeteo, forcerHeure, forcerMarche } from '../lib/rendu/meteo.js';
+import { majRoutes, niveauRoutes } from '../lib/rendu/routes.js';
+import { TECHS_PALIER } from '../lib/rendu/modeles.js';
+import { jeter } from '../lib/rendu/toon.js';
+import { BAT, QBAT, bFerme, modele, INSTALLATIONS, QUARTIERS, EPOQUES } from '../lib/rendu/modernes.js';
 
-// le catalogue de web_power (années, noms, groupes des installations ; époques) est une donnée du jeu : lue dans ses fichiers
-const P = await chargerPower(['02-terrain', '05-catalogue', '06-eau', '06b-dechets', '07-epoques-rd'].map(f => `../sources/web_power/js/${f}.js`));
 
 const $ = s => document.querySelector(s);
 const charger = c => fetch(c).then(r => r.json());
@@ -31,7 +29,7 @@ const [R, carte, base] = await Promise.all([
 // ------------------------------------------------------------------ les époques des deux sources, bout à bout
 const ERES = [
   ...R.epoques.map(e => ({ source: 'web_royaumes', cle: e.cle, an: e.debut, nom: e.nom, txt: '' })),
-  ...P.ERES.map(e => ({ source: 'web_power', an: e.an, nom: e.nom, txt: e.txt })),
+  ...EPOQUES.map(e => ({ source: 'web_power', an: e.an, nom: e.nom, txt: e.txt })),
 ];
 
 // ------------------------------------------------------------------ la carte
@@ -79,12 +77,11 @@ const LIEU = {        // où web_power autorise chaque installation (sinon : ter
   prise: i => terre(i) && !riviere(i) && voisins(i).some(n => riviere(n) || eau(n)), step: i => terre(i) && !riviere(i) && voisins(i).some(n => riviere(n) || eau(n)),
 };
 function batimentsPower(an) {
-  const q = (k, n = 1) => Array.from({ length: n }, () => ({ nom: P.QUART[k].nom, groupe: 'Villes', dessin: L => P.QBAT[k](L, { fum: [] }) }));
+  const q = (k, n = 1) => Array.from({ length: n }, () => ({ nom: QUARTIERS.find(q => q.cle === k).nom, groupe: 'Villes', dessin: L => QBAT[k](L, { fum: [] }) }));
   const villes = [...q('centre'), ...q('residentiel', 2), ...q('industriel'), ...(an >= 1930 ? q('hopital') : []), ...(an >= 1960 ? q('affaires') : []), ...q('village')];
-  const fermes = [['Ferme céréalière', false], ['Ferme d’élevage', true]].map(([nom, e]) => ({ nom, groupe: 'Fermes', dessin: L => P.bFerme(L, e) }));
-  const GROUPES = { production: 'Production', stockage: 'Stockage', reseau: 'Réseau', eau: 'Eau', dechets: 'Déchets' };
-  const inst = Object.entries(P.TYPES).filter(([k, t]) => P.BAT[k] && !t.cache && t.an <= an && !(t.fin && t.fin < an))
-    .map(([k, t]) => ({ type: k, nom: t.nom, groupe: GROUPES[t.groupe] || t.groupe, dessin: (L, ex) => P.BAT[k](L, ex) }));
+  const fermes = [['Ferme céréalière', false], ['Ferme d’élevage', true]].map(([nom, e]) => ({ nom, groupe: 'Fermes', dessin: L => bFerme(L, e) }));
+  const inst = INSTALLATIONS.filter(t => t.groupe !== 'Chantier' && t.an <= an && !(t.fin && t.fin < an))
+    .map(t => ({ type: t.cle, nom: t.nom, groupe: t.groupe, dessin: (L, ex) => BAT[t.cle](L, ex) }));
   return [...villes, ...fermes, ...inst];
 }
 function poserPower(an) {
@@ -152,13 +149,13 @@ ERES.forEach((e, i) => {
   if (i && e.source !== ERES[i - 1].source) frise.append(Object.assign(document.createElement('span'), { className: 'separe' }));
   const b = document.createElement('button');
   b.type = 'button'; b.className = e.source === 'web_power' ? 'power' : 'royaumes';
-  b.innerHTML = `<b>${e.an}</b>${e.nom}`; b.title = `${e.nom} (${e.source})`;
+  b.innerHTML = `<b>${e.an}</b>${e.nom}`; b.title = `${e.nom} (${e.source === 'web_power' ? 'bâtiments modernes' : 'bâtiments anciens'})`;
   b.onclick = () => choisir(e);
   frise.append(b); e.bouton = b;
 });
 function afficherEre() {
   $('#annee').textContent = ere.an; $('#ere').textContent = ere.nom;
-  $('#source').textContent = `rendu ${ere.source} · ${liste.length} bâtiments`;
+  $('#source').textContent = `${ere.source === 'web_power' ? 'bâtiments modernes' : 'bâtiments anciens'} · ${liste.length} bâtiments`;
   $('#texte-ere').textContent = ere.txt;
   for (const e of ERES) e.bouton.setAttribute('aria-pressed', e === ere);
   history.replaceState(null, '', '#' + ere.an);

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Monde vivant web_royaumes</title>
-<link rel="stylesheet" href="../../lib/royaumes/rendu.css">
+<link rel="stylesheet" href="../../lib/rendu/rendu.css">
 <link rel="stylesheet" href="../visionneuse.css">
 </head>
 <body>
@@ -25,20 +25,20 @@
 </form>
 <p class="aide">Glisser : déplacer · clic droit ou Maj : tourner · molette : zoom</p>
 <script type="module">
-// Le vrai pipeline de rendu du jeu (lib/royaumes), appelé dans le même ordre que appliquer() de main.js,
+// Le vrai pipeline de rendu du jeu (lib/rendu), appelé dans le même ordre que appliquer() de main.js,
 // sur une carte et un état produits par le moteur Rust (donnees/carte.json, etat.json). Seul l'état est retouché ici :
 // époque, saison, météo, et tous les bâtiments posés autour de la capitale.
-import { cam, posCase, voisins } from '../../lib/royaumes/scene.js';
-import * as plateau from '../../lib/royaumes/plateau.js';
-import { initMonde, synchroniser } from '../../lib/royaumes/monde.js';
-import { majVie } from '../../lib/royaumes/vie.js';
-import { majQuartiers } from '../../lib/royaumes/quartiers.js';
-import { majBrouillard } from '../../lib/royaumes/brouillard.js';
-import { majMarine } from '../../lib/royaumes/marine.js';
-import { majEspions } from '../../lib/royaumes/espions.js';
-import { appliquerMeteo, forcerHeure, forcerMarche } from '../../lib/royaumes/meteo.js';
-import { majRoutes, niveauRoutes } from '../../lib/royaumes/routes.js';
-import { TECHS_PALIER } from '../../lib/royaumes/modeles.js';
+import { cam, posCase, voisins } from '../../lib/rendu/scene.js';
+import * as plateau from '../../lib/rendu/plateau.js';
+import { initMonde, synchroniser } from '../../lib/rendu/monde.js';
+import { majVie } from '../../lib/rendu/vie.js';
+import { majQuartiers } from '../../lib/rendu/quartiers.js';
+import { majBrouillard } from '../../lib/rendu/brouillard.js';
+import { majMarine } from '../../lib/rendu/marine.js';
+import { majEspions } from '../../lib/rendu/espions.js';
+import { appliquerMeteo, forcerHeure, forcerMarche } from '../../lib/rendu/meteo.js';
+import { majRoutes, niveauRoutes } from '../../lib/rendu/routes.js';
+import { TECHS_PALIER } from '../../lib/rendu/modeles.js';
 
 const charger = chemin => fetch(chemin).then(r => r.json());
 const [R, carte, base] = await Promise.all([charger('../../sources/web_royaumes/rust/royaumes/data/regles.json'), charger('donnees/carte.json'), charger('donnees/etat.json')]);
