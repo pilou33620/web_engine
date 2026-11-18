@@ -60,7 +60,7 @@ const en1960 = INSTALLATIONS.filter(t => t.an <= 1960 && !(t.fin && t.fin < 1960
 | Jeu | Dossier | `PARTIES` |
 |---|---|---|
 | web_royaumes | `web/graphismes/` | `rendu` (servi par le serveur Rust) |
-| web_power | `graphismes/` | reste en 1.4.0, avec son propre moteur (partie `power` d'alors), en attendant de décider s'il passe au moteur unique |
+| web_power | `graphismes/` | `rendu` (le moteur unique depuis la 2.3.0 : le jeu dessine dans un groupe à son échelle, voir son `js/01-moteur.js`) |
 
 ## Utiliser la bibliothèque dans un jeu
 

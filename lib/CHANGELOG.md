@@ -12,6 +12,8 @@ Ce qu'il faut à web_power pour passer au moteur unique :
   qu'un jeu peut teinter sans toucher aux bâtiments (les vues réseau de web_power assombrissent la carte) ;
 - `modernes.js` : `semer` est exporté, pour un jeu qui appelle lui-même les dessins de `BAT` et `QBAT`.
 
+web_power passe au moteur unique (partie `rendu`) : plateau, caméra, ciel et modèles viennent de la bibliothèque.
+
 ## 2.2.0 — 2026-11-18
 
 Les animations des bâtiments modernes de web_power, dans `rendu/modernes.js` :
