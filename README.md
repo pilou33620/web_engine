@@ -41,6 +41,8 @@ outils/
   verifier.mjs             ouvre toutes les pages et maquettes dans Chromium et échoue à la moindre erreur
 ```
 
+**Jeux branchés sur la bibliothèque :** web_royaumes et web_power. Ils ont basculé sur leur branche `claude/building-renders-gallery-60h8rg`, à fusionner dans leur main. Jusque-là, `outils/synchroniser.sh` signale tout graphisme modifié dans un jeu, qu'il faut reporter dans `lib/`.
+
 **Règles de base :**
 - **Les graphismes se modifient dans `lib/`,** jamais dans un jeu. La CI de chaque jeu le vérifie.
 - **On ne modifie jamais `sources/`** (`outils/synchroniser.sh` la remplace).

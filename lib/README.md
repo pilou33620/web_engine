@@ -50,6 +50,11 @@ Object.assign(window, { THREE, mergeGeometries });
 <script defer src="graphismes/power/01-outils.js"></script>
 ```
 
+Une page qui doit aussi s'ouvrir directement en `file://` ne peut pas charger de module local : Chrome les refuse.
+Dans ce cas, pointez la carte d'import vers le CDN, **à la même version** que `three/VERSION` :
+`https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js` et `…/three@0.186.1/examples/jsm/`. Les scripts classiques de `power/` se chargent normalement en `file://`.
+C'est ce que fait web_power.
+
 ### `power/pont.js` : les modèles de web_power dans le moteur royaumes
 
 ```js
@@ -60,6 +65,13 @@ scene.add(groupe);                               // à l'échelle du plateau roy
 ```
 
 `chargerPower([urls])` évalue aussi, si on les lui donne, les scripts de catalogue d'un jeu (`TYPES`, `ERES`, `QUART`). C'est ainsi que la carte test sait quelles installations existent à chaque époque.
+
+## Jeux qui utilisent la bibliothèque
+
+| Jeu | Dossier | Parties utilisées |
+|---|---|---|
+| web_royaumes | `web/graphismes/` | `three/`, `royaumes/` (servi par le serveur Rust) |
+| web_power | `graphismes/` | `power/` (servi par `serveur.py` ; three.js r186 depuis le CDN, pour l'ouverture en `file://`) |
 
 ## Utiliser la bibliothèque dans un jeu
 
