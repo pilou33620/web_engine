@@ -23,6 +23,10 @@
     <button role="tab" data-src="web_royaumes">web_royaumes</button>
     <button role="tab" data-src="web_power">web_power</button>
   </nav>
+  <nav role="tablist" aria-label="Page">
+    <button role="tab" data-page="visionneuse">Bâtiments</button>
+    <button role="tab" data-page="monde">Monde vivant</button>
+  </nav>
   <p id="note"></p>
 </header>
 <iframe id="vue" title="Rendus des bâtiments"></iframe>
@@ -32,15 +36,19 @@ const NOTES = {
   web_royaumes: '1700 → 1816 : Ancien Régime, Lumières, Empire, Révolution industrielle. Source retenue pour les époques passées.',
   web_power: '1900 → 2035 : centrales, réseau, eau, déchets, quartiers. Source retenue pour les époques modernes.',
 };
+// « Bâtiments » : chaque modèle seul ; « Monde vivant » : la carte du jeu avec sa nature et ses animations
 const onglets = document.querySelectorAll('nav button');
-function ouvrir(src) {
-  onglets.forEach(b => b.setAttribute('aria-selected', b.dataset.src === src));
-  document.getElementById('vue').src = `${src}/visionneuse.html`;
+let [src, page] = location.hash.slice(1).split('/');
+function ouvrir() {
+  if (!(src in NOTES)) src = 'web_royaumes';
+  if (page !== 'monde') page = 'visionneuse';
+  onglets.forEach(b => b.setAttribute('aria-selected', b.dataset.src === src || b.dataset.page === page));
+  document.getElementById('vue').src = `${src}/${page}.html`;
   document.getElementById('note').textContent = NOTES[src];
-  history.replaceState(null, '', '#' + src);
+  history.replaceState(null, '', `#${src}/${page}`);
 }
-onglets.forEach(b => b.onclick = () => ouvrir(b.dataset.src));
-ouvrir(location.hash.slice(1) in NOTES ? location.hash.slice(1) : 'web_royaumes');
+onglets.forEach(b => b.onclick = () => { src = b.dataset.src || src; page = b.dataset.page || page; ouvrir(); });
+ouvrir();
 </script>
 </body>
 </html>

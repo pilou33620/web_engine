@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GridMaster</title>
+<script src="js/00-appareil.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="tourner" role="dialog" aria-modal="true" aria-labelledby="tourner-titre">
+  <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="14" y="4" width="20" height="40" rx="4" fill="#253021" stroke="#ffc94d" stroke-width="3"/><circle cx="24" cy="38" r="2" fill="#ffc94d"/></svg>
+  <h2 id="tourner-titre"><span class="t-paysage">Tournez la tablette en paysage</span><span class="t-portrait">Tournez le téléphone en portrait</span></h2>
+  <p><span class="t-paysage">Sur tablette, la carte et le panneau de gestion tiennent côte à côte en format paysage.</span><span class="t-portrait">Sur téléphone, GridMaster se joue en portrait : la carte en haut, le panneau en bas.</span></p>
+  <button type="button" class="btn secondaire petit" onclick="document.documentElement.dataset.ignorer = 1; majFormat();">Continuer ainsi</button>
+</div>
+
+<div id="app">
+  <header class="barre">
+    <button type="button" class="ico" data-act="menu" aria-label="Menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+    <div id="date" class="titre-date">GridMaster</div>
+    <nav class="vues" aria-label="Vue de la carte">
+      <button type="button" data-act="vue" data-id="carte" class="actif" title="Vue globale (touche 1)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2 17 6v8l-7 4-7-4V6z" fill="#86c552" stroke="#0f130e" stroke-width="2" stroke-linejoin="round"/></svg><span>Carte</span></button>
+      <button type="button" data-act="vue" data-id="elec" title="Vue électricité (touche 2)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M11 1 4 11h5l-1 8 7-10h-5z" fill="#ffc94d" stroke="#0f130e" stroke-width="2" stroke-linejoin="round"/></svg><span>Électricité</span></button>
+      <button type="button" data-act="vue" data-id="eau" title="Vue eau (touche 3)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1c4 6 6 8.5 6 11.5a6 6 0 0 1-12 0C4 9.5 6 7 10 1z" fill="#38b6ff" stroke="#0f130e" stroke-width="2" stroke-linejoin="round"/></svg><span>Eau</span></button>
+      <button type="button" data-act="vue" data-id="dechets" title="Vue déchets (touche 4)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 6h10l-1 12H6zM3 6h14M8 6V3h4v3" fill="#f0a35e" stroke="#0f130e" stroke-width="2" stroke-linejoin="round"/></svg><span>Déchets</span></button>
+    </nav>
+    <div class="pills">
+      <div id="p-evt" class="pill evt cache" hidden></div>
+      <div id="p-freq" class="pill" title="Fréquence du réseau"><span class="pt"></span><span id="freq">50,00 Hz</span></div>
+      <div id="p-dec" class="pill cache" title="Déchets valorisés (recyclage, compost, énergie) sur 30 jours ; rouge si les bacs débordent ou si les dépôts sauvages s’accumulent"><span class="pt"></span><span><span class="lib">Déchets </span><span id="dec-txt">—</span></span></div>
+      <div id="p-eau" class="pill cache" title="Eau potable : part des besoins servis"><span class="pt"></span><span><span class="lib">Eau </span><span id="eau-txt">—</span></span></div>
+      <div class="pill cache" title="Satisfaction des habitants"><svg width="15" height="15" viewBox="0 0 24 24" fill="#ffc94d" stroke="#0f130e" stroke-width="1.5" aria-hidden="true"><path d="M12 2l3 7 7 .6-5.3 4.6 1.6 7.1L12 17.5 5.7 21.3l1.6-7.1L2 9.6 9 9z"/></svg><span id="sat">—</span></div>
+    </div>
+    <div class="tresorerie"><div class="etiquette">TRÉSORERIE</div><div id="argent" class="argent">—</div></div>
+  </header>
+
+  <main id="zone">
+    <canvas id="scene" aria-label="Carte hexagonale de la région"></canvas>
+    <div id="etiquettes"></div>
+    <div id="temps" class="flottant temps" role="group" aria-label="Vitesse du temps"></div>
+    <nav class="flottant lentilles" id="lentilles" aria-label="Lentilles de la carte"></nav>
+    <button type="button" id="carte-eq" class="flottant carte-eq" data-act="onglet" data-id="dispatch"></button>
+    <div class="aide" id="aide" hidden></div>
+    <section class="flottant guide" id="guide" aria-live="polite" hidden></section>
+    <div class="flottant chantier" id="chantier" role="toolbar" aria-label="Construire"></div>
+    <div class="flottant minicarte"><canvas id="mini" width="400" height="266" aria-label="Mini-carte"></canvas></div>
+  </main>
+
+  <aside id="panneau" aria-label="Panneau de gestion">
+    <div class="tete-panneau"><h2 id="titre-panneau">Dispatch</h2>
+      <button type="button" class="fermer" data-act="onglet" data-id="carte" aria-label="Fermer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div id="contenu-panneau" class="contenu-panneau"></div>
+  </aside>
+
+  <nav class="nav" aria-label="Navigation du jeu">
+    <button type="button" data-act="onglet" data-id="accueil"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Région</button>
+    <button type="button" data-act="onglet" data-id="dispatch"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M3 20h18"/><path d="M4 16l4-6 4 3 4-7 4 5"/></svg>Dispatch</button>
+    <button type="button" data-act="onglet" data-id="eau"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 3c4.5 6 6.5 9 6.5 12a6.5 6.5 0 0 1-13 0C5.5 12 7.5 9 12 3z"/></svg>Eau</button>
+    <button type="button" data-act="onglet" data-id="dechets"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 7h14l-1.2 13H6.2zM3 7h18M9 7V4h6v3M10 11v6M14 11v6"/></svg>Déchets</button>
+    <button type="button" data-act="onglet" data-id="construire"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M3 21h18M6 21V9l6-4 6 4v12"/><path d="M10 21v-5h4v5"/></svg>Construire</button>
+    <button type="button" data-act="onglet" data-id="reseau"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 3l-4 18M12 3l4 18M7 9h10M6 14h12"/></svg>Réseau</button>
+    <button type="button" data-act="onglet" data-id="meteo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 0-8 6 6 0 0 0-11.5 1.5A3.3 3.3 0 0 0 7 18z"/></svg>Météo</button>
+    <button type="button" data-act="onglet" data-id="economie"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M15 8.5a4 4 0 1 0 0 7M7 11h6M7 13.5h6"/></svg>Économie</button>
+    <button type="button" data-act="onglet" data-id="rd"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/><path d="M7.5 15h9"/></svg>R&amp;D</button>
+  </nav>
+</div>
+<div class="bulle" id="bulle" hidden></div>
+<div id="modale" class="modale" hidden><div class="boite" role="dialog" aria-modal="true" aria-labelledby="modale-titre"><div id="modale-contenu" style="display:flex;flex-direction:column;gap:12px"></div></div></div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
+<script type="module">
+// three.js arrive en module depuis le CDN ; le jeu, en scripts classiques (defer) qui partagent leurs déclarations, s'exécute après, dans l'ordre des balises
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+Object.assign(window, { THREE, mergeGeometries });
+</script>
+<script defer src="js/01-outils.js"></script>
+<script defer src="js/02-terrain.js"></script>
+<script defer src="js/03-moteur-3d.js"></script>
+<script defer src="js/04-modeles.js"></script>
+<script defer src="js/05-catalogue.js"></script>
+<script defer src="js/06-eau.js"></script>
+<script defer src="js/06b-dechets.js"></script>
+<script defer src="js/06c-territoire.js"></script>
+<script defer src="js/07-epoques-rd.js"></script>
+<script defer src="js/08-installations.js"></script>
+<script defer src="js/09-lignes.js"></script>
+<script defer src="js/10-reseau.js"></script>
+<script defer src="js/11-meteo-demande.js"></script>
+<script defer src="js/12-dispatch.js"></script>
+<script defer src="js/13-simulation.js"></script>
+<script defer src="js/14-superpositions.js"></script>
+<script defer src="js/15-camera.js"></script>
+<script defer src="js/16-interface.js"></script>
+<script defer src="js/17-panneaux.js"></script>
+<script defer src="js/18-hud.js"></script>
+<script defer src="js/19-vues.js"></script>
+<script defer src="js/20-actions.js"></script>
+<script defer src="js/21-partie.js"></script>
+<script defer src="js/22-banc.js"></script>
+<script defer src="js/23-ambiance.js"></script>
+<script defer src="js/24-ciel.js"></script>
+<script defer src="js/25-boucle.js"></script>
+
+</body>
+</html>

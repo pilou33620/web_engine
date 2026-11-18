@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monde vivant web_power</title>
+<link rel="stylesheet" href="../visionneuse.css">
+<style>iframe { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; } #attente:not([hidden]) { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; }</style>
+</head>
+<body>
+<iframe id="jeu" src="jeu.html" title="Le jeu web_power"></iframe>
+<p id="attente">Construction de la région…</p>
+<form class="barre" id="choix">
+  <label>Époque <select name="ere"></select></label>
+  <label>Mois <select name="mois"><option value="0">Janvier</option><option value="3">Avril</option><option value="4" selected>Mai</option><option value="6">Juillet</option><option value="9">Octobre</option><option value="11">Décembre</option></select></label>
+  <label>Temps <select name="temps"><option value="degage">Dégagé</option><option value="nuageux">Nuageux</option><option value="pluie">Pluie</option><option value="neige">Neige</option></select></label>
+  <label><input type="checkbox" name="neige"> Neige au sol</label>
+  <label>Heure <select name="heure"><option value="7">7 h</option><option value="12" selected>Midi</option><option value="19">19 h</option><option value="23">Nuit</option></select></label>
+</form>
+<p class="aide">Glisser : déplacer · molette : zoom · le temps s'écoule (6 minutes de jeu par seconde)</p>
+<script>
+// Le jeu complet est copié tel quel (jeu.html, js/, css/) ; cette page le pilote depuis l'extérieur, avec ses propres fonctions :
+// nouvelle partie, croissance des villes année par année jusqu'à l'époque choisie, une installation de chaque type de l'époque
+// raccordée à la capitale, puis le mois, le temps qu'il fait (un jour de ce mois qui le donne) et l'heure.
+const f = document.getElementById('choix'), cadre = document.getElementById('jeu');
+const jeu = code => cadre.contentWindow.eval(code);
+// seule la carte reste : panneaux, barres et fenêtres du jeu sont masqués
+const MASQUE = '#app{display:block!important} #zone{position:fixed!important;inset:0!important} header.barre,#panneau,nav.nav,.flottant,#modale,#toast,#tourner,.bulle,#aide,#guide{display:none!important}';
+
+const PILOTE = `(function (an, mois, temps, heure, neige) {
+  const minutes = (a, m, j, h) => Date.UTC(a, m, j, h) / 60000 - DEBUT;
+  nouvellePartie('normal');
+  S.argent = 1e12; S.vit = 1;
+  // les villes grandissent et des villages se fondent, année après année, comme dans nouvelAn()
+  for (let y = 1901; y <= an; y++) { S.min = minutes(y, 0, 1, 8); for (const v of [...VILLES]) if (y >= v.prochaine) croissanceVille(v, null); fonderPeutEtre(null); }
+  S.rd.acquis = RD.filter(r => r.an <= an).map(r => r.id);
+  // une installation de chaque type disponible cette année-là, au plus près de la capitale, raccordée au réseau
+  const cap = VILLES[0].centre;
+  for (const [ty, t] of Object.entries(TYPES)) {
+    if (t.cache || !BAT[ty] || UNITES.some(u => u.type === ty)) continue;
+    const lieu = LISTE.filter(x => !raison(x, ty)).sort((a, b) => dist(a, cap) - dist(b, cap) || hache(a.q, a.r, 9) - hache(b.q, b.r, 9))[0];
+    if (!lieu) continue;
+    creerUnite(lieu, ty, { immediat: true });
+    if (t.reseau) tracerLigne(lieu, cap, kvDispo(t.reseau), { immediat: true });
+  }
+  S.ordre = UNITES.filter(u => TYPES[u.type].f && !TYPES[u.type].fatal && u.type !== 'batterie').map(u => u.id).concat('imp'); trierOrdre();
+  topoEau(); routesSale = true;
+  // le jour du mois dont la météo ressemble au temps demandé
+  const genre = w => w.neb > .72 ? (w.temp < 1.5 ? 'neige' : 'pluie') : w.neb > .35 ? 'nuageux' : 'degage';
+  let jour = 15;
+  for (let j = 1; j <= 28; j++) if (genre(meteo(minutes(an, mois, j, heure))) === temps) { jour = j; break; }
+  S.min = minutes(an, mois, jour, heure);
+  prechauffer();
+  neigeSol = neige ? 1 : 0;
+  S.enJeu = true; S.pause = false;
+  cible.set(cap.x + 30, 0, cap.z + 20); distc = 300; majCam();
+  return jour;
+})`;
+
+function appliquer() {
+  document.getElementById('attente').hidden = false;
+  setTimeout(() => {  // laisse le message s'afficher avant le calcul
+    try { jeu(PILOTE)(+f.ere.value, +f.mois.value, f.temps.value, +f.heure.value, f.neige.checked); }
+    finally { document.getElementById('attente').hidden = true; }
+  }, 30);
+}
+cadre.addEventListener('load', () => {
+  const d = cadre.contentDocument, st = d.createElement('style'); st.textContent = MASQUE; d.head.append(st);
+  // les scripts du jeu (defer) ont tourné au chargement : ERES est prêt
+  for (const e of jeu('ERES')) f.ere.add(new Option(`${e.an} · ${e.nom}`, e.an));
+  f.ere.value = 1960;
+  f.addEventListener('change', appliquer);
+  appliquer();
+});
+</script>
+</body>
+</html>

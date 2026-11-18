@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monde vivant web_royaumes</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="../visionneuse.css">
+</head>
+<body>
+<canvas id="carte" aria-label="Monde de web_royaumes"></canvas>
+<div id="etiquettes"></div>
+<div id="eclair"></div>
+<form class="barre" id="choix">
+  <label>Époque <select name="epoque"></select></label>
+  <label>Saison <select name="saison"><option value="0">Hiver</option><option value="1" selected>Printemps</option><option value="2">Été</option><option value="3">Automne</option></select></label>
+  <label>Temps <select name="genre">
+    <option value="soleil">Soleil</option><option value="nuages">Nuages</option><option value="pluie">Pluie</option><option value="orage">Orage</option>
+    <option value="tempete">Tempête</option><option value="brouillard">Brouillard</option><option value="neige">Neige</option><option value="gel">Gel</option><option value="canicule">Canicule</option>
+  </select></label>
+  <label><input type="checkbox" name="neige"> Neige au sol</label>
+  <label>Heure <select name="heure"><option value="">Cycle</option><option value="jour">Jour</option><option value="aube">Aube</option><option value="crepuscule">Crépuscule</option><option value="nuit">Nuit</option></select></label>
+  <label>Marché <select name="marche"><option value="1">Jour de marché</option><option value="0">Sans marché</option></select></label>
+  <label>Remparts <select name="fortif"><option value="0">Ville ouverte</option><option value="1">Palissade</option><option value="2">Murailles</option><option value="3">Bastions</option><option value="4">Citadelle</option></select></label>
+</form>
+<p class="aide">Glisser : déplacer · clic droit ou Maj : tourner · molette : zoom</p>
+<script type="module">
+// Le vrai pipeline de rendu du jeu (js/rendu, copié tel quel), appelé dans le même ordre que appliquer() de main.js,
+// sur une carte et un état produits par le moteur Rust (donnees/carte.json, etat.json). Seul l'état est retouché ici :
+// époque, saison, météo, et tous les bâtiments posés autour de la capitale.
+import { cam, posCase, voisins } from './js/rendu/scene.js';
+import * as plateau from './js/rendu/plateau.js';
+import { initMonde, synchroniser } from './js/rendu/monde.js';
+import { majVie } from './js/rendu/vie.js';
+import { majQuartiers } from './js/rendu/quartiers.js';
+import { majBrouillard } from './js/rendu/brouillard.js';
+import { majMarine } from './js/rendu/marine.js';
+import { majEspions } from './js/rendu/espions.js';
+import { appliquerMeteo, forcerHeure, forcerMarche } from './js/rendu/meteo.js';
+import { majRoutes, niveauRoutes } from './js/rendu/routes.js';
+import { TECHS_PALIER } from './js/rendu/modeles.js';
+
+const charger = n => fetch(`donnees/${n}.json`).then(r => r.json());
+const [R, carte, base] = await Promise.all([charger('regles'), charger('carte'), charger('etat')]);
+const f = document.getElementById('choix');
+for (const e of R.epoques) f.epoque.add(new Option(`${e.nom} (${e.debut})`, e.cle));
+
+initMonde(R);
+plateau.construire(carte);
+const N = carte.l * carte.h, ville = base.villes.find(v => v.capitale) || base.villes[0], cap = ville.case;
+// cases de terre rangées par éloignement de la capitale (parcours en largeur)
+const terre = i => carte.terrain[i] >= 3 && carte.terrain[i] <= 5, eau = i => carte.terrain[i] <= 2;
+const dist = new Array(N).fill(-1), ordre = [cap]; dist[cap] = 0;
+for (let k = 0; k < ordre.length; k++) for (const n of voisins(ordre[k])) if (dist[n] < 0) { dist[n] = dist[ordre[k]] + 1; ordre.push(n); }
+// tous les bâtiments du jeu autour de la capitale : port et pêcheur au bord de l'eau, les autres hors forêt et hors rivière
+const pris = new Set(base.batiments.map(b => b.case)), batiments = [...base.batiments];
+let id = 1000;
+for (const def of R.batiments) {
+  if (def.cle === 'hotel') continue;
+  const rive = ['port', 'pecheur'].includes(def.cle);
+  const c = ordre.find(i => !pris.has(i) && terre(i) && !carte.riviere[i] && (rive ? voisins(i).some(eau) : !carte.foret[i]));
+  if (c == null) continue;
+  pris.add(c);
+  batiments.push({ id: id++, cle: def.cle, proprio: 0, case: c, reste: 0, ouvriers: 0, etat: '', pause: false, file: [], face: (c % 6) * Math.PI / 3, ville: ville.id, produit: {}, arret: null });
+}
+const rayon = Math.max(...[...pris].map(i => dist[i])) + 1;
+const proprio = base.cases.proprio.map((p, i) => (dist[i] >= 0 && dist[i] <= rayon && !eau(i) ? 0 : p));
+// le palier de l'armée (uniformes, armes) suit l'époque
+const PALIER = { ancien: 1, lumieres: 2, empire: 3, industrie: 5 };
+const MOIS = [1, 4, 7, 10], TEMP = [2, 12, 22, 12];
+
+function etat() {
+  const ep = R.epoques.find(e => e.cle === f.epoque.value), saison = +f.saison.value, genre = f.genre.value, fortif = +f.fortif.value, marche = f.marche.value === '1';
+  const temperature = { neige: -2, gel: -6, canicule: 33 }[genre] ?? TEMP[saison];
+  const enceinte = fortif >= 3 ? [cap, ...voisins(cap).filter(i => terre(i))] : [cap];
+  return {
+    ...base, annee: ep.debut, mois: MOIS[saison], saison, epoque: { cle: ep.cle, nom: ep.nom }, jour_marche: marche,
+    meteo: { ...base.meteo, genre, temperature, pluie: ['pluie', 'orage', 'tempete', 'neige'].includes(genre) ? 0.7 : 0, vent: genre === 'tempete' ? 1 : 0.4, neige_sol: f.neige.checked ? 1 : 0 },
+    explore: null, visible: null, // sans brouillard de guerre : tout est en vue
+    joueur: { ...base.joueur, techs: TECHS_PALIER.slice(1, PALIER[ep.cle] + 1) },
+    villes: base.villes.map(v => v.id !== ville.id ? v : { ...v, niveau: 5, jour_marche: marche, eclairage: ep.cle !== 'ancien', ecoles: 2, fortif, enceinte, travaux_fortif: null }),
+    batiments, cases: { ...base.cases, proprio },
+  };
+}
+function appliquer() {
+  const e = etat();
+  forcerHeure(f.heure.value || null); forcerMarche(e.jour_marche);
+  // même ordre que appliquer() dans main.js
+  plateau.majEtat(e);
+  plateau.majSaison(e.saison, e.meteo.neige_sol);
+  synchroniser(e);
+  majBrouillard(e); majMarine(e); majEspions(e, null);
+  niveauRoutes(e.joueur?.routes?.niveau || 1);
+  majRoutes(e.routes);
+  majVie(e, null);
+  majQuartiers(e);
+  appliquerMeteo(e.meteo, e.saison);
+}
+f.addEventListener('change', appliquer);
+appliquer();
+const p = posCase(cap);
+Object.assign(cam, { l: Math.sqrt(3) * carte.l, h: 1.5 * carte.h, x: p.x, z: p.z, cible: 16, d: 16, auto: true });
+</script>
+</body>
+</html>
