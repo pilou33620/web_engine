@@ -3,6 +3,15 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.2.0 — 2026-11-18
+
+Les animations des bâtiments modernes de web_power, dans `rendu/modernes.js` :
+- `animer(m, { pop })` anime un modèle posé : fumées (bouffées de `vie.js`), éoliennes dont la vitesse suit le vent (`climat.vent`),
+  fenêtres et réverbères des quartiers allumés la nuit, courant qui circule dans les lignes, rebond de la construction (`pop`, 650 ms) ;
+  un modèle retiré de la scène sort tout seul de la liste ;
+- `modele(dessin, graine, { chantier: true })` : le modèle en transparence sous la grue, comme pendant les travaux ;
+- carte test : elle passe par `animer()` (avec le rebond) ; le chantier montre un poste en travaux ; les zones industrielles fument.
+
 ## 2.1.0 — 2026-11-18
 
 Tous les bâtiments modernes de web_power sont dans le moteur :

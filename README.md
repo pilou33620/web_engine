@@ -80,7 +80,7 @@ Un serveur est nécessaire (modules JS et `fetch`). web_power et certaines maque
 
 - **Une seule scène :** celle du moteur de web_royaumes, avec sa nature (mer, rivières, forêts, champs, montagnes), sa météo, l'heure du jour et ses animations.
 - **Époques de web_royaumes :** les 56 bâtiments autour de la capitale, avec ses remparts, son armée et la vie des quartiers.
-- **Époques modernes (d'après web_power) :** les quartiers, les fermes, une installation de chaque type disponible cette année-là, un tronçon de chaque tension de ligne et un chantier (la dernière époque montre aussi le futur : la fusion), dessinés par `lib/rendu/modernes.js`, avec leurs fumées et leurs éoliennes. Le catalogue de `modernes.js` dit quelles installations existent à chaque époque.
+- **Époques modernes (d'après web_power) :** les quartiers, les fermes, une installation de chaque type disponible cette année-là, un tronçon de chaque tension de ligne et un chantier (la dernière époque montre aussi le futur : la fusion), dessinés par `lib/rendu/modernes.js`, avec les animations de web_power : fumées, éoliennes au vent, fenêtres allumées la nuit, courant dans les lignes, rebond de construction. Le catalogue de `modernes.js` dit quelles installations existent à chaque époque.
 - **Réglages :** saison, temps, neige au sol, heure. Le bouton « Bâtiments » ouvre la liste de l'époque : un clic y amène la caméra et entoure la case.
 
 ## Mettre à jour

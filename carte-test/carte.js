@@ -3,10 +3,10 @@
 //  - époques de web_royaumes : l'état de partie du moteur Rust, retouché (époque, saison…), passé au pipeline du jeu ;
 //  - époques de web_power : ses quartiers, ses fermes et chacune de ses installations de l'époque, dessinés par ses propres
 //    modèles (lib/rendu/modernes.js) et posés sur le même plateau, avec leurs fumées et leurs éoliennes.
-import { THREE, scene, cam, posCase, voisins, viser, chaqueImage } from '../lib/rendu/scene.js';
+import { THREE, scene, cam, posCase, voisins, viser } from '../lib/rendu/scene.js';
 import * as plateau from '../lib/rendu/plateau.js';
 import { initMonde, synchroniser } from '../lib/rendu/monde.js';
-import { majVie, bouffee } from '../lib/rendu/vie.js';
+import { majVie } from '../lib/rendu/vie.js';
 import { majQuartiers } from '../lib/rendu/quartiers.js';
 import { majBrouillard } from '../lib/rendu/brouillard.js';
 import { majMarine } from '../lib/rendu/marine.js';
@@ -15,7 +15,7 @@ import { appliquerMeteo, forcerHeure, forcerMarche } from '../lib/rendu/meteo.js
 import { majRoutes, niveauRoutes } from '../lib/rendu/routes.js';
 import { TECHS_PALIER } from '../lib/rendu/modeles.js';
 import { jeter } from '../lib/rendu/toon.js';
-import { BAT, QBAT, bFerme, modele, INSTALLATIONS, QUARTIERS, EPOQUES } from '../lib/rendu/modernes.js';
+import { BAT, QBAT, bFerme, modele, animer, INSTALLATIONS, QUARTIERS, EPOQUES } from '../lib/rendu/modernes.js';
 
 
 const $ = s => document.querySelector(s);
@@ -69,7 +69,6 @@ const FORTIF = { ancien: 2, lumieres: 3, empire: 3, industrie: 4 };   // shortcu
 
 // ------------------------------------------------------------------ époques de web_power : ses modèles sur le même plateau
 const moderne = new THREE.Group(); scene.add(moderne);
-let fumees = [], rotors = [];
 const MER_Y = -0.12;  // les modèles en mer de web_power sont posés sur l'eau
 const LIEU = {        // où web_power autorise chaque installation (sinon : terre ferme, hors rivière et hors forêt)
   fil: i => terre(i) && riviere(i), barrage: i => terre(i) && riviere(i),
@@ -77,7 +76,7 @@ const LIEU = {        // où web_power autorise chaque installation (sinon : ter
   prise: i => terre(i) && !riviere(i) && voisins(i).some(n => riviere(n) || eau(n)), step: i => terre(i) && !riviere(i) && voisins(i).some(n => riviere(n) || eau(n)),
 };
 function batimentsPower(an) {
-  const q = (k, n = 1) => Array.from({ length: n }, () => ({ nom: QUARTIERS.find(q => q.cle === k).nom, groupe: 'Villes', dessin: L => QBAT[k](L, { fum: [] }) }));
+  const q = (k, n = 1) => Array.from({ length: n }, () => ({ nom: QUARTIERS.find(q => q.cle === k).nom, groupe: 'Villes', dessin: QBAT[k] }));
   const villes = [...q('centre'), ...q('residentiel', 2), ...q('industriel'), ...(an >= 1930 ? q('hopital') : []), ...(an >= 1960 ? q('affaires') : []), ...q('village')];
   const fermes = [['Ferme céréalière', false], ['Ferme d’élevage', true]].map(([nom, e]) => ({ nom, groupe: 'Fermes', dessin: L => bFerme(L, e) }));
   const jusque = an >= EPOQUES.at(-1).an ? Infinity : an;  // la dernière époque montre aussi le futur (fusion)
@@ -91,20 +90,14 @@ function poserPower(an) {
     const c = i === 0 ? cap : placer(pris, LIEU[b.type] || (k => terre(k) && !riviere(k) && !foret(k)));
     if (c == null) return;
     pris.add(c);
-    const m = modele(b.dessin, i), { x, z } = posCase(c);
+    const m = b.type === 'grue' ? modele(BAT.poste, i, { chantier: true }) : modele(b.dessin, i), { x, z } = posCase(c);  // le chantier : un poste en travaux
     m.groupe.position.set(x, eau(c) ? MER_Y : plateau.dessus(c) - (b.type === 'barrage' ? 0.1 : 0), z);
     m.groupe.rotation.y = (c % 6) * Math.PI / 3;
-    moderne.add(m.groupe); m.groupe.updateMatrixWorld(true);
-    for (const [fx, fy, fz, vapeur] of m.fumees) fumees.push({ p: new THREE.Vector3(fx, fy, fz).applyMatrix4(m.groupe.matrixWorld), genre: vapeur ? 'blanche' : 'noire', t: Math.random() });
-    rotors.push(...m.rotors);
+    moderne.add(m.groupe); animer(m, { pop: true });
     liste.push({ ...b, case: c });
   });
   return liste;
 }
-chaqueImage(dt => {
-  for (const f of fumees) if ((f.t -= dt) < 0) { f.t = 0.3 + Math.random() * 0.2; bouffee(f.p.x, f.p.y, f.p.z, f.genre); }
-  for (const r of rotors) r.rotation.z -= dt * 2;
-});
 
 // ------------------------------------------------------------------ appliquer une époque
 const f = $('#choix'), MOIS = [1, 4, 7, 10], TEMP = [2, 12, 22, 12];
@@ -124,7 +117,7 @@ function etat() {
 function appliquer(nouvelleEre) {
   if (nouvelleEre) {
     ere = nouvelleEre;
-    jeter(moderne); scene.add(moderne); moderne.clear(); fumees = []; rotors = [];
+    jeter(moderne); scene.add(moderne); moderne.clear();
     liste = ere.source === 'web_power' ? poserPower(ere.an)
       : batimentsRoy.map(b => ({ nom: b.cle === 'hotel' ? `${NOMS.hotel} niv. 5` : NOMS[b.cle], groupe: R.categories?.find?.(c => c.cle === R.batiments.find(d => d.cle === b.cle)?.cat)?.nom || 'Royaume', case: b.case }));
     plateau.degager(ere.source === 'web_power' ? liste.map(b => b.case) : []);

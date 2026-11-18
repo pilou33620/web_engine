@@ -45,9 +45,10 @@ majVie(etat); majQuartiers(etat); appliquerMeteo(etat.meteo, etat.saison);
 - **Les bâtiments modernes :**
 
 ```js
-import { BAT, QBAT, bFerme, modele, INSTALLATIONS, EPOQUES } from './graphismes/rendu/modernes.js';
-const { groupe, fumees, rotors } = modele(BAT.nucleaire, 1);   // à l'échelle du plateau (une case de 10 → 1)
-scene.add(groupe);                                               // fumees : où lancer des bouffées (vie.js) ; rotors : à faire tourner
+import { BAT, QBAT, bFerme, modele, animer, INSTALLATIONS, EPOQUES } from './graphismes/rendu/modernes.js';
+const m = modele(BAT.nucleaire, 1);   // à l'échelle du plateau (une case de 10 → 1) ; modele(…, { chantier: true }) : en travaux
+m.groupe.position.set(x, y, z); scene.add(m.groupe);
+animer(m, { pop: true });             // fumées, éoliennes au vent, fenêtres la nuit, courant des lignes, rebond de construction
 const en1960 = INSTALLATIONS.filter(t => t.an <= 1960 && !(t.fin && t.fin < 1960));
 ```
 
