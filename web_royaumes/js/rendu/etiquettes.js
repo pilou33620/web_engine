@@ -27,6 +27,8 @@ export function etiquette(cle, html, x, y, z, opts = {}) {
   Object.assign(it, { x, y, z, dy: opts.dy || 0, loin: opts.loin ?? 999, vu: true });
   return it;
 }
+/** Cache (ou remontre) une étiquette sans la détruire. */
+export function masquer(cle, oui) { const it = items.get(cle); if (it) it.el.style.visibility = oui ? 'hidden' : ''; }
 export function deplacer(cle, x, y, z) { const it = items.get(cle); if (it) { it.x = x; it.y = y; it.z = z; } }
 /** Retire les étiquettes non revues depuis le dernier balayage. */
 export function balayer(prefixe) {
