@@ -21,7 +21,7 @@
   <label>Heure <select name="heure"><option value="jour">Jour</option><option value="aube">Aube</option><option value="crepuscule">Crépuscule</option><option value="nuit">Nuit</option><option value="">Cycle</option></select></label>
   <label><input type="checkbox" name="noms" checked> Noms</label>
 </form>
-<p class="note">Tous les bâtiments de web_power (1900 → 2035) en même temps, une rangée par famille, dessinés par lib/rendu/modernes.js avec leurs animations (fumées, éoliennes, courant, fenêtres la nuit).</p>
+<p class="note">Tous les bâtiments de web_power (1900 → 2035) en même temps, une rangée par famille, dessinés par lib/rendu/modernes.js avec leurs animations (fumées, éoliennes, courant, fenêtres la nuit, véhicules, bras, voyants…).</p>
 <p class="aide">Glisser : déplacer · clic droit ou Maj : tourner · molette : zoom</p>
 <script type="module">
 import { THREE, scene, cam, camera, apresCamera } from '../../lib/rendu/scene.js';
@@ -32,8 +32,8 @@ import { BAT, QBAT, bFerme, modele, animer, INSTALLATIONS, QUARTIERS } from '../
 // ------------------------------------------------------------------ le catalogue complet, rangé par famille
 const liste = [
   ...QUARTIERS.map(q => ({ nom: q.nom, groupe: 'Villes', dessin: QBAT[q.cle] })),
-  { nom: 'Ferme céréalière', groupe: 'Fermes', dessin: L => bFerme(L, false) },
-  { nom: 'Ferme d’élevage', groupe: 'Fermes', dessin: L => bFerme(L, true) },
+  { nom: 'Ferme céréalière', groupe: 'Fermes', dessin: (L, ex) => bFerme(L, false, ex) },
+  { nom: 'Ferme d’élevage', groupe: 'Fermes', dessin: (L, ex) => bFerme(L, true, ex) },
   ...INSTALLATIONS.map(t => ({ cle: t.cle, nom: `${t.nom} (${t.an}${t.fin ? '–' + t.fin : ''})`, groupe: t.groupe, dessin: BAT[t.cle] })),
 ];
 const MER = ['offshore'], RIVIERE = ['fil', 'barrage', 'prise'];

@@ -3,6 +3,17 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.3.0 — 2026-11-18
+
+Chaque bâtiment moderne a maintenant son animation, dans `rendu/modernes.js` :
+- `piece(L, ex, dessin, x, y, z, a, axe, amp, v, ph)` déclare une partie mobile (tourne, oscille, glisse, pulse, clignote), animée par `animer()` ;
+  `modele()` la renvoie dans `pieces` ; un modèle dessiné hors de `modele()` la garde immobile ;
+- panneaux solaires qui suivent le soleil, embruns des barrages et du fil de l'eau, plasma de la fusion, voyants des batteries, feux des postes,
+  du château d'eau et du centre de déchets dangereux, flèche de la grue, vanne de la prise d'eau, agitateur, ventilations, balancier du forage,
+  jet de la source, ponts racleurs de l'épuration, roseaux du lagunage, bulldozer, voiture, retourneur et fumée du compost, camions, conteneur
+  du quai, dômes et torchère du méthaniseur, vaches et tracteur des fermes, hélicoptère de l'hôpital ;
+- `bFerme(L, elevage, ex)` : troisième argument facultatif pour ses animations.
+
 ## 2.2.0 — 2026-11-18
 
 Les animations des bâtiments modernes de web_power, dans `rendu/modernes.js` :
