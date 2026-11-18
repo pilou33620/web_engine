@@ -20,7 +20,7 @@
   <label>Saison <select name="saison"><option value="0">Hiver</option><option value="1">Printemps</option><option value="2" selected>Été</option><option value="3">Automne</option></select></label>
   <label><input type="checkbox" name="neige"> Neige au sol</label>
 </form>
-<p class="note">Maquette à valider : à gauche le rendu actuel (lib/royaumes/plateau.js), puis deux propositions. Mêmes unités, ombrage toon et contours que le plateau.</p>
+<p class="note">Validée le 18/11/2026 : la proposition 1 est retenue pour les forêts et les montagnes (lib 1.3.0). « Avant » est le rendu d'avant cette date. Mêmes unités, ombrage toon et contours que le plateau.</p>
 <p class="aide">Glisser : déplacer · clic droit ou Maj : tourner · molette : zoom</p>
 <script type="module">
 // Les variantes sont écrites dans les conventions de decor() de plateau.js (tailles × S0, contour EP, hache pour le hasard)
@@ -52,7 +52,7 @@ function bosseler(g, force, graine) {
 // ================================================================== arbres
 const FEUILLES = { 1: [0x8fd15a, 0xa6dd6a, 0x7cc84d, 0x97d35f, 0xf2b5cf], 2: [0x5fae3e, 0x74b83f, 0x4f9a37], 3: [0xd9822b, 0xc9a13a, 0xb5562a, 0x74b83f] };
 const ARBRES = {
-  // ---- actuel : copie de arbre() de plateau.js
+  // ---- avant : arbre() de plateau.js jusqu'à la lib 1.2.0
   actuel(L, i) {
     for (let k = 0; k < 7; k++) {
       const [x, z] = auHasard(i, k, 21), s = (0.8 + hache(i, k, 23) * 0.45) * S0, conif = hache(i, k, 24) < 0.55, y = 0;
@@ -109,7 +109,7 @@ const ARBRES = {
 // ================================================================== montagnes
 const ROCHE = 0x8a8173, ROCHE2 = 0x7a7266, NEIGE = 0xf7f5ee;
 const MONTAGNES = {
-  // ---- actuel : copie de decor() de plateau.js
+  // ---- avant : decor() de plateau.js jusqu'à la lib 1.2.0
   actuel(L, i) {
     for (let k = 0, n = 1 + (hache(i, 50) * 2 | 0); k < n; k++) {
       const [x, z] = k ? auHasard(i, k, 51) : [(hache(i, 52) - 0.5) * 0.2, (hache(i, 53) - 0.5) * 0.2];
@@ -149,8 +149,8 @@ const MONTAGNES = {
 // ================================================================== mise en vitrine
 const COLONNES = [['actuel', 'Actuel'], ['fournie', 'Proposition 1'], ['stylisee', 'Proposition 2']];
 const LIGNES = [   // les montagnes au fond, pour ne pas cacher les forêts
-  { nom: 'Montagne', sol: 0x8f8879, h: 0.46, v: MONTAGNES, cles: ['actuel', 'massif', 'strates'], noms: ['Actuel', 'P1 · massif de roche taillée', 'P2 · roche en strates'] },
-  { nom: 'Forêt', sol: 0x5d9b3a, h: 0.02, v: ARBRES, cles: ['actuel', 'fournie', 'stylisee'], noms: ['Actuel', 'P1 · plus fournie et variée', 'P2 · silhouettes stylisées'] },
+  { nom: 'Montagne', sol: 0x8f8879, h: 0.46, v: MONTAGNES, cles: ['actuel', 'massif', 'strates'], noms: ['Avant', 'P1 · massif de roche taillée (retenue)', 'P2 · roche en strates'] },
+  { nom: 'Forêt', sol: 0x5d9b3a, h: 0.02, v: ARBRES, cles: ['actuel', 'fournie', 'stylisee'], noms: ['Avant', 'P1 · plus fournie et variée (retenue)', 'P2 · silhouettes stylisées'] },
 ];
 const PAS = 2.5, groupe = new THREE.Group(), etiq = document.getElementById('etiquettes'), f = document.getElementById('choix');
 scene.add(groupe);

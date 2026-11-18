@@ -3,6 +3,15 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 1.3.0 — 2026-11-18
+
+Nouveaux arbres et montagnes du plateau (`royaumes/plateau.js`), proposition 1 de `maquettes/web_engine/arbres-montagnes.html` :
+- forêts plus fournies (11/6 arbres par arbre compté par le moteur) et variées : sapins à trois étages de trois verts,
+  feuillus en grappes de trois boules, branches nues l'hiver, buissons en forêt ;
+- montagnes en massif de trois pics de roche taillée, neige qui descend plus bas l'hiver, éboulis et sapins au pied.
+
+Outils : l'installateur installe toutes les parties si on ne lui en demande aucune (anciens scripts des jeux).
+
 ## 1.2.0 — 2026-11-18
 
 Les jeux ne prennent que les parties qu'ils déclarent (`PARTIES` dans leur `outils/maj-graphismes.sh`) :

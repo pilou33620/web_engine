@@ -2,11 +2,12 @@
 # Installe dans un dossier d'un jeu les parties de la bibliothèque graphique (lib/) qu'il demande, avec leurs dépendances,
 # en remplaçant entièrement ce dossier, et y écrit VERSION.json (version, commit de web_engine, parties).
 # Appelé par outils/maj-graphismes.sh de chaque jeu.
-# Usage : outils/installer.sh /chemin/du/jeu/graphismes partie…   (parties : three, royaumes, power, pont)
+# Usage : outils/installer.sh /chemin/du/jeu/graphismes [partie…]   (parties : three, royaumes, power, pont ; toutes par défaut)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 DEST=${1:?usage : outils/installer.sh /chemin/du/dossier partie…}; shift
-[ $# -gt 0 ] || { echo "aucune partie demandée (three, royaumes, power, pont)" >&2; exit 2; }
+# sans partie demandée : tout, comme avant les parties (anciens scripts maj-graphismes.sh des jeux)
+[ $# -gt 0 ] || set -- three royaumes power pont
 # ce dont chaque partie a besoin pour fonctionner
 declare -A BESOIN=([three]="" [royaumes]="three" [power]="" [pont]="royaumes power")
 declare -A PRISES=()
