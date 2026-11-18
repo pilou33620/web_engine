@@ -160,12 +160,13 @@ Le découpage reprend celui de web_cao : une page, un dossier `css/` et des scri
 | Fichier | Contenu |
 |---|---|
 | `index.html` | la page : structure HTML, chargement de three.js et des scripts |
+| `graphismes/` | **la bibliothèque graphique commune web_engine** (outils et grille, moteur 3D, modèles, ambiance, ciel). Ne pas modifier ici : les graphismes se modifient dans web_engine (`lib/`), puis `bash outils/maj-graphismes.sh` ; la CI vérifie que ce dossier est identique à web_engine, et l'action « graphismes » propose chaque lundi la dernière version |
 | `css/style.css` | tous les styles, mises en page paysage et portrait comprises |
 | `js/00-appareil.js` | détection ordinateur, tablette ou téléphone, avant l'affichage |
-| `js/01-outils.js` | utilitaires, grille hexagonale |
+| `graphismes/power/01-outils.js` | utilitaires, grille hexagonale |
 | `js/02-terrain.js` | génération des cartes et du terrain |
-| `js/03-moteur-3d.js` | scène three.js, matériaux, plateau |
-| `js/04-modeles.js` | modèles 3D des installations et des quartiers |
+| `graphismes/power/03-moteur-3d.js` | scène three.js, matériaux, plateau |
+| `graphismes/power/04-modeles.js` | modèles 3D des installations et des quartiers |
 | `js/05-catalogue.js` | catalogue des centrales et des postes, tensions des lignes |
 | `js/06-eau.js` | réseau d'eau : ouvrages, conduites, qualité, simulation |
 | `js/06b-dechets.js` | déchets : sites, collecte, tri, traitement, marché, simulation journalière |
@@ -186,8 +187,8 @@ Le découpage reprend celui de web_cao : une page, un dossier `css/` et des scri
 | `js/20-actions.js` | boutons, menu, tutoriel, bilans annuels |
 | `js/21-partie.js` | nouvelle partie, sauvegarde, chargement |
 | `js/22-banc.js` | stratégies programmées du banc d'équilibrage |
-| `js/23-ambiance.js` | routes, véhicules, animaux, bateaux |
-| `js/24-ciel.js` | jour et nuit, nuages, pluie, neige, saisons, lumières |
+| `graphismes/power/23-ambiance.js` | routes, véhicules, animaux, bateaux |
+| `graphismes/power/24-ciel.js` | jour et nuit, nuages, pluie, neige, saisons, lumières |
 | `js/25-boucle.js` | démarrage et boucle d'animation |
 
 Les scripts sont des scripts classiques chargés dans l'ordre de leur numéro : ils partagent leurs déclarations, donc un fichier peut utiliser ce que les précédents ont défini. Seul three.js arrive en module ES, depuis le CDN.

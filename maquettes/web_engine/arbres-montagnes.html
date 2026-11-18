@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arbres et montagnes</title>
+<link rel="stylesheet" href="../../lib/royaumes/rendu.css">
+<link rel="stylesheet" href="../../galerie/visionneuse.css">
+<style>
+  #etiquettes span.titre { font-size: 13px; font-weight: 600; background: rgba(20, 26, 19, .82); }
+  .note { position: fixed; top: 54px; left: 8px; right: 8px; margin: 0; padding: 6px 10px; font-size: 13px; background: rgba(20, 26, 19, .7); border-radius: 8px; }
+</style>
+</head>
+<body>
+<canvas id="carte" aria-label="Arbres et montagnes : actuel et propositions"></canvas>
+<div id="etiquettes"></div>
+<div id="eclair"></div>
+<form class="barre" id="choix">
+  <b>Arbres et montagnes</b>
+  <label>Saison <select name="saison"><option value="0">Hiver</option><option value="1">Printemps</option><option value="2" selected>Été</option><option value="3">Automne</option></select></label>
+  <label><input type="checkbox" name="neige"> Neige au sol</label>
+</form>
+<p class="note">Maquette à valider : à gauche le rendu actuel (lib/royaumes/plateau.js), puis deux propositions. Mêmes unités, ombrage toon et contours que le plateau.</p>
+<p class="aide">Glisser : déplacer · clic droit ou Maj : tourner · molette : zoom</p>
+<script type="module">
+// Les variantes sont écrites dans les conventions de decor() de plateau.js (tailles × S0, contour EP, hache pour le hasard)
+// pour que celle qui sera retenue y passe telle quelle.
+import { THREE, scene, cam, camera, apresCamera, hache, lumiere } from '../../lib/royaumes/scene.js';
+import { lot, put, fige, jeter, boite, cyl, cone, sphere } from '../../lib/royaumes/toon.js';
+
+const S0 = 0.11, EP = 0.022, R = 1;
+const p = (L, g, col, x, y, z, ry = 0, ep = EP) => put(L, g, col, x, y, z, ry, ep);
+const TEINTES = [0xe2e9f2, 0xf0fbe8, 0xfff4d8, 0xffd8a8], BLANC = new THREE.Color(0xf4f7fb);
+let saison = 2, neige = 0;
+const nv = (hex, k = 1) => (neige > 0 ? new THREE.Color(hex).lerp(BLANC, neige * k).getHex() : hex);
+// un point au hasard dans la case (comme auHasard de plateau.js, sans les rivières)
+const auHasard = (i, k, g, r = 0.62) => { const a = hache(i, k, g) * Math.PI * 2, l = Math.sqrt(hache(i, k, g + 1)) * r; return [Math.cos(a) * l, Math.sin(a) * l]; };
+// une géométrie aux sommets bousculés (roche taillée) ; garde la pointe et la base à leur hauteur
+function bosseler(g, force, graine) {
+  g = g.index ? g.toNonIndexed() : g.clone();
+  const P = g.attributes.position, cle = (x, y, z) => `${x.toFixed(3)},${y.toFixed(3)},${z.toFixed(3)}`, vu = new Map();
+  for (let v = 0; v < P.count; v++) {
+    const x = P.getX(v), y = P.getY(v), z = P.getZ(v), k = cle(x, y, z);
+    if (!vu.has(k)) { const n = vu.size; vu.set(k, [(hache(graine, n, 1) - 0.5) * force, (hache(graine, n, 2) - 0.5) * force * 0.6, (hache(graine, n, 3) - 0.5) * force]); }
+    const [dx, dy, dz] = vu.get(k), bord = Math.hypot(x, z) > 1e-4 ? 1 : 0;
+    P.setXYZ(v, x + dx * bord, y + dy * bord, z + dz * bord);
+  }
+  g.deleteAttribute('normal'); g.computeVertexNormals();
+  return g;
+}
+
+// ================================================================== arbres
+const FEUILLES = { 1: [0x8fd15a, 0xa6dd6a, 0x7cc84d, 0x97d35f, 0xf2b5cf], 2: [0x5fae3e, 0x74b83f, 0x4f9a37], 3: [0xd9822b, 0xc9a13a, 0xb5562a, 0x74b83f] };
+const ARBRES = {
+  // ---- actuel : copie de arbre() de plateau.js
+  actuel(L, i) {
+    for (let k = 0; k < 7; k++) {
+      const [x, z] = auHasard(i, k, 21), s = (0.8 + hache(i, k, 23) * 0.45) * S0, conif = hache(i, k, 24) < 0.55, y = 0;
+      p(L, cyl(0.3 * s, 0.4 * s, 1.4 * s, 5), 0x7a5233, x, y + 0.7 * s, z);
+      if (conif) {
+        p(L, cone(1.9 * s, 3 * s, 6), saison === 0 ? nv(0x5f7f5a, 0.3) : 0x3e7f34, x, y + 2.6 * s, z);
+        p(L, cone(1.4 * s, 2.4 * s, 6), neige > 0.3 ? 0xf4f6f8 : saison === 0 ? 0x557a50 : 0x4c9440, x, y + 4 * s, z);
+      } else if (saison === 0) p(L, sphere(1.25 * s, 0), nv(0x8b7d6b, 0.6), x, y + 2.3 * s, z);
+      else { const pal = FEUILLES[saison] || FEUILLES[2]; p(L, sphere(1.9 * s, 0), pal[hache(i, k, 27) * pal.length | 0], x, y + 2.9 * s, z); }
+    }
+  },
+  // ---- proposition 1 : forêt plus fournie et plus variée (sapins à trois étages, feuillus en grappes, buissons, branches l'hiver)
+  fournie(L, i) {
+    const VERTS = [0x3e7f34, 0x356f30, 0x4a8a3c];
+    for (let k = 0; k < 11; k++) {
+      const [x, z] = auHasard(i, k, 21, 0.66), s = (0.62 + hache(i, k, 23) * 0.55) * S0, conif = hache(i, k, 24) < 0.5, ry = hache(i, k, 25) * 6;
+      p(L, cyl(0.2 * s, 0.32 * s, 1.5 * s, 5), 0x6e4a2c, x, 0.75 * s, z);
+      if (conif) {
+        const v = saison === 0 ? 0x557a50 : VERTS[hache(i, k, 26) * 3 | 0];
+        [[1.75, 2.3, 1.9], [1.35, 2.1, 3.2], [0.95, 1.9, 4.4]].forEach(([r, h, y], e) =>
+          p(L, cone(r * s, h * s, 7), neige > 0.3 && e === 2 ? 0xf4f6f8 : nv(v, e === 2 ? 0.4 : 0.15), x, y * s, z, ry + e * 0.45));
+      } else if (saison === 0) {
+        // nu l'hiver : trois branches et quelques rameaux
+        for (let b = 0; b < 3; b++) { const a = ry + b * 2.1, g = boite(0.16 * s, 1.5 * s, 0.16 * s).rotateZ(0.6); p(L, g, nv(0x6e4a2c, 0.4), x + Math.cos(a) * 0.35 * s, 1.95 * s, z + Math.sin(a) * 0.35 * s, a, 0); }
+      } else {
+        const pal = FEUILLES[saison] || FEUILLES[2], c = j => pal[hache(i, k, 27 + j) * pal.length | 0];
+        p(L, sphere(1.45 * s, 0), c(0), x, 2.75 * s, z, ry);
+        p(L, sphere(1.05 * s, 0), c(1), x + Math.cos(ry) * 0.9 * s, 2.35 * s, z + Math.sin(ry) * 0.9 * s, ry);
+        p(L, sphere(0.95 * s, 0), c(2), x - Math.cos(ry + 0.8) * 0.8 * s, 3.3 * s, z - Math.sin(ry + 0.8) * 0.8 * s, ry);
+      }
+    }
+    for (let k = 0; k < 4; k++) { const [x, z] = auHasard(i, k, 41, 0.7), s = (0.5 + hache(i, k, 42) * 0.3) * S0; p(L, sphere(1 * s, 0).scale(1, 0.6, 1), saison === 0 ? nv(0x5d6b3e, 0.5) : saison === 3 ? 0x8a8a3a : 0x4f8f3a, x, 0.35 * s, z); }
+  },
+  // ---- proposition 2 : silhouettes stylisées (sapins en abat-jour, feuillus ronds et peupliers)
+  stylisee(L, i) {
+    for (let k = 0; k < 9; k++) {
+      const [x, z] = auHasard(i, k, 21), s = (0.75 + hache(i, k, 23) * 0.45) * S0, genre = hache(i, k, 24), ry = hache(i, k, 25) * 6;
+      p(L, cyl(0.22 * s, 0.3 * s, 1.6 * s, 6), 0x7a5233, x, 0.8 * s, z);
+      if (genre < 0.45) {
+        const v = saison === 0 ? 0x557a50 : 0x3f8238;
+        for (let e = 0; e < 4; e++) { const r = 1.75 - e * 0.38; p(L, cyl(r * 0.35 * s, r * s, 1.25 * s, 8), neige > 0.3 && e === 3 ? 0xf4f6f8 : nv(v, 0.15 + e * 0.08), x, (1.7 + e * 0.95) * s, z, ry); }
+        p(L, cone(0.4 * s, 0.9 * s, 8), neige > 0.3 ? 0xf4f6f8 : v, x, 5.6 * s, z, ry);
+      } else if (genre < 0.7) {
+        const c = saison === 0 ? nv(0x8b7d6b, 0.6) : saison === 3 ? 0xc9a13a : saison === 1 ? 0x97d35f : 0x6aae3f;
+        p(L, sphere(1 * s, 1).scale(0.7, 2.1, 0.7), c, x, 3.4 * s, z, ry);   // peuplier
+      } else {
+        const pal = saison === 0 ? [nv(0x8b7d6b, 0.6)] : FEUILLES[saison] || FEUILLES[2];
+        p(L, sphere(1.7 * s, 1), pal[hache(i, k, 27) * pal.length | 0], x, 3 * s, z, ry);
+      }
+    }
+  },
+};
+
+// ================================================================== montagnes
+const ROCHE = 0x8a8173, ROCHE2 = 0x7a7266, NEIGE = 0xf7f5ee;
+const MONTAGNES = {
+  // ---- actuel : copie de decor() de plateau.js
+  actuel(L, i) {
+    for (let k = 0, n = 1 + (hache(i, 50) * 2 | 0); k < n; k++) {
+      const [x, z] = k ? auHasard(i, k, 51) : [(hache(i, 52) - 0.5) * 0.2, (hache(i, 53) - 0.5) * 0.2];
+      const s = (k ? 0.6 + hache(i, k, 54) * 0.2 : 1 + hache(i, k, 54) * 0.2) * S0, ry = hache(i, k, 55) * 2;
+      p(L, cone(6 * s, 9 * s, 5), nv(ROCHE, 0.3), x, 4.5 * s, z, ry);
+      p(L, cone(2.8 * s, 4 * s, 5), NEIGE, x, 7 * s, z, ry, 0.012);
+    }
+  },
+  // ---- proposition 1 : un massif — trois pics de roche taillée, neige qui descend plus bas l'hiver, éboulis et sapins au pied
+  massif(L, i) {
+    const PICS = [[0, -0.05, 1.15, 0], [-0.38, 0.12, 0.72, 1], [0.36, 0.2, 0.62, 2]];
+    for (const [x, z, k, j] of PICS) {
+      const s = k * S0, ry = hache(i, j, 55) * 6, h = 9.5 * s, bas = saison === 0 || neige > 0.3 ? 0.42 : 0.62;
+      p(L, bosseler(cone(5.6 * s, h, 6, 3), 1.1 * s, i * 7 + j), nv(j === 1 ? ROCHE2 : ROCHE, 0.25), x, h / 2, z, ry);
+      // la neige : le haut de la même roche, un peu grossi, à partir de « bas » de la hauteur
+      const hn = h * (1 - bas), rn = 5.6 * s * (1 - bas) * 1.08;
+      p(L, bosseler(cone(rn, hn, 6, 2), 0.5 * s, i * 7 + j), NEIGE, x, h - hn / 2 + 0.002, z, ry, 0.012);
+    }
+    for (let k = 0; k < 6; k++) { const [x, z] = auHasard(i, k, 61, 0.8), s = (0.35 + hache(i, k, 62) * 0.3) * S0; p(L, sphere(1.2 * s, 0), nv(0x9b958a, 0.4), x, 0.3 * s, z, hache(i, k, 63) * 3); }
+    for (let k = 0; k < 4; k++) { const [x, z] = auHasard(i, k, 71, 0.85), s = (0.5 + hache(i, k, 72) * 0.2) * S0; if (Math.hypot(x, z) < 0.6) continue; p(L, cyl(0.2 * s, 0.3 * s, 1 * s, 5), 0x6e4a2c, x, 0.5 * s, z); p(L, cone(1.4 * s, 3 * s, 7), neige > 0.3 ? 0xe9eef2 : 0x3e7f34, x, 2.4 * s, z); }
+  },
+  // ---- proposition 2 : roche en strates — gradins hexagonaux de plus en plus étroits, sommet enneigé
+  strates(L, i) {
+    for (let k = 0, n = 2; k < n; k++) {
+      const [x, z] = k ? [0.34, 0.26] : [-0.08, -0.06], s = (k ? 0.65 : 1.1) * S0, ry = hache(i, k, 55) * 6, bas = saison === 0 || neige > 0.3 ? 2 : 3;
+      let y = 0;
+      for (let e = 0; e < 5; e++) {
+        const r = (5.8 - e * 1.05) * s, h = (2.1 - e * 0.18) * s;
+        p(L, cyl(r * 0.86, r, h, 6), e >= bas ? NEIGE : nv(e % 2 ? ROCHE2 : ROCHE, 0.25), x, y + h / 2, z, ry + e * 0.2);
+        y += h;
+      }
+      p(L, cone(0.9 * s, 1.6 * s, 6), NEIGE, x, y + 0.8 * s, z, ry);
+    }
+  },
+};
+
+// ================================================================== mise en vitrine
+const COLONNES = [['actuel', 'Actuel'], ['fournie', 'Proposition 1'], ['stylisee', 'Proposition 2']];
+const LIGNES = [   // les montagnes au fond, pour ne pas cacher les forêts
+  { nom: 'Montagne', sol: 0x8f8879, h: 0.46, v: MONTAGNES, cles: ['actuel', 'massif', 'strates'], noms: ['Actuel', 'P1 · massif de roche taillée', 'P2 · roche en strates'] },
+  { nom: 'Forêt', sol: 0x5d9b3a, h: 0.02, v: ARBRES, cles: ['actuel', 'fournie', 'stylisee'], noms: ['Actuel', 'P1 · plus fournie et variée', 'P2 · silhouettes stylisées'] },
+];
+const PAS = 2.5, groupe = new THREE.Group(), etiq = document.getElementById('etiquettes'), f = document.getElementById('choix');
+scene.add(groupe);
+let poses = [];
+function afficher() {
+  saison = +f.saison.value; neige = f.neige.checked ? 1 : 0;
+  for (const o of [...groupe.children]) jeter(o);
+  etiq.textContent = ''; poses = [];
+  LIGNES.forEach((ligne, r) => ligne.cles.forEach((cle, c) => {
+    const x = c * PAS + 1.5, z = r * PAS + 1.5, i = 17 + r * 3 + c;
+    // la case, teintée par la saison et blanchie par la neige, comme rebatir() de plateau.js
+    const col = new THREE.Color(ligne.sol).multiply(new THREE.Color(TEINTES[saison])).lerp(BLANC, neige * 0.6).getHex();
+    const T = lot(); put(T, cyl(R * 0.965, R, 0.16, 6), col, 0, ligne.h - 0.08, 0, 0, 0);
+    const D = lot(); ligne.v[cle](D, i);
+    fige(T, groupe).position.set(x, 0, z);
+    fige(D, groupe).position.set(x, ligne.h, z);   // le décor posé sur le dessus de la case
+    const el = document.createElement('span'); el.className = 'titre'; el.textContent = `${ligne.nom} — ${ligne.noms[c]}`; etiq.append(el);
+    poses.push({ el, p: new THREE.Vector3(x, 0, z) });
+  }));
+  lumiere.hauteurSoleil = [0.35, 0.75, 1.0, 0.6][saison];
+}
+apresCamera(() => {
+  const v = new THREE.Vector3(), dx = Math.sin(cam.lacet), dz = Math.cos(cam.lacet);
+  for (const { el, p: q } of poses) { v.set(q.x + dx * 1.15, 0, q.z + dz * 1.15).project(camera); el.hidden = v.z > 1; el.style.transform = `translate(${(v.x + 1) / 2 * innerWidth}px, ${(1 - v.y) / 2 * innerHeight}px) translate(-50%, -50%)`; }
+});
+f.addEventListener('change', afficher);
+afficher();
+Object.assign(cam, { l: 3 * PAS, h: 2 * PAS, x: 1.5 + PAS, z: 1.5 + PAS / 2, cible: 10, d: 10, lacet: 0, auto: false });
+</script>
+</body>
+</html>

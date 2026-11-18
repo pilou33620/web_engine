@@ -22,7 +22,7 @@ from pathlib import Path
 import appairage
 
 RACINE = Path(__file__).resolve().parent
-STATIQUE = re.compile(r"^/(?:index\.html|css/[\w-]+\.css|js/[\w-]+\.js)?$")   # la page, ses styles et ses scripts ; ni .git/, ni le Python, ni le banc
+STATIQUE = re.compile(r"^/(?:index\.html|css/[\w-]+\.css|js/[\w-]+\.js|graphismes/power/[\w-]+\.js)?$")   # la page, ses styles, ses scripts et ceux de la bibliothèque graphique ; ni .git/, ni le Python, ni le banc
 GARDE = appairage.Garde("WEB_POWER", actif=False)   # remplacé dans main() selon --local
 
 

@@ -1,17 +1,22 @@
 {
  "depots": {
   "web_royaumes": {
-   "commit": "c33f18272e82ca9b16febbc934c37516c6e50f05",
+   "commit": "97e4caf02f9cdf9dfc5518aa1c3bcfa6ddf3603b",
    "date": "2026-11-18",
-   "message": "Vie des quartiers : la foule de la halle suit le jour de marché du moteur (rien sous siège, blocus ou disette)"
+   "message": "Graphismes : images et icônes viennent aussi de la bibliothèque web_engine (1.1.0)"
   },
   "web_power": {
-   "commit": "14109fc3bdc5f03b62e65a34d1b17d89842bea6c",
-   "date": "2026-11-07",
-   "message": "Appairage : le nom Tailscale exact de ce poste est accepté (Host)"
+   "commit": "1e2fef409f2037fbcfe722e8d66299343cd297ed",
+   "date": "2026-11-18",
+   "message": "Graphismes : bibliothèque web_engine 1.0.0 (documentation des jeux branchés)"
   }
  },
  "maquettes": [
+  {
+   "source": "web_engine",
+   "chemin": "maquettes/web_engine/arbres-montagnes.html",
+   "titre": "Arbres et montagnes"
+  },
   {
    "source": "web_power",
    "chemin": "maquettes/web_power/dechets.html",

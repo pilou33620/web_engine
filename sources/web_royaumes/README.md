@@ -120,9 +120,12 @@ rust/royaumes/        le moteur et le serveur (Rust)
                       retranchements et forts, événements à choix
   src/vue.rs          ce que reçoit l'interface
   src/serveur.rs      serveur HTTP (web_tools_commun), sauvegardes, options, mise à jour
-web/                  l'interface (index.html, css/, js/, vendor/three r186)
-  js/rendu/           plateau 3D (relief), modèles, routes, vie de la carte, météo, étiquettes,
-                      brouillard, marine, espions, remparts, sièges, forts
+web/                  l'interface (index.html, css/, js/) ; images, icônes et rendu : graphismes/
+  graphismes/         la bibliothèque graphique commune web_engine (three.js r186 ; royaumes/ : plateau 3D, modèles, images, icônes,
+                      routes, vie de la carte, météo, étiquettes, brouillard, marine, espions, remparts, sièges, forts).
+                      NE PAS MODIFIER ICI : les graphismes se modifient dans web_engine (lib/), puis
+                      `bash outils/maj-graphismes.sh` ; la CI vérifie que ce dossier est identique à web_engine
+outils/maj-graphismes.sh   met à jour web/graphismes depuis web_engine (aussi chaque lundi par l'action « graphismes »)
 maquettes/            maquettes 3D validées avant intégration (rendu, armées, guerre, vie des quartiers)
 tests/navigateur.py   banc d'essai de l'interface dans Chrome (Playwright)
 ```

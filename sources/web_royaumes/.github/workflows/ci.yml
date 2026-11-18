@@ -24,3 +24,7 @@ jobs:
       # l'interface : chaque module JavaScript doit au moins se lire
       - name: Interface (syntaxe)
         run: for f in $(find web/js -name '*.js'); do node --experimental-default-type=module --check "$f" || exit 1; done
+
+      # les graphismes viennent de la bibliothèque commune web_engine : ils se modifient là-bas, pas ici
+      - name: Graphismes (identiques à la bibliothèque web_engine)
+        run: bash outils/maj-graphismes.sh --verifier

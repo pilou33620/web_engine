@@ -19,7 +19,7 @@ const N = +arg('paralleles', 4), sortie = arg('sortie', 'banc');
   const res = []; let i = 0; const t0 = Date.now();
   async function ouvrier(n) {
     const p = await b.newPage({ viewport: { width: 400, height: 300 } });
-    if (V) await p.route(/cdn.jsdelivr.net/, r => { const u = r.request().url(); const f = u.includes('/build/three.module.js') ? V + 'build/three.module.min.js' : V + 'addons/' + u.split('/examples/jsm/')[1]; r.fulfill({ path: f, contentType: 'application/javascript' }); });
+    if (V) await p.route(/cdn.jsdelivr.net/, r => { const u = r.request().url(); const f = u.includes('/build/') ? V + 'build/' + u.split('/build/')[1] : V + 'addons/' + u.split('/examples/jsm/')[1]; r.fulfill({ path: f, contentType: 'application/javascript' }); });
     p.on('pageerror', e => console.log(`[${n}] ERREUR`, e.message));
     await p.goto(URL); await p.waitForFunction(() => window.GM && GM.bancPartie, null, { timeout: 60000 });
     while (i < runs.length) {

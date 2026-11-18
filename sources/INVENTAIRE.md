@@ -2,7 +2,7 @@
 
 Généré par `outils/synchroniser.sh` : ne pas modifier à la main.
 
-## web_royaumes — `c33f182` (2026-11-18)
+## web_royaumes — `97e4caf` (2026-11-18)
 
 | Fichier | Taille | Rôle (en-tête du fichier) |
 |---|---:|---|
@@ -28,51 +28,60 @@ Généré par `outils/synchroniser.sh` : ne pas modifier à la main.
 | `maquettes/source/quartiers/quartiers.js` | 150 ko | Les logements du jeu (modeles.js, collé plus haut) animés selon la météo, la saison, l'heure et l'époque. |
 | `maquettes/source/scene.js` | 46 ko | Maquette : le plateau de Royaumes des Rives rendu comme web_power (toon 3 tons, contours bruns, hexagones étagés). |
 | `maquettes/source/vie2.js` | 32 ko | Même façon de faire que l'ambiance : petits modèles en boîtes (unités de web_power), contours, va-et-vient simples. |
-| `web/css/style.css` | 13 ko | Royaumes des Rives — interface (thème de la vidéo : bleu nuit, or, rubans colorés) |
-| `web/icons/icon-180.png` | 9 ko |  |
-| `web/icons/icon-192.png` | 10 ko |  |
-| `web/icons/icon-512.png` | 27 ko |  |
-| `web/img/evenement-disette.svg` | 2 ko |  |
-| `web/img/evenement-inventeur.svg` | 7 ko |  |
-| `web/img/evenement-philosophe.svg` | 2 ko |  |
+| `web/css/style.css` | 12 ko | Royaumes des Rives — interface (thème de la vidéo : bleu nuit, or, rubans colorés) |
+| `web/graphismes/CHANGELOG.md` | 0 ko | Journal des versions de la bibliothèque graphique |
+| `web/graphismes/README.md` | 6 ko | Bibliothèque graphique web_engine |
+| `web/graphismes/VERSION.json` | 0 ko |  |
+| `web/graphismes/package.json` | 0 ko |  |
+| `web/graphismes/power/01-outils.js` | 3 ko |  |
+| `web/graphismes/power/03-moteur-3d.js` | 9 ko |  |
+| `web/graphismes/power/04-modeles.js` | 22 ko |  |
+| `web/graphismes/power/23-ambiance.js` | 20 ko | Décor animé, sans effet sur la simulation. Tout est en instances : quelques centaines d'objets mis à jour à chaque image. |
+| `web/graphismes/power/24-ciel.js` | 7 ko | teinte du sol mois par mois : hiver froid, printemps vert, été doré, automne roux |
+| `web/graphismes/power/pont.js` | 2 ko | Le pont : les modèles de web_power (04-modeles.js) assemblés avec les briques du moteur royaumes (toon.js, three.js r186). |
+| `web/graphismes/royaumes/brouillard.js` | 15 ko | Le brouillard de guerre (maquettes/guerre.html) : trois états par case, d'après etat.explore et etat.visible. |
+| `web/graphismes/royaumes/espions.js` | 16 ko | L'espionnage (maquettes/guerre.html) : l'espion en cape à l'écharpe du royaume, tricorne et lanterne (1700, Lumières), |
+| `web/graphismes/royaumes/etiquettes.js` | 2 ko | Étiquettes HTML posées sur la carte : bannières des villes (rang + nom, comme sur la vidéo), |
+| `web/graphismes/royaumes/forts.js` | 33 ko | Les forts d'armée et les retranchements (maquette validée : maquettes/guerre.html, source maquettes/source/guerre/forts.js). |
+| `web/graphismes/royaumes/guerre_commun.js` | 10 ko | Ce que partagent la marine et l'espionnage (maquettes/guerre.html) : écume des sillages, éclairs des canons, |
+| `web/graphismes/royaumes/icons/icon-180.png` | 9 ko |  |
+| `web/graphismes/royaumes/icons/icon-192.png` | 10 ko |  |
+| `web/graphismes/royaumes/icons/icon-512.png` | 27 ko |  |
+| `web/graphismes/royaumes/img/evenement-disette.svg` | 2 ko |  |
+| `web/graphismes/royaumes/img/evenement-inventeur.svg` | 7 ko |  |
+| `web/graphismes/royaumes/img/evenement-philosophe.svg` | 2 ko |  |
+| `web/graphismes/royaumes/marine.js` | 32 ko | La marine (maquettes/guerre.html) : navires aux couleurs du royaume (pavillon, flamme, liston) qui tanguent et laissent |
+| `web/graphismes/royaumes/meteo.js` | 15 ko | Le temps qu'il fait et l'heure du jour, rendus : pluie, neige, brouillard, orage (éclairs), nuages et leur ombre, |
+| `web/graphismes/royaumes/modeles.js` | 78 ko | Les modèles des bâtiments et des armées, dans le vocabulaire de web_power (maquette maquettes/rendu-power.html) : |
+| `web/graphismes/royaumes/monde.js` | 20 ko | Ce qui vit sur le plateau et suit l'état de la partie : bâtiments (et chantiers), armées, bannières ; |
+| `web/graphismes/royaumes/plateau.js` | 22 ko | Le plateau, rendu comme web_power (maquettes/rendu-power.html) : hexagones séparés et étagés, ombrage toon en trois tons |
+| `web/graphismes/royaumes/quartiers.js` | 94 ko | La vie des quartiers (maquette maquettes/quartiers.html), sur les seuls bâtiments proches du centre du regard : |
+| `web/graphismes/royaumes/remparts.js` | 28 ko | Les remparts des villes : une amélioration à quatre niveaux (Palissade, Murailles, Bastions à la Vauban, Citadelle), |
+| `web/graphismes/royaumes/rendu.css` | 1 ko | Styles des éléments HTML du rendu : canevas #carte, étiquettes posées sur la carte (#etiquettes : bannières .ban et .barres des villes, |
+| `web/graphismes/royaumes/routes.js` | 4 ko | Les routes : tracées par le moteur entre les bâtiments et les villes, dessinées en rubans posés sur les cases |
+| `web/graphismes/royaumes/scene.js` | 8 ko | La scène 3D : moteur de rendu, caméra inclinée (glisser, pincer, tourner), lumières, boucle d'animation. |
+| `web/graphismes/royaumes/sieges.js` | 44 ko | Les sièges (maquette validée : maquettes/guerre.html, source maquettes/source/guerre/guerre.js) : le siège en règle d'une ville |
+| `web/graphismes/royaumes/toon.js` | 4 ko | Le rendu de web_power, commun à tout le plateau : ombrage dessin animé en trois tons et contours brun foncé. |
+| `web/graphismes/royaumes/vie.js` | 58 ko | La vie de la carte, comme la maquette rendu-power : fumées, charrettes, bêtes, faune des lisières, bateaux, oiseaux, |
+| `web/graphismes/three/LICENSE` | 1 ko |  |
+| `web/graphismes/three/VERSION` | 0 ko |  |
+| `web/graphismes/three/addons/utils/BufferGeometryUtils.js` | 36 ko |  |
+| `web/graphismes/three/three.core.js` | 1423 ko |  |
+| `web/graphismes/three/three.module.js` | 647 ko |  |
 | `web/index.html` | 6 ko |  |
 | `web/js/api.js` | 1 ko | Les appels au serveur Rust (le moteur décide de tout ; la page affiche et envoie les ordres). |
 | `web/js/main.js` | 22 ko | Royaumes des Rives : démarrage, écran d'accueil (réglage de la carte avec aperçu 3D), boucle des tours. |
-| `web/js/rendu/brouillard.js` | 15 ko | Le brouillard de guerre (maquettes/guerre.html) : trois états par case, d'après etat.explore et etat.visible. |
-| `web/js/rendu/espions.js` | 16 ko | L'espionnage (maquettes/guerre.html) : l'espion en cape à l'écharpe du royaume, tricorne et lanterne (1700, Lumières), |
-| `web/js/rendu/etiquettes.js` | 2 ko | Étiquettes HTML posées sur la carte : bannières des villes (rang + nom, comme sur la vidéo), |
-| `web/js/rendu/forts.js` | 33 ko | Les forts d'armée et les retranchements (maquette validée : maquettes/guerre.html, source maquettes/source/guerre/forts.js). |
-| `web/js/rendu/guerre_commun.js` | 10 ko | Ce que partagent la marine et l'espionnage (maquettes/guerre.html) : écume des sillages, éclairs des canons, |
-| `web/js/rendu/marine.js` | 32 ko | La marine (maquettes/guerre.html) : navires aux couleurs du royaume (pavillon, flamme, liston) qui tanguent et laissent |
-| `web/js/rendu/meteo.js` | 15 ko | Le temps qu'il fait et l'heure du jour, rendus : pluie, neige, brouillard, orage (éclairs), nuages et leur ombre, |
-| `web/js/rendu/modeles.js` | 78 ko | Les modèles des bâtiments et des armées, dans le vocabulaire de web_power (maquette maquettes/rendu-power.html) : |
-| `web/js/rendu/monde.js` | 20 ko | Ce qui vit sur le plateau et suit l'état de la partie : bâtiments (et chantiers), armées, bannières ; |
-| `web/js/rendu/plateau.js` | 22 ko | Le plateau, rendu comme web_power (maquettes/rendu-power.html) : hexagones séparés et étagés, ombrage toon en trois tons |
-| `web/js/rendu/quartiers.js` | 94 ko | La vie des quartiers (maquette maquettes/quartiers.html), sur les seuls bâtiments proches du centre du regard : |
-| `web/js/rendu/remparts.js` | 28 ko | Les remparts des villes : une amélioration à quatre niveaux (Palissade, Murailles, Bastions à la Vauban, Citadelle), |
-| `web/js/rendu/routes.js` | 4 ko | Les routes : tracées par le moteur entre les bâtiments et les villes, dessinées en rubans posés sur les cases |
-| `web/js/rendu/scene.js` | 8 ko | La scène 3D : moteur de rendu, caméra inclinée (glisser, pincer, tourner), lumières, boucle d'animation. |
-| `web/js/rendu/sieges.js` | 44 ko | Les sièges (maquette validée : maquettes/guerre.html, source maquettes/source/guerre/guerre.js) : le siège en règle d'une ville |
-| `web/js/rendu/toon.js` | 4 ko | Le rendu de web_power, commun à tout le plateau : ombrage dessin animé en trois tons et contours brun foncé. |
-| `web/js/rendu/vie.js` | 58 ko | La vie de la carte, comme la maquette rendu-power : fumées, charrettes, bêtes, faune des lisières, bateaux, oiseaux, |
 | `web/js/ui.js` | 61 ko | L'interface : barre du haut, panneaux (construire, diplomatie, armées, royaume, menu), fiche d'une case |
 | `web/manifest.webmanifest` | 0 ko |  |
-| `web/vendor/three/LICENSE` | 1 ko |  |
-| `web/vendor/three/VERSION` | 0 ko |  |
-| `web/vendor/three/three.core.js` | 1423 ko |  |
-| `web/vendor/three/three.module.js` | 647 ko |  |
 
-## web_power — `14109fc` (2026-11-07)
+## web_power — `1e2fef4` (2026-11-18)
 
 | Fichier | Taille | Rôle (en-tête du fichier) |
 |---|---:|---|
 | `css/style.css` | 24 ko | GridMaster : plateau d'hexagones cartoon + panneaux de gestion. Tokens repris de web_office ; thème unique sombre, comme le jeu. |
-| `index.html` | 9 ko | GridMaster |
+| `index.html` | 10 ko | GridMaster |
 | `js/00-appareil.js` | 0 ko | appareil : le téléphone se joue en portrait, la tablette et l'ordinateur en paysage |
-| `js/01-outils.js` | 3 ko |  |
 | `js/02-terrain.js` | 12 ko | Relief : e = amp·bruit + gu·u + gv·v + base − ile·(distance au centre). Les proportions de mer, collines, montagnes, forêts et plaines |
-| `js/03-moteur-3d.js` | 9 ko |  |
-| `js/04-modeles.js` | 22 ko |  |
 | `js/05-catalogue.js` | 6 ko | mw : puissance ; capex M€ ; delai mois ; opex k€/MW/an ; cout €/MWh hors CO₂ ; co2 g/kWh ; ramp MW/min ; min MW |
 | `js/06-eau.js` | 26 ko | Bilan par réseau connexe à chaque pas de 15 minutes : ressource, stocks des châteaux d'eau, fuites, qualité (6 paramètres), rejets. |
 | `js/06b-dechets.js` | 24 ko | Un pas par jour, à minuit : chaque ville remplit ses bacs, les camions les vident (du lundi au samedi), |
@@ -93,8 +102,6 @@ Généré par `outils/synchroniser.sh` : ne pas modifier à la main.
 | `js/20-actions.js` | 35 ko |  |
 | `js/21-partie.js` | 8 ko |  |
 | `js/22-banc.js` | 21 ko | Aucune IA : chaque stratégie applique des règles fixes une fois par mois de jeu, ce qui rend le banc reproductible. |
-| `js/23-ambiance.js` | 20 ko | Décor animé, sans effet sur la simulation. Tout est en instances : quelques centaines d'objets mis à jour à chaque image. |
-| `js/24-ciel.js` | 7 ko | teinte du sol mois par mois : hiver froid, printemps vert, été doré, automne roux |
 | `js/25-boucle.js` | 3 ko |  |
 | `maquettes/dechets.html` | 72 ko | Maquette Déchets |
 

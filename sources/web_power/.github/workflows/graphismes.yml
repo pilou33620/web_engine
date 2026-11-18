@@ -1,0 +1,36 @@
+name: graphismes
+
+# Chaque lundi (ou à la demande), installe la dernière bibliothèque graphique de web_engine ; si elle a changé,
+# pousse la branche maj-graphismes et ouvre une demande de fusion. Modèle : web_engine/outils/jeu/graphismes.yml.
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branche, étiquette ou commit de web_engine'
+        default: main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  maj:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Installer la bibliothèque
+        run: bash outils/maj-graphismes.sh "${{ inputs.ref || 'main' }}"
+      - name: Demande de fusion si elle a changé
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git add -A
+          if git diff --cached --quiet; then echo "graphismes déjà à jour"; exit 0; fi
+          v=$(python3 -c "import json,glob; print(json.load(open(glob.glob('**/graphismes/VERSION.json', recursive=True)[0]))['version'])")
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B maj-graphismes
+          git commit -m "Graphismes : bibliothèque web_engine $v"
+          git push -f origin maj-graphismes
+          gh pr create --head maj-graphismes --title "Graphismes : bibliothèque web_engine $v" --body "Mise à jour automatique depuis web_engine (outils/maj-graphismes.sh)." || echo "demande déjà ouverte, ou création de demandes interdite aux actions dans les réglages du dépôt"

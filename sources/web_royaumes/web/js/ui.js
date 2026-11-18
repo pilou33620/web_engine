@@ -1,7 +1,7 @@
 // L'interface : barre du haut, panneaux (construire, diplomatie, armées, royaume, menu), fiche d'une case
 // (ville, bâtiment, armées, flottes, espions, fort, siège), récapitulatif du mois, événements à choix, annonces.
-import { echapper as e } from './rendu/etiquettes.js';
-import { voisins } from './rendu/scene.js';
+import { echapper as e } from '../graphismes/royaumes/etiquettes.js';
+import { voisins } from '../graphismes/royaumes/scene.js';
 
 const $ = s => document.querySelector(s);
 let J = null, A = null;
@@ -586,7 +586,7 @@ function effetsOption(o, d) {
 }
 export function carteChoix(c) {
   const E = J.etat, def = R().evenements_choix?.find(d => d.cle === c.cle);
-  const illus = ILLUSTRE.includes(c.cle) ? `<img src="img/evenement-${c.cle}.svg" alt="">` : `<span>${c.icone}</span>`;
+  const illus = ILLUSTRE.includes(c.cle) ? `<img src="graphismes/royaumes/img/evenement-${c.cle}.svg" alt="">` : `<span>${c.icone}</span>`;
   const n = c.options.length;
   return modale(`${c.icone} ${e(c.titre)}`, `<div class="illus">${illus}</div><p class="mini">${e(E.date)} · ${e(E.epoque.nom)}</p><p>${e(c.texte)}</p>`,
     c.options.map((o, i) => { const fx = effetsOption(o, def?.options[i]); return { l: `${e(o.texte)}${fx ? ` · ${fx}` : ''}`, c: i === n - 1 ? 'rouge' : i === 0 ? 'vert' : 'b2', v: i, d: !o.possible }; }), 'choix');

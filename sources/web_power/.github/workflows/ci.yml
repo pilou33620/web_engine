@@ -9,6 +9,9 @@ jobs:
         with: { python-version: '3.12' }
       - name: Serveur — fichiers servis, Host
         run: python test/banc-serveur.py
+      # les graphismes viennent de la bibliothèque commune web_engine : ils se modifient là-bas, pas ici
+      - name: Graphismes (identiques à la bibliothèque web_engine)
+        run: bash outils/maj-graphismes.sh --verifier
       - name: Appairage — code, jeton et cookie partagés
         run: python appairage.py
       - name: appairage.py est le même que celui de web_suite

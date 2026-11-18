@@ -1,5 +1,5 @@
 // La scène 3D : moteur de rendu, caméra inclinée (glisser, pincer, tourner), lumières, boucle d'animation.
-import * as THREE from '../../vendor/three/three.module.js';
+import * as THREE from '../three/three.module.js';
 
 export { THREE };
 export const SQ3 = Math.sqrt(3);
