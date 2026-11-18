@@ -17,12 +17,13 @@ const serveur = createServer(async (req, res) => {
 }).listen(0);
 const base = `http://localhost:${serveur.address().port}/`;
 
-// page, attente (ms), réglages successifs (champs du formulaire #choix)
+// page, attente (ms), réglages successifs (champs du formulaire #choix ; frise : l'année de l'époque à choisir sur la carte test)
 const PAGES = [
   ['galerie/web_royaumes/visionneuse.html', 4000, [{}, { epoque: 'industrie', saison: '0', neige: true }, { epoque: 'empire', saison: '3', neige: false, ruine: true }]],
   ['galerie/web_royaumes/monde.html', 6000, [{}, { epoque: 'industrie', saison: '0', genre: 'neige', neige: true, heure: 'crepuscule', fortif: '4' }, { epoque: 'lumieres', saison: '2', genre: 'orage', neige: false, heure: 'nuit', fortif: '2' }]],
   ['galerie/web_power/visionneuse.html', 4000, [{}, { ere: '1900', saison: '0', neige: true }]],
   ['galerie/web_power/monde.html', 15000, [{}, { ere: '1900', mois: '0', temps: 'neige', neige: true, heure: '7' }, { ere: '2020', mois: '6', temps: 'degage', neige: false, heure: '19' }]],
+  ['carte-test/index.html', 8000, [{}, { frise: '1816', saison: '0', genre: 'neige', neige: true }, { frise: '1960', saison: '2', genre: 'soleil', neige: false, heure: 'nuit' }, { frise: '2035', heure: 'jour' }]],
   ['index.html', 5000, [{}]],
 ];
 const sources = JSON.parse(await readFile(join(racine, 'sources/SOURCES.json'), 'utf8'));
@@ -40,7 +41,7 @@ for (const [page, attente, reglages] of PAGES) {
   await p.goto(base + page); await p.waitForTimeout(attente);
   for (const [i, r] of reglages.entries()) {
     if (i) {
-      await p.evaluate(r => { const f = document.getElementById('choix'); for (const [k, v] of Object.entries(r)) { if (typeof v === 'boolean') f[k].checked = v; else f[k].value = v; } f.dispatchEvent(new Event('change')); }, r);
+      await p.evaluate(r => { if (r.frise) [...document.querySelectorAll('#frise button')].find(b => b.textContent.startsWith(r.frise)).click(); const f = document.getElementById('choix'); for (const [k, v] of Object.entries(r)) { if (k === 'frise') continue; if (typeof v === 'boolean') f[k].checked = v; else f[k].value = v; } f.dispatchEvent(new Event('change')); }, r);
       await p.waitForTimeout(Math.min(attente, 5000));
     }
     await p.screenshot({ path: join(racine, 'outils/captures', `${page.replace(/[/.]/g, '_')}-${i}.png`) });

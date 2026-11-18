@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carte test</title>
+<link rel="stylesheet" href="../sources/web_royaumes/web/css/style.css">
+<link rel="stylesheet" href="carte.css">
+</head>
+<body>
+<canvas id="carte" aria-label="Carte test : tous les bâtiments de toutes les époques"></canvas>
+<div id="etiquettes"></div>
+<div id="eclair"></div>
+
+<header class="hud haut">
+  <div class="titre"><b id="annee">1700</b> <span id="ere">Ancien Régime</span> <small id="source"></small></div>
+  <form id="choix">
+    <label>Saison <select name="saison"><option value="0">Hiver</option><option value="1" selected>Printemps</option><option value="2">Été</option><option value="3">Automne</option></select></label>
+    <label>Temps <select name="genre">
+      <option value="soleil">Soleil</option><option value="nuages">Nuages</option><option value="pluie">Pluie</option><option value="orage">Orage</option>
+      <option value="tempete">Tempête</option><option value="brouillard">Brouillard</option><option value="neige">Neige</option><option value="gel">Gel</option><option value="canicule">Canicule</option>
+    </select></label>
+    <label><input type="checkbox" name="neige"> Neige au sol</label>
+    <label>Heure <select name="heure"><option value="">Cycle</option><option value="jour">Jour</option><option value="aube">Aube</option><option value="crepuscule">Crépuscule</option><option value="nuit">Nuit</option></select></label>
+    <button type="button" id="voir-liste" aria-expanded="false" aria-controls="liste">Bâtiments</button>
+  </form>
+</header>
+<p id="texte-ere" class="hud texte"></p>
+
+<aside id="liste" class="hud liste" hidden aria-label="Bâtiments de l'époque"></aside>
+
+<nav id="frise" class="hud frise" aria-label="Époques"></nav>
+<p id="attente" class="hud attente">Chargement…</p>
+
+<script type="module" src="carte.js"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+/* Carte test : la carte plein écran (styles du jeu web_royaumes), un bandeau en haut, la frise des époques en bas, la liste à droite. */
+.hud { position: fixed; z-index: 5; color: #f3f0e6; font: 14px/1.3 system-ui, sans-serif; }
+.hud * { font-family: system-ui, sans-serif; }
+.hud select, .hud button { font: inherit; }
+.haut { top: 8px; left: 8px; right: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding: 8px 12px; background: rgba(20, 26, 19, .85); border-radius: 10px; }
+.haut .titre { font-size: 16px; }
+.haut .titre b { font-size: 20px; margin-right: 4px; }
+.haut .titre small { opacity: .7; margin-left: 6px; }
+#choix { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+#voir-liste { padding: 4px 12px; border-radius: 8px; border: 1px solid #5d6b55; background: #2b3527; color: inherit; cursor: pointer; }
+#voir-liste[aria-expanded="true"] { background: #f3f0e6; color: #1b211a; }
+.texte { top: 64px; left: 8px; max-width: min(560px, calc(100% - 32px)); margin: 0; padding: 6px 10px; font-size: 13px; background: rgba(20, 26, 19, .7); border-radius: 8px; }
+.texte:empty { display: none; }
+.frise { bottom: 8px; left: 8px; right: 8px; display: flex; gap: 4px; overflow-x: auto; padding: 6px; background: rgba(20, 26, 19, .85); border-radius: 10px; }
+.frise button { flex: 1 0 auto; min-width: 74px; padding: 5px 8px; border: 1px solid #5d6b55; border-radius: 8px; background: transparent; color: inherit; cursor: pointer; text-align: left; font-size: 12px; line-height: 1.2; }
+.frise button b { display: block; font-size: 14px; }
+.frise button.power { border-color: #4f7aa0; }
+.frise button[aria-pressed="true"] { background: #f3f0e6; color: #1b211a; }
+.frise .separe { flex: 0 0 2px; background: #5d6b55; margin: 2px 4px; }
+.liste { top: 64px; right: 8px; bottom: 76px; width: min(300px, calc(100% - 32px)); overflow-y: auto; padding: 8px 10px; background: rgba(20, 26, 19, .88); border-radius: 10px; }
+.liste h3 { margin: 10px 0 4px; font-size: 13px; opacity: .75; }
+.liste button { display: block; width: 100%; text-align: left; padding: 3px 6px; border: 0; border-radius: 6px; background: transparent; color: inherit; cursor: pointer; }
+.liste button:hover, .liste button:focus-visible { background: #3a4734; }
+.attente { inset: 0; display: grid; place-items: center; margin: 0; pointer-events: none; font-size: 18px; text-shadow: 0 1px 3px #000; }
+.attente[hidden] { display: none; }
