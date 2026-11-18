@@ -34,6 +34,11 @@ for ligne in "${BRANCHES[@]}"; do
   else echo "branche $r/$b introuvable (fusionnée ou supprimée ?) : $f ignoré" >&2; fi
 done
 
+# maquettes/ : dossier permanent de web_engine. Les maquettes des jeux et des branches y sont ajoutées ou mises à jour,
+# jamais supprimées : un jeu peut retirer les siennes (sources/ suivra), web_engine les garde.
+for r in web_royaumes web_power; do [ -d "sources/$r/maquettes" ] && mkdir -p "maquettes/$r" && cp -r "sources/$r/maquettes/." "maquettes/$r/"; done
+for d in sources/branches/*/; do [ -d "$d/maquettes" ] && n=$(basename "$d") && mkdir -p "maquettes/$n" && cp -r "$d/maquettes/." "maquettes/$n/"; done
+
 # SOURCES.json : commits copiés et maquettes (lu par index.html)
 python3 - "$(depot web_royaumes)" "$(depot web_power)" <<'EOF'
 import json, subprocess, sys, pathlib, re
@@ -42,10 +47,9 @@ out = {'depots': {}, 'maquettes': []}
 for nom, d in zip(['web_royaumes', 'web_power'], sys.argv[1:]):
     h, date, msg = git(d, 'log', '-1', '--format=%H%x09%cs%x09%s', 'origin/main').split('\t')
     out['depots'][nom] = {'commit': h, 'date': date, 'message': msg}
-for p in sorted(pathlib.Path('sources').glob('**/maquettes/*.html')):
+for p in sorted(pathlib.Path('maquettes').glob('*/*.html')):
     t = re.search(r'<title>(.*?)</title>', p.read_text(encoding='utf-8', errors='replace'), re.S)
-    src = p.parts[2] if p.parts[1] == 'branches' else p.parts[1]
-    out['maquettes'].append({'source': src, 'chemin': str(p), 'titre': (t.group(1).strip() if t else p.stem)})
+    out['maquettes'].append({'source': p.parts[1], 'chemin': p.as_posix(), 'titre': (t.group(1).strip() if t else p.stem)})
 pathlib.Path('sources/SOURCES.json').write_text(json.dumps(out, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
 print(len(out['maquettes']), 'maquettes')
 EOF
@@ -90,4 +94,5 @@ ecarts() {  # $1 dossier du jeu, $2 dossier de lib, $3… fichiers
   for f in "$@"; do [ -f "$jeu/$f" ] && ! diff -q <(sed "s#'../../vendor/three/#'../three/#" "$jeu/$f") "$bib/$f" >/dev/null && echo "  À REPORTER dans $bib : $jeu/$f"; done; return 0
 }
 [ -d sources/web_royaumes/web/js/rendu ] && ecarts sources/web_royaumes/web/js/rendu lib/royaumes $(cd lib/royaumes && ls *.js)
+for d in img icons; do [ -d sources/web_royaumes/web/$d ] && ecarts sources/web_royaumes/web/$d lib/royaumes/$d $(cd lib/royaumes/$d && ls); done
 [ -f sources/web_power/js/04-modeles.js ] && ecarts sources/web_power/js lib/power 01-outils.js 03-moteur-3d.js 04-modeles.js 23-ambiance.js 24-ciel.js

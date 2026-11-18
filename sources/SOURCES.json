@@ -13,33 +13,33 @@
  },
  "maquettes": [
   {
-   "source": "web_power-heliosphere",
-   "chemin": "sources/branches/web_power-heliosphere/maquettes/conquete-spatiale.html",
-   "titre": "Héliosphère"
-  },
-  {
    "source": "web_power",
-   "chemin": "sources/web_power/maquettes/dechets.html",
+   "chemin": "maquettes/web_power/dechets.html",
    "titre": "Maquette Déchets"
   },
   {
+   "source": "web_power-heliosphere",
+   "chemin": "maquettes/web_power-heliosphere/conquete-spatiale.html",
+   "titre": "Héliosphère"
+  },
+  {
    "source": "web_royaumes",
-   "chemin": "sources/web_royaumes/maquettes/armees.html",
+   "chemin": "maquettes/web_royaumes/armees.html",
    "titre": "Armées par technologie"
   },
   {
    "source": "web_royaumes",
-   "chemin": "sources/web_royaumes/maquettes/guerre.html",
+   "chemin": "maquettes/web_royaumes/guerre.html",
    "titre": "Guerre et diplomatie"
   },
   {
    "source": "web_royaumes",
-   "chemin": "sources/web_royaumes/maquettes/quartiers.html",
+   "chemin": "maquettes/web_royaumes/quartiers.html",
    "titre": "Vie des quartiers"
   },
   {
    "source": "web_royaumes",
-   "chemin": "sources/web_royaumes/maquettes/rendu-power.html",
+   "chemin": "maquettes/web_royaumes/rendu-power.html",
    "titre": "Rendu façon web_power"
   }
  ]

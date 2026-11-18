@@ -1,0 +1,1438 @@
+// ===================================================================== Vie des quartiers (maquette)
+// Les logements du jeu (modeles.js, collé plus haut) animés selon la météo, la saison, l'heure et l'époque.
+// Même façon de faire que vie.js : petits modèles en boîtes (unités de web_power) regroupés en InstancedMesh par modèle,
+// pièces fixes figées en lots fusionnés, points lumineux additifs. Chaque animation a sa condition « quand » et son libellé,
+// et le panneau « En ce moment » liste les libellés dont la condition est vraie.
+
+// ------------------------------------------------------------------ scène
+const toile = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas: toile, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x1b211a);
+scene.fog = new THREE.Fog(0xb8c0c4, 1000, 2000); // toujours présent : l'ajouter plus tard recompilerait tous les matériaux
+const cam = new THREE.PerspectiveCamera(30, 1, 0.05, 220); scene.add(cam);
+const hemi = new THREE.HemisphereLight(0xeef7ff, 0x7d8466, 1.5); scene.add(hemi);
+const soleil = new THREE.DirectionalLight(0xfff0d4, 2.6);
+soleil.castShadow = true; Object.assign(soleil.shadow.camera, { left: -5, right: 5, top: 5, bottom: -5, near: 1, far: 50 });
+soleil.shadow.mapSize.set(2048, 2048); soleil.shadow.bias = -0.0008; soleil.shadow.normalBias = 0.02;
+scene.add(soleil, soleil.target);
+const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
+const AXE_Y = V(0, 1, 0), UN = V(1, 1, 1);
+const _m = new THREE.Matrix4(), _m2 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _s = V(), _p = V(), _v = V(), _w = V(), _col = new THREE.Color(), _e = new THREE.Euler();
+const tache = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), d = g.createRadialGradient(32, 32, 0, 32, 32, 32); d.addColorStop(0, 'rgba(255,255,255,1)'); d.addColorStop(0.35, 'rgba(255,255,255,.6)'); d.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = d; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
+const ECH = 0.04, ECH_BAT = 0.1, DALLE = 0.025, EP = 0.022;
+const VITRE = 0x3a4652, BOIS = 0x5b3a1e, PIERRE = 0xbcb6a8;
+
+// ------------------------------------------------------------------ le bourg : six cases de logements autour de la mairie, la taverne et la boulangerie
+const CARTE = ['FFPLPFF', 'FPcmPPF', 'PFbHpPP', 'PPtiqPL', 'LPPMeFF', 'FFLPPFF']; // M : la halle du marché, e : la petite école (au premier plan)
+const LETTRES = { F: 'foret', P: 'prairie', L: 'plaine', c: 'cabane', m: 'maison', b: 'boulangerie', H: 'hotel', p: 'maison_pierre', t: 'taverne', i: 'immeuble', q: 'hotel_particulier', M: 'marche', e: 'ecole' };
+const TERR = { prairie: { col: 0x84c450, h: 0 }, plaine: { col: 0xc9c65c, h: 0 }, foret: { col: 0x5d9b3a, h: 0.02 } };
+const CASES = [];
+CARTE.forEach((ligne, r) => [...ligne].forEach((l, c) => { const t = LETTRES[l], bati = !TERR[t]; CASES.push({ c, r, t: bati ? 'prairie' : t, cle: bati ? t : null, x: SQ3 * (c + 0.5 * (r & 1)), z: 1.5 * r, top: bati ? 0 : TERR[t].h }); }));
+const BATS = CASES.filter(k => k.cle), centre = CASES.find(k => k.cle === 'hotel'), parCle = cle => BATS.find(k => k.cle === cle);
+// la halle au fond du marché, la cour de l'école tournée vers la caméra
+for (const k of BATS) { k.rot = k.cle === 'marche' || k.cle === 'ecole' ? 0 : (hache(k.c, k.r, 2) * 6 | 0) * Math.PI / 3; k.M = new THREE.Matrix4().compose(V(k.x, k.top, k.z), new THREE.Quaternion().setFromAxisAngle(AXE_Y, k.rot), V(ECH_BAT, ECH_BAT, ECH_BAT)); }
+// coordonnées locales d'un bâtiment (unités de web_power) → monde, comme vie.js
+const posB = (k, lx, lz) => ({ x: k.x + (lx * Math.cos(k.rot) + lz * Math.sin(k.rot)) * ECH_BAT, z: k.z + (-lx * Math.sin(k.rot) + lz * Math.cos(k.rot)) * ECH_BAT });
+const capB = (k, dx, dz) => k.rot - Math.atan2(dz, dx); // cap d'un modèle (face à +x) qui regarde la direction locale (dx, dz)
+const monde = (k, x, y, z) => V(x, y, z).applyMatrix4(k.M);
+// les rues : les joints entre les dalles (le tour de la place et les six rues qui en partent)
+const coin = (i, r = 1) => ({ x: centre.x + Math.sin(i * Math.PI / 3) * r, z: centre.z + Math.cos(i * Math.PI / 3) * r });
+const RUES = [...[0, 1, 2, 3, 4, 5].map(i => [coin(i), coin(i + 1)]), ...[0, 1, 2, 3, 4, 5].map(i => [coin(i), coin(i, 2)])];
+// les rues du marché et de l'école : le tour de l'immeuble, et les joints de part et d'autre de la halle
+const coinK = (k, i) => ({ x: k.x + Math.sin(i * Math.PI / 3), z: k.z + Math.cos(i * Math.PI / 3) });
+const KM = parCle('marche'), KE = parCle('ecole');
+RUES.push([coin(0, 2), coinK(KM, 2)], [coinK(KM, 2), coinK(KE, 3)], [coinK(KE, 3), coin(1, 2)], [coin(0, 2), coinK(KM, 4)], [coinK(KM, 4), coinK(KM, 5)], [coinK(KM, 2), coinK(KM, 1)]);
+// les rues en graphe : les promeneurs vont de carrefour en carrefour et choisissent au hasard la rue suivante
+const GRAPHE = (() => {
+  const nds = [], idx = new Map(), n = p => { const c = `${Math.round(p.x * 100)},${Math.round(p.z * 100)}`; if (!idx.has(c)) { idx.set(c, nds.length); nds.push({ x: p.x, z: p.z, v: [] }); } return idx.get(c); };
+  for (const [a, b] of RUES) { const i = n(a), j = n(b); nds[i].v.push(j); nds[j].v.push(i); }
+  return nds;
+})();
+
+// ------------------------------------------------------------------ l'état réglé par les boutons
+let EPOQUE = 'ancien', SAISON = 1, MOIS = 3, METEO = 'beau', HEURE = 'cycle'; // départ au printemps : l'école est ouverte (fermée l'été)
+let horloge = 2, pFixe = 0, tMeteo = 99, VENT = 0.25, t = 0, FLAQUE = 0;
+const JOUR_S = 300, CREP_S = 30, NUIT_S = 60, AUBE_S = 30, CYCLE = JOUR_S + CREP_S + NUIT_S + AUBE_S; // les durées de meteo.js
+const H = { j: 1, a: 0, n: 0, phase: 'jour', p: 0 };
+const PLUVIEUX = () => ['pluie', 'orage', 'tempete'].includes(METEO);
+const NEIGE_TOMBE = () => METEO === 'neige' || (SAISON === 0 && PLUVIEUX()); // comme meteo.js : l'hiver, la pluie tombe en neige
+const PLUIE = () => PLUVIEUX() && !NEIGE_TOMBE();
+const NEIGE_SOL = () => SAISON === 0 || METEO === 'neige';
+const SEC = () => !PLUVIEUX() && METEO !== 'neige';
+const DOUX = () => ['beau', 'nuageux'].includes(METEO);
+const CLAIR = () => ({ beau: 1, canicule: 1, nuageux: 0.45 })[METEO] || 0;
+const JOUR = () => H.phase === 'jour', SOIR = () => H.phase === 'crepuscule', NUIT = () => H.phase === 'nuit', AUBE = () => H.phase === 'aube';
+const DEHORS = () => JOUR() || (AUBE() && H.p > 12) || (SOIR() && H.p < 14); // les heures où l'on est dehors
+const NOMS_MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+const SAISON_MOIS = m => [0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 0][m];
+// la phase de la lune suit le mois du tour (0 nouvelle, 0,5 pleine) : huit phases sur l'année, pleine lune en janvier et en septembre
+const PHASE_LUNE = m => ((m + 4) % 8) / 8;
+const NOM_PHASE = f => ['nouvelle lune', 'premier croissant', 'premier quartier', 'lune gibbeuse croissante', 'pleine lune', 'lune gibbeuse décroissante', 'dernier quartier', 'dernier croissant'][Math.round(f * 8) % 8];
+
+function majHeure(dt) {
+  if (HEURE === 'cycle') {
+    // lecture accélérée : le jour dix fois plus vite, le soir, la nuit et l'aube trois fois (environ 70 s pour le cycle complet)
+    const h0 = horloge; horloge = (horloge + dt * (horloge < JOUR_S ? 10 : 3)) % CYCLE; if (horloge < h0) JOUR_N++;
+    const p = horloge;
+    if (p < JOUR_S) Object.assign(H, { j: 1, a: 0, n: 0, phase: 'jour', p });
+    else if (p < JOUR_S + CREP_S) { const u = (p - JOUR_S) / CREP_S; Object.assign(H, { j: Math.max(0, 1 - 2 * u), a: 1 - Math.abs(2 * u - 1), n: Math.max(0, 2 * u - 1), phase: 'crepuscule', p: p - JOUR_S }); }
+    else if (p < JOUR_S + CREP_S + NUIT_S) Object.assign(H, { j: 0, a: 0, n: 1, phase: 'nuit', p: p - JOUR_S - CREP_S });
+    else { const u = (p - JOUR_S - CREP_S - NUIT_S) / AUBE_S; Object.assign(H, { j: Math.max(0, 2 * u - 1), a: 1 - Math.abs(2 * u - 1), n: Math.max(0, 1 - 2 * u), phase: 'aube', p: p - JOUR_S - CREP_S - NUIT_S }); }
+  } else {
+    pFixe += dt;
+    const w = { jour: [1, 0, 0], aube: [0, 1, 0], crepuscule: [0, 1, 0], nuit: [0, 0, 1] }[HEURE];
+    Object.assign(H, { j: w[0], a: w[1], n: w[2], phase: HEURE, p: pFixe });
+  }
+}
+
+// ------------------------------------------------------------------ lumière (couleurs de meteo.js, plus un crépuscule plus rosé que l'aube)
+const LUMIERE = {
+  jour: { sol: 0xfff0d4, sI: 2.6, hemi: 0xeef7ff, hI: 1.5, fond: 0x1b211a, el: 1 },
+  aube: { sol: 0xff9f5a, sI: 1.9, hemi: 0xd8d4e8, hI: 1.15, fond: 0x3b2717, el: 0.25 },
+  crep: { sol: 0xff7f6a, sI: 1.75, hemi: 0xcdbde0, hI: 1.1, fond: 0x2c1b2a, el: 0.22 },
+  nuit: { sol: 0x8ea6ff, sI: 0.6, hemi: 0x7484b4, hI: 0.95, fond: 0x090d1a, el: 0.6 },
+};
+for (const L of Object.values(LUMIERE)) for (const c of ['sol', 'hemi', 'fond']) L[c] = new THREE.Color(L[c]);
+const SOMBRE = { beau: 1, nuageux: 0.8, pluie: 0.55, orage: 0.42, brouillard: 0.6, tempete: 0.45, neige: 0.7, canicule: 1 };
+const CIEL = { hI: 1.5, fond: new THREE.Color(), el: 1, eclair: 0, tEclair: 3 };
+const GRIS = new THREE.Color(0x3a4248), BRUME = new THREE.Color(0x9aa2a6);
+function majLumiere() {
+  const J = LUMIERE.jour, A = SOIR() ? LUMIERE.crep : LUMIERE.aube, N = LUMIERE.nuit, { j, a, n } = H, s = SOMBRE[METEO];
+  const mix = (c, cible) => cible.setRGB(J[c].r * j + A[c].r * a + N[c].r * n, J[c].g * j + A[c].g * a + N[c].g * n, J[c].b * j + A[c].b * a + N[c].b * n);
+  soleil.intensity = (J.sI * j + A.sI * a + N.sI * n) * s;
+  CIEL.hI = (J.hI * j + A.hI * a + N.hI * n) * (0.75 + 0.25 * s);
+  mix('sol', soleil.color); mix('hemi', hemi.color); mix('fond', CIEL.fond);
+  if (METEO === 'canicule') soleil.color.lerp(_col.setHex(0xffd9a0), 0.5 * j);
+  const clarte = j + a * 0.7 + n * 0.25;
+  if (s < 0.9) CIEL.fond.lerp(GRIS, (1 - s) * 0.6 * clarte);
+  if (METEO === 'brouillard') CIEL.fond.lerp(_col.copy(BRUME).multiplyScalar(clarte), 0.85);
+  CIEL.el = [0.35, 0.75, 1, 0.6][SAISON] * (J.el * j + A.el * a + N.el * n);
+}
+
+// ------------------------------------------------------------------ plateau d'hexagones (comme la maquette rendu-power), rues entre les dalles
+let PLATEAU = null;
+const TEINTES = [0xe2e9f2, 0xf0fbe8, 0xfff4d8, 0xffd8a8]; // hiver, printemps, été, automne
+function ruban(a, b, larg, y) {
+  const dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz), px = -dz / l * larg, pz = dx / l * larg;
+  const pos = [a.x + px, y, a.z + pz, b.x + px, y, b.z + pz, a.x - px, y, a.z - pz, a.x - px, y, a.z - pz, b.x + px, y, b.z + pz, b.x - px, y, b.z - pz];
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(pos.map((_, i) => (i % 3 === 1 ? 1 : 0)), 3)); return g;
+}
+function construirePlateau() {
+  jeter(PLATEAU); PLATEAU = new THREE.Group(); scene.add(PLATEAU);
+  const T = lot(), D = lot(), teinte = new THREE.Color(TEINTES[SAISON]), blanc = NEIGE_SOL(), BL = new THREE.Color(0xf4f7fb);
+  let gr = 1; const rnd = () => hache(gr++, 5, 17);
+  for (const k of CASES) {
+    const d = TERR[k.t], bas = -1, h = k.top - bas, g = cyl(0.965, 1, h, 6).toNonIndexed(); g.translate(k.x, bas + h / 2, k.z);
+    const c = new THREE.Color(d.col).offsetHSL((hache(k.c, k.r, 1) - 0.5) * 0.015, 0, (hache(k.c, k.r, 2) - 0.5) * 0.05).multiply(teinte);
+    if (blanc) c.lerp(BL, 0.55);
+    const nn = g.attributes.normal, a = new Float32Array(nn.count * 3);
+    for (let i = 0; i < nn.count; i++) { const f = nn.getY(i) > 0.5 ? 1 : 0.62; a.set([c.r * f, c.g * f, c.b * f], i * 3); }
+    g.setAttribute('color', new THREE.BufferAttribute(a, 3)); T.g.push(g);
+    if (k.cle) continue;
+    const y = k.top, rr = () => { const an = rnd() * Math.PI * 2, l = Math.sqrt(rnd()) * 0.62; return [k.x + Math.cos(an) * l, k.z + Math.sin(an) * l]; }, s0 = 0.11;
+    if (k.t === 'foret') for (let i = 0, nb = 5 + (rnd() * 3 | 0); i < nb; i++) {
+      const [x, z] = rr(), s = (0.8 + rnd() * 0.45) * s0;
+      const vert = SAISON === 3 ? [0xd9822b, 0xc9a13a, 0xb5562a] : SAISON === 0 ? [0x8a8f7a, 0x9aa08a, 0x7f846f] : [0x5fae3e, 0x74b83f, 0x4f9a37];
+      put(D, cyl(0.3 * s, 0.4 * s, 1.4 * s, 5), 0x7a5233, x, y + 0.7 * s, z, 0, EP);
+      if (rnd() < 0.55) { put(D, cone(1.9 * s, 3 * s, 6), blanc ? 0x5f7f5a : 0x3e7f34, x, y + 2.6 * s, z, 0, EP); put(D, cone(1.4 * s, 2.4 * s, 6), blanc ? 0xf4f6f8 : 0x4c9440, x, y + 4 * s, z, 0, EP); }
+      else put(D, sphere(1.9 * s, 0), vert[rnd() * 3 | 0], x, y + 2.9 * s, z, 0, EP);
+    }
+    if (k.t === 'plaine') {
+      const an = (hache(k.c, k.r, 7) * 3 | 0) * Math.PI / 3, ca = Math.cos(an), sa = Math.sin(an);
+      const C = blanc ? [0xeef2f6, 0xe4eaef] : SAISON === 0 ? [0xa08a5a, 0x8f7a4f] : SAISON === 1 ? [0x9fd35a, 0x86c24a, 0xb5d86a] : SAISON === 3 ? [0xc9a35a, 0xa8803f, 0x9b7d4a] : [0xe3c75b, 0xd6b24a, 0xa9c457, 0xc9b24a];
+      for (let b = -1; b <= 1; b++) for (const cote of [-1, 1]) { const lx = cote * 0.25, lz = b * 0.28; put(D, boite(0.46, 0.03, 0.24), C[hache(k.c * 7 + b, k.r * 5 + cote, 9) * C.length | 0], k.x + lx * ca + lz * sa, y + 0.015, k.z - lx * sa + lz * ca, an, 0); }
+    }
+    if (k.t === 'prairie' && rnd() < 0.6) { const [x, z] = rr(); put(D, sphere(s0, 0), blanc ? 0xdfe6dc : 0x5fa83c, x, y + 0.7 * s0, z, 0, EP); }
+  }
+  // l'arbre du hibou, à la lisière du bois, près de la boulangerie
+  const kb = parCle('boulangerie'), kf = CASES.find(k => k.c === kb.c - 1 && k.r === kb.r);
+  ARBRE_HIBOU.set(kf.x + (kb.x - kf.x) * 0.36, 0, kf.z + 0.18);
+  { const [x, z] = [ARBRE_HIBOU.x, ARBRE_HIBOU.z], y = kf.top; put(D, cyl(0.022, 0.03, 0.34, 6), 0x6a4a2e, x, y + 0.17, z, 0, EP); put(D, boite(0.13, 0.016, 0.016), 0x6a4a2e, x + 0.06, y + 0.2, z, 0, 0.008); put(D, sphere(0.12, 0), SAISON === 3 ? 0xc9a13a : blanc ? 0x9aa08a : 0x4f9a37, x - 0.02, y + 0.38, z, 0, EP); }
+  // rues de l'époque : terre, puis pavés (Empire), puis chaussée empierrée (Industrie) ; blanchies l'hiver avant l'industrie
+  const ROUTE = { ancien: 0xc9a874, lumieres: 0xc9a874, empire: 0xb9b2a2, industrie: 0x8a867e }[EPOQUE];
+  for (const [a, b] of RUES) put(D, ruban(a, b, 0.075, 0.012), blanc && EPOQUE !== 'industrie' ? 0xe3e6e2 : ROUTE, 0, 0, 0, 0, 0);
+  if (!blanc) for (const c of cellsMarelle(MARELLE_RUE.x, MARELLE_RUE.z, MARELLE_RUE.ux, MARELLE_RUE.uz, 0.034, true)) put(D, boite(0.029, 0.001, 0.029), 0xf4f2ea, c.x, 0.0135, c.z, 0, 0);
+  fige(T, PLATEAU); fige(D, PLATEAU);
+}
+const ARBRE_HIBOU = V();
+
+// ------------------------------------------------------------------ bâtiments du jeu, relevés et décor de saison / de météo
+// Les fenêtres, portes, toits et cheminées relevés dans modeles.js deviennent des « cadres » (Matrix4 local → monde) :
+// origine au centre de la pièce, +z vers l'extérieur, unités de web_power.
+let BATIS = null;
+const DRAPS = [], FEN = [], PORTES = [], TOITS = [], CHEM = [], LAMPES = [], LANTERNES = [], RUISS = [], FLAQUES_POS = [], TABLES = [];
+const cadre = (k, x, y, z, ry) => new THREE.Matrix4().multiplyMatrices(k.M, _m.compose(_p.set(x, y, z), _q.setFromAxisAngle(AXE_Y, ry), UN));
+const dansCadre = (M, x, y, z) => V(x, y, z).applyMatrix4(M);
+// un point d'une pièce relevée, dans les coordonnées locales du bâtiment (pour y poser du décor avec put)
+const surPiece = (r, lx, ly, lz) => [r.x + lx * Math.cos(r.ry) + lz * Math.sin(r.ry), (r.y || 0) + ly, r.z - lx * Math.sin(r.ry) + lz * Math.cos(r.ry)];
+function prisme(L, w, d, h, col, x, y, z, ry, ep) { const p = cyl(1, 1, d, 3); p.rotateX(Math.PI / 2); p.rotateZ(Math.PI); p.scale(w / SQ3, h / 1.5, 1); p.translate(0, h / 6, 0); put(L, p, col, x, y + h / 6, z, ry, ep); }
+function versMonde(Ls, M, Ld) { for (const g of Ls.g) Ld.g.push(g.applyMatrix4(M)); for (const o of Ls.o) Ld.o.push(o.applyMatrix4(M)); }
+const CHAUME = [0xc9a14f, 0xb8903f];
+const ROND = (n, r = 6.2) => { const a = 0.4 + Math.PI / 4 + n * Math.PI / 2; return [Math.cos(a) * r, Math.sin(a) * r]; }; // places libres entre les chaumières
+
+function construireBatiments() {
+  jeter(BATIS); BATIS = new THREE.Group(); scene.add(BATIS);
+  for (const l of [FEN, PORTES, TOITS, CHEM, LAMPES, LANTERNES, RUISS, FLAQUES_POS, TABLES, DRAPS]) l.length = 0;
+  const TOUT = lot(), neige = NEIGE_SOL();
+  let id = 0;
+  for (const k of BATS) {
+    const { L, ex, E } = MOD.construire(k.cle, EPOQUE, SAISON, neige);
+    const Dl = lot(); // décor de la maquette, en coordonnées locales du bâtiment
+    if (neige) for (const g of L.g) { g.computeBoundingBox(); if (g.boundingBox.max.y > 0.3) continue; const c = g.attributes.color; for (let i = 0; i < c.count; i++) c.setXYZ(i, c.getX(i) * 0.35 + 0.62, c.getY(i) * 0.35 + 0.635, c.getZ(i) * 0.35 + 0.65); } // la neige tient aussi sur les dalles
+    // ---- la mairie : une porte, des fenêtres (le modèle du jeu n'en a pas), une guirlande l'hiver, les lanternes de la place selon l'époque
+    if (k.cle === 'hotel') {
+      const hm = 2.8 * E.h, rangs = E.h >= 1.5 ? 2 : 1;
+      put(Dl, boite(0.9, 1.4, 0.08), BOIS, 0, 0.95, 1.64, 0, 0); ex.portes.push({ x: 0, z: 1.62, ry: 0, w: 0.9, h: 1.4 });
+      for (const f of [1, -1]) for (let e = 0; e < rangs; e++) for (const x of f > 0 ? [-1.35, 1.35] : [-1.35, 0, 1.35]) {
+        const y = 0.25 + hm * (e + 0.6) / rangs; put(Dl, boite(0.55, 0.7, 0.08), VITRE, x, y, f * 1.62, 0, 0);
+        ex.fen.push({ x, y, z: f * 1.62, ry: f > 0 ? 0 : Math.PI, w: 0.55, h: 0.7, volet: E.volets ? 0x4a6a7a : 0 });
+      }
+      if (SAISON === 0) for (let i = 0; i <= 12; i++) { const u = i / 12, x = -2 + 4 * u, y = hm + 0.05 - Math.sin(u * Math.PI * 3 % Math.PI) * 0.35; put(Dl, sphere(0.16, 0), i % 3 ? 0x2f6a34 : 0xd9322a, x, y, 1.7, 0, 0); }
+      const pl = [[-3.2, 2.4], [3.2, 2.2], [3.4, -2.4], [-3.4, -2.2]];
+      pl.forEach(([x, z], i) => {
+        let hy = 2.8;
+        if (EPOQUE === 'ancien') { put(Dl, boite(0.15, 2.4, 0.15), BOIS, x, 1.2, z, 0, 0.06); put(Dl, boite(0.8, 0.1, 0.1), BOIS, x + 0.35, 2.35, z, 0, 0); put(Dl, boite(0.32, 0.42, 0.32), 0xffd08a, x + 0.65, 1.95, z, 0, 0.05); put(Dl, cone(0.28, 0.25, 4), 0x3a2a20, x + 0.65, 2.27, z, Math.PI / 4, 0); hy = 1.95; LAMPES.push({ p: monde(k, x + 0.65, hy, z), i }); return; }
+        if (EPOQUE !== 'industrie') { put(Dl, boite(0.14, 2.7, 0.14), 0x2b2b30, x, 1.35, z, 0, 0.06); put(Dl, boite(0.75, 0.08, 0.08), 0x2b2b30, x + 0.33, 2.7, z, 0, 0); put(Dl, boite(0.4, 0.45, 0.4), 0xffe2a0, x + 0.62, 2.3, z, 0, 0.05); put(Dl, cone(0.34, 0.3, 4), 0x2b2b30, x + 0.62, 2.68, z, Math.PI / 4, 0); hy = 2.3; LAMPES.push({ p: monde(k, x + 0.62, hy, z), i }); return; }
+        LAMPES.push({ p: monde(k, x, hy, z), i }); // les réverbères à gaz du modèle du jeu
+      });
+    }
+    if (k.cle === 'marche') decorMarche(k, Dl);
+    if (k.cle === 'ecole') decorEcole(k, E, Dl, neige, ex);
+    // ---- relevés → cadres
+    for (const f of ex.fen) {
+      const m = cadre(k, f.x, f.y, f.z, f.ry), i = id++;
+      FEN.push({ k, m, w: f.w, h: f.h, volet: f.volet, chaume: CHAUME.includes(f.toitC), c: V().setFromMatrixPosition(m), n: V(m.elements[8], m.elements[9], m.elements[10]).normalize(), rang: hache(i, 1, 5), r2: hache(i, 2, 5), r3: hache(i, 3, 5), rideau: [0xb8453a, 0xd9a43a, 0x5c7a4a, 0xe8d8b0, 0x7a4a7a][i % 5], lum: 0, o: 1, i, rec: f });
+    }
+    for (const p of ex.portes) PORTES.push({ k, m: cadre(k, p.x, 0, p.z, p.ry), w: p.w, h: p.h, i: PORTES.length, rec: p });
+    for (const r of ex.toits) if (r.w < 9) TOITS.push({ k, m: cadre(k, r.x, r.y, r.z, r.ry), ...r, petit: r.w < 3.4 && r.d < 3.4 });
+    for (const a of ex.drap) { const f = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.13, 6, 1).translate(0.11, 0, 0), toon(0x2f5fa8, { side: THREE.DoubleSide })); f.position.copy(monde(k, a[0], a[1], a[2])); if (a[3]) f.scale.setScalar(a[3]); BATIS.add(f); DRAPS.push(f); }
+    for (const a of ex.fum) CHEM.push({ k, pos: monde(k, a[0], a[1], a[2]), noire: a[3] === true, four: a[3] === 'fumee', rang: hache(CHEM.length, 7, 3), prochain: hache(CHEM.length, 8, 3) });
+    // ---- décor de la saison et de la météo (figé avec le bâtiment ; tout est reconstruit quand la saison ou la météo change)
+    for (const r of ex.toits) {
+      if (r.w >= 9) continue;
+      if (neige) prisme(Dl, r.w + 0.14, r.d - 0.06, r.h + 0.04, 0xf4f7fb, r.x, r.y + 0.07, r.z, r.ry, 0.12); // toits blanchis
+      if (neige && r.w < 6) for (const sx of [-1, 1]) for (let n = 0; n < 4; n++) { const lz = (n / 3 - 0.5) * r.d * 0.8, lg = 0.22 + hache(r.x * 9, n, sx + 2) * 0.35, [x, y, z] = surPiece(r, sx * r.w / 2 * 0.98, -lg / 2, lz); put(Dl, cone(0.06, lg, 4).rotateX(Math.PI), 0xd8f0ff, x, y, z, 0, 0); } // stalactites
+      if ((SAISON === 1 || SAISON === 2) && r.w < 3.4 && hache(r.x * 7, r.z * 3, 11) < 0.45) { const [x, y, z] = surPiece(r, r.w / 2 * 0.8, -0.12, r.d / 2 * 0.85); put(Dl, sphere(0.16, 0).scale(1, 0.8, 1), 0x7a5a3a, x, y, z, 0, 0.05); } // nid d'hirondelles
+      if (PLUIE()) for (const sz of [1, -1]) { const [x, y, z] = surPiece(r, r.w / 2 * 0.95, 0, sz * r.d / 2 * 0.9); RUISS.push({ a: monde(k, x, y, z), b: monde(k, x, 0.25, z), ph: hache(RUISS.length, 3, 9) }); } // l'eau dégouline des avant-toits
+      if (PLUIE() && CHAUME.includes(r.col) && r.w < 3.4) { const [x, , z] = surPiece(r, -r.w / 2 * 0.95, 0, r.d / 2 * 0.9); put(Dl, cyl(0.24, 0.18, 0.36, 8), 0x8a6a4a, x, 0.43, z, 0, 0.06); put(Dl, cyl(0.2, 0.2, 0.02, 8), 0x5fa8d8, x, 0.57, z, 0, 0); RUISS.push({ a: monde(k, x, r.y, z), b: monde(k, x, 0.6, z), ph: 0.3, seau: true }); } // seau sous la fuite de la chaumière
+    }
+    for (const f of ex.fen) {
+      const fr = f;
+      if ((SAISON === 1 || SAISON === 2) && hache(f.x * 13, f.z * 7, 21) < 0.6) { // jardinières
+        const [x, y, z] = surPiece(fr, 0, -f.h / 2 - 0.1, 0.16); put(Dl, boite(f.w * 1.15, 0.14, 0.2), 0x8a5a34, x, y, z, f.ry, 0.04);
+        const C = SAISON === 1 ? [0xff7ab8, 0xffd34d, 0xf6f2ea, 0xb57bff] : [0xd9322a, 0xe8463a, 0xff6a5a];
+        for (let n = 0; n < 4; n++) { const [fx, fy, fz] = surPiece(fr, (n / 3 - 0.5) * f.w, -f.h / 2 + 0.02, 0.16); put(Dl, sphere(0.075, 0), C[(n + (f.x * 3 | 0)) % C.length], fx, fy, fz, 0, 0); put(Dl, sphere(0.06, 0), 0x3f8a34, fx + 0.03, fy - 0.04, fz, 0, 0); }
+      }
+      if (SAISON === 3 && hache(f.x * 5, f.z * 11, 22) < 0.3) { // pots de confiture sur le rebord
+        const [x, y, z] = surPiece(fr, 0, -f.h / 2 - 0.02, 0.1); put(Dl, boite(f.w * 1.1, 0.04, 0.14), BOIS, x, y, z, f.ry, 0);
+        for (let n = 0; n < 3; n++) { const [jx, jy, jz] = surPiece(fr, (n - 1) * f.w * 0.3, -f.h / 2 + 0.05, 0.1); put(Dl, cyl(0.045, 0.045, 0.09, 6), [0xa02a3a, 0x6a2a5a, 0xe07a2a][n], jx, jy, jz, 0, 0); }
+      }
+    }
+    for (const p of ex.portes) {
+      const pr = { ...p, y: 0.25 }, hp = hache(p.x * 7, p.z * 5, 23);
+      if (k.cle === 'taverne' || k.cle === 'boulangerie' || hp < 0.45) { const [x, y, z] = surPiece(pr, p.w / 2 + 0.2, p.h + 0.05, 0.16); put(Dl, boite(0.06, 0.06, 0.25), 0x2b2b30, x, y + 0.2, z, p.ry, 0); put(Dl, boite(0.16, 0.22, 0.16), 0xffe0a0, x, y, z, p.ry, 0.03); LANTERNES.push({ p: monde(k, x, y, z), k, r: hp }); }
+      if (SAISON === 0 && hp < 0.75) { const [x, y, z] = surPiece(pr, 0, p.h * 0.62, 0.06); put(Dl, new THREE.TorusGeometry(p.w * 0.28, 0.045, 4, 10), 0x2f6a34, x, y, z, p.ry, 0.02); put(Dl, boite(0.1, 0.12, 0.04), 0xd9322a, x, y - p.w * 0.26, z, p.ry, 0); } // couronne de houx
+      if (SAISON === 3 && hp > 0.35) for (let n = 0; n < (hp > 0.7 ? 2 : 1); n++) { const [x, y, z] = surPiece(pr, p.w / 2 + 0.25 + n * 0.32, 0.12, 0.3 + n * 0.1); put(Dl, sphere(0.17 - n * 0.04, 1).scale(1, 0.72, 1), 0xe07a1a, x, y, z, 0, 0.04); put(Dl, boite(0.03, 0.08, 0.03), 0x4a6a2a, x, y + 0.13, z, 0, 0); } // citrouilles
+      if (hp < 0.6) FLAQUES_POS.push(dansCadre(cadre(k, p.x, 0.26, p.z, p.ry), 0.3, 0, 0.9 + hp));
+    }
+    // ---- les places libres de chaque case (coordonnées locales de web_power)
+    if (k.cle === 'cabane') {
+      const [px, pz] = ROND(0), a0 = 0.4 + Math.PI / 4;
+      if (SAISON !== 0 && !neige) { // potager : terre, puis pousses, puis légumes mûrs, puis citrouilles
+        put(Dl, boite(2.6, 0.12, 1.5), 0x6a4a2e, px, 0.3, pz, -a0 + Math.PI / 2, 0.05);
+        for (let rg = 0; rg < 3; rg++) for (let n = 0; n < 4; n++) { const lx = (n / 3 - 0.5) * 2.1, lz = (rg - 1) * 0.45, x = px + lx * Math.cos(-a0 + Math.PI / 2) + lz * Math.sin(-a0 + Math.PI / 2), z = pz - lx * Math.sin(-a0 + Math.PI / 2) + lz * Math.cos(-a0 + Math.PI / 2);
+          if (SAISON === 1) put(Dl, cone(0.1, 0.22, 4), 0x9fd35a, x, 0.47, z, 0, 0);
+          else if (SAISON === 2) { put(Dl, sphere(0.22, 0), rg === 1 ? 0x7fbf5a : 0x3f8a34, x, 0.52, z, 0, 0.04); if (rg !== 1) put(Dl, sphere(0.08, 0), 0xd9322a, x + 0.12, 0.6, z, 0, 0); }
+          else if (n % 2 === 0) put(Dl, sphere(0.2, 1).scale(1, 0.7, 1), 0xe07a1a, x, 0.48, z, 0, 0.04);
+        }
+      }
+      const [bx, bz] = ROND(1); // bois de chauffage : grand tas à l'automne, entamé l'hiver
+      const nb = SAISON === 3 ? 7 : SAISON === 0 ? 3 : 4;
+      for (let i = 0; i < nb; i++) { const b = cyl(0.19, 0.19, 1.3, 7); b.rotateZ(Math.PI / 2); put(Dl, b, i % 2 ? 0xa0703f : 0xb07a45, bx, 0.44 + Math.floor(i / 3) * 0.36, bz + ((i % 3) - 1) * 0.4 + (Math.floor(i / 3) % 2) * 0.2, 0, 0.07); }
+      put(Dl, cyl(0.45, 0.5, 0.5, 8), 0xb98a55, bx + 1.4, 0.5, bz + 0.6, 0, 0.06); // billot
+      const [tx, tz] = ROND(2);
+      if (SAISON === 2) TABLES.push({ k, x: tx, z: tz, ry: -(a0 + Math.PI) });
+      if (neige) { put(Dl, sphere(0.5, 1), 0xf6f8fb, tx, 0.7, tz, 0, 0.04); put(Dl, sphere(0.36, 1), 0xf6f8fb, tx, 1.35, tz, 0, 0.04); put(Dl, sphere(0.26, 1), 0xf6f8fb, tx, 1.82, tz, 0, 0.04); put(Dl, cyl(0.18, 0.2, 0.3, 8), 0x1f1f1f, tx, 2.2, tz, 0, 0.03); put(Dl, cone(0.05, 0.25, 5).rotateZ(-Math.PI / 2), 0xf08a30, tx + 0.3, 1.85, tz, 0, 0); }
+      const [lx, lz] = ROND(3), ta = 0.4 + Math.PI / 4 + 3 * Math.PI / 2 + Math.PI / 2; // corde à linge, posée en travers
+      for (const o of [-1.4, 1.4]) put(Dl, boite(0.12, 2.2, 0.12), BOIS, lx + Math.cos(ta) * o, 1.35, lz + Math.sin(ta) * o, 0, 0.05);
+      put(Dl, boite(2.8, 0.03, 0.03), 0xe9e2d0, lx, 2.35, lz, -ta, 0);
+      LINGE.k = k; LINGE.x = lx; LINGE.z = lz; LINGE.cap = -ta;
+    }
+    if (k.cle === 'hotel_particulier' && SAISON === 2) TABLES.push({ k, x: 0, z: 0.3, ry: 0 });
+    if (k.cle === 'maison_pierre' && SAISON === 3) put(Dl, sphere(0.9, 1).scale(1, 0.45, 1), 0xd9822b, 2.6, 0.3, 1.0, 0, 0.05); // le tas de feuilles ratissées
+    for (const T of TABLES.filter(x => x.k === k)) { // table dressée dehors l'été
+      const tb = { x: T.x, y: 0.25, z: T.z, ry: T.ry }, at = (lx, ly, lz) => surPiece(tb, lx, ly, lz);
+      let [x, y, z] = at(0, 0.95, 0); put(Dl, boite(2, 0.12, 1.0), 0xf6f2ea, x, y, z, T.ry, 0.05);
+      for (const [a, b] of [[-0.85, -0.4], [0.85, -0.4], [-0.85, 0.4], [0.85, 0.4]]) { [x, y, z] = at(a, 0.45, b); put(Dl, boite(0.1, 0.9, 0.1), BOIS, x, y, z, T.ry, 0); }
+      for (const b of [-0.95, 0.95]) { [x, y, z] = at(0, 0.45, b); put(Dl, boite(1.8, 0.1, 0.32), BOIS, x, y, z, T.ry, 0.04); }
+      [x, y, z] = at(0.4, 1.17, 0); put(Dl, boite(0.18, 0.3, 0.18), 0xffe0a0, x, y, z, 0, 0.03); T.lampe = monde(k, x, y + 0.05, z);
+      for (const n of [-0.5, 0.2]) { [x, y, z] = at(n, 1.05, 0.2); put(Dl, cyl(0.12, 0.12, 0.05, 8), 0xe8e2d0, x, y, z, 0, 0); }
+    }
+    versMonde(L, k.M, TOUT); versMonde(Dl, k.M, TOUT);
+  }
+  fige(TOUT, BATIS);
+  // flaques des rues : au milieu des rues et devant certaines portes
+  for (const [a, b] of RUES) FLAQUES_POS.push(V(a.x + (b.x - a.x) * (0.3 + hache(a.x * 9, b.z * 7, 1) * 0.4), 0.013, a.z + (b.z - a.z) * (0.3 + hache(a.z * 9, b.x * 7, 2) * 0.4)));
+  majInstancesFenetres();
+}
+const LINGE = { k: null, x: 0, z: 0, cap: 0 };
+
+// ------------------------------------------------------------------ pièces dynamiques en InstancedMesh (une seule passe de dessin par sorte)
+const BOITE1 = new THREE.BoxGeometry(1, 1, 1);
+function mkInst(geo, mat, n, couleurs = false) { const m = new THREE.InstancedMesh(geo, mat, n); m.count = 0; m.frustumCulled = false; if (couleurs) { m.setColorAt(0, _col.set(0xffffff)); for (let i = 1; i < n; i++) m.setColorAt(i, _col); } scene.add(m); return m; }
+const NF = 700;
+const VITRES = mkInst(BOITE1, new THREE.MeshBasicMaterial({ color: 0xffffff }), NF, true); // la vitre, posée juste devant celle du modèle : éteinte, allumée, rideau, ouverte
+const VOLETS = mkInst(BOITE1, toon(0xffffff), NF * 2, true);
+const VOILES = mkInst(BOITE1, toon(0xf6f2ea, { side: THREE.DoubleSide }), NF);
+const SILS = mkInst(BOITE1, new THREE.MeshBasicMaterial({ color: 0x2a1a10 }), 120);
+let SILWIN = [];
+function majInstancesFenetres() {
+  FEN.forEach((f, i) => { _m.copy(f.m).multiply(_m2.compose(_p.set(0, 0, 0.045), _q.identity(), _s.set(f.w, f.h, 0.012))); VITRES.setMatrixAt(i, _m); });
+  VITRES.count = FEN.length; VITRES.instanceMatrix.needsUpdate = true;
+  // ombres chinoises : toutes les fenêtres de la taverne et une fenêtre sur sept ailleurs
+  SILWIN = FEN.filter(f => f.k.cle === 'taverne' || (f.r3 > 0.86 && f.k.cle !== 'ecole')).slice(0, 55);
+}
+// la lumière des fenêtres selon l'époque : chandelle, lampe à huile, lampe plus claire (quinquet), bec de gaz ; et son vacillement
+const LAMPE = { ancien: [0xffa24a, 0.3], lumieres: [0xffb85a, 0.14], empire: [0xffc870, 0.08], industrie: [0xfff2cc, 0.015] };
+const RUE = { ancien: 0xffa850, lumieres: 0xffc060, empire: 0xffcc70, industrie: 0xfff4d0 };
+function cibleLum(f) {
+  const ph = H.phase, p = H.p, ind = EPOQUE === 'industrie', cle = f.k.cle;
+  if (cle === 'taverne' && ((ph === 'crepuscule' && p > 3) || (ph === 'nuit' && p < 50))) return 1.25; // la taverne s'anime le soir
+  if (cle === 'ecole') return EN_CLASSE() && (SAISON === 0 || !CLAIR()) ? 0.8 : 0; // l'école est vide le soir et la nuit
+  if (cle === 'marche') return 0;
+  if (cle === 'boulangerie' && ((ph === 'nuit' && p > 35) || ph === 'aube')) return 1; // le boulanger se lève avant l'aube
+  if (ph === 'crepuscule') return p > 2 + f.rang * 24 ? 1 : 0; // une à une
+  if (ph === 'nuit') return f.r2 < (ind ? 0.5 : 0.35) || p < 12 + f.r2 * 42 ? 1 : 0; // elles s'éteignent tard, une à une ; les veilleurs gardent la leur
+  if (ph === 'aube') return f.r3 < 0.3 && p < 5 + f.r3 * 60 ? 1 : 0; // quelques lève-tôt
+  return (METEO === 'brouillard' && f.r3 < 0.4) || (METEO === 'orage' && f.r3 < 0.25) ? 0.75 : 0;
+}
+function cibleVolet(f) {
+  if (METEO === 'tempete') return f.r2 < 0.55 ? -1 : 0; // la moitié battent, les autres ont été fermés
+  if (PLUVIEUX() || METEO === 'neige' && !DEHORS()) return tMeteo > 0.6 + f.rang * 7 ? 0 : 1; // on les ferme un à un
+  if (NUIT()) return f.cible > 0 ? 1 : 0;
+  if (AUBE()) return H.p > 2 + f.rang * 24 ? 1 : 0; // on les ouvre un à un
+  return 1;
+}
+// les volets du jeu (vert sous le chaume, bleu-gris ailleurs), un peu ravivés pour qu'on les distingue de la vitre une fois fermés
+const VOLET_VIF = { [0x5c7a4a]: 0x6f9a52, [0x4a6a7a]: 0x5a8fb4 };
+const VITRE_C = new THREE.Color(VITRE), INTERIEUR = new THREE.Color(0x1c130d), FLASH = new THREE.Color(0xf4f8ff), C_LAMPE = new THREE.Color(), C_ON = new THREE.Color(), C_RID = new THREE.Color();
+function majFenetres(dt) {
+  const [lc, fl] = LAMPE[EPOQUE], clarte = 0.3 + 0.7 * Math.min(1, H.j + H.a * 0.6), ouvertes = METEO === 'canicule' && JOUR();
+  C_LAMPE.setHex(lc);
+  let nv = 0, nvo = 0;
+  for (const f of FEN) {
+    f.cible = cibleLum(f);
+    f.lum += Math.sign(f.cible - f.lum) * Math.min(Math.abs(f.cible - f.lum), dt * 2.5);
+    const vac = 1 - fl * (0.5 + 0.5 * Math.sin(t * 17 + f.i * 3.1) * Math.sin(t * 7.3 + f.i));
+    const rideau = METEO === 'orage' || (f.lum > 0.3 && (NUIT() || SOIR()) && f.r3 > 0.6);
+    C_RID.setHex(f.rideau);
+    _col.copy(ouvertes ? INTERIEUR : rideau ? C_RID : VITRE_C).multiplyScalar(ouvertes ? 1 : clarte * (rideau ? 0.75 : 1));
+    if (f.lum > 0) { C_ON.copy(C_LAMPE); if (rideau) C_ON.lerp(C_RID, 0.45).multiplyScalar(1.15); _col.lerp(C_ON.multiplyScalar(vac), Math.min(1, f.lum)); }
+    if (CIEL.eclair > 0) _col.lerp(FLASH, CIEL.eclair * 0.85);
+    VITRES.setColorAt(f.i, _col);
+    // volets : charnière au bord de la fenêtre, 0 fermé, 1 rabattu contre le mur
+    if (f.volet) {
+      const c = cibleVolet(f);
+      if (c < 0) f.o = THREE.MathUtils.clamp(0.5 + 0.8 * Math.sin(t * (1.7 + f.r3 * 2.2) + f.i) * Math.sin(t * 0.63 + f.i * 3), 0, 1);
+      else f.o += Math.sign(c - f.o) * Math.min(Math.abs(c - f.o), dt * 1.4);
+      const ww = f.w, ph = Math.PI * f.o;
+      for (const v of [-1, 1]) {
+        const cx = v * ww / 2 - v * ww / 4 * Math.cos(v * ph), cz = 0.07 + v * ww / 4 * Math.sin(v * ph);
+        _m.copy(f.m).multiply(_m2.compose(_p.set(cx, 0, cz), _q.setFromAxisAngle(AXE_Y, v * ph), _s.set(ww / 2 * 0.93, f.h * 1.05, 0.03)));
+        VOLETS.setMatrixAt(nv, _m); VOLETS.setColorAt(nv++, _col.setHex(VOLET_VIF[f.volet] || f.volet));
+      }
+    } else f.o = 1;
+    // lueur de la fenêtre (affaiblie derrière un volet clos)
+    if (f.lum > 0.04) HALO.mettre(_p.copy(f.c).addScaledVector(f.n, 0.006), C_ON.copy(C_LAMPE), Math.min(1, f.lum) * vac * (f.volet ? 0.25 + 0.75 * f.o : 1) * (JOUR() ? 0.45 : 0.9));
+    // canicule : fenêtres grandes ouvertes, voilage qui ondule dehors
+    if (ouvertes) {
+      const a = 0.25 + 0.22 * Math.sin(t * 1.3 + f.i * 1.7);
+      _m.copy(f.m).multiply(_m2.compose(_p.set(0, f.h / 2, 0.06), _q.setFromAxisAngle(_v.set(1, 0, 0), -a), UN)).multiply(_m2.compose(_p.set(0, -f.h * 0.45, 0), _q.identity(), _s.set(f.w * 0.8, f.h * 0.9, 0.01)));
+      VOILES.setMatrixAt(nvo++, _m);
+    }
+  }
+  VITRES.instanceColor.needsUpdate = true;
+  VOLETS.count = nv; VOLETS.instanceMatrix.needsUpdate = true; if (VOLETS.instanceColor) VOLETS.instanceColor.needsUpdate = true;
+  VOILES.count = nvo; VOILES.instanceMatrix.needsUpdate = true;
+  // ombres chinoises : on passe derrière le rideau ; on danse derrière ceux de la taverne
+  let ns = 0;
+  if (NUIT() || SOIR()) for (const f of SILWIN) {
+    const tav = f.k.cle === 'taverne';
+    if (f.lum < 0.6 || f.o < 0.6 || (!tav && Math.sin(t * 0.21 + f.i * 2.3) < -0.1)) continue;
+    const x = Math.sin(t * (tav ? 1.6 : 0.45) + f.i) * (f.w / 2 - f.w * 0.17) * 0.92, saut = tav ? Math.abs(Math.sin(t * 6 + f.i)) * f.h * 0.07 : 0;
+    _m.copy(f.m).multiply(_m2.compose(_p.set(x, -f.h * 0.14 + saut, 0.052), _q.identity(), _s.set(f.w * 0.3, f.h * 0.56, 0.004))); SILS.setMatrixAt(ns++, _m);
+    _m.copy(f.m).multiply(_m2.compose(_p.set(x, f.h * 0.25 + saut, 0.052), _q.identity(), _s.set(f.w * 0.19, f.h * 0.19, 0.004))); SILS.setMatrixAt(ns++, _m);
+  }
+  SILS.count = ns; SILS.instanceMatrix.needsUpdate = true;
+}
+
+// ------------------------------------------------------------------ points lumineux (additifs) : fenêtres et lanternes, réverbères et four, yeux
+// un point lumineux a une seule profondeur : on l'avance vers la caméra pour que le mur qui le porte ne le coupe pas en biais
+function lueurs(n, taille, avance) {
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3)); g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3), 3)); g.setDrawRange(0, 0);
+  const o = new THREE.Points(g, new THREE.PointsMaterial({ map: tache, size: taille, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+  o.frustumCulled = false; scene.add(o); o.nb = 0;
+  o.mettre = (p, c, k = 1) => { if (o.nb >= n) return; _w.copy(cam.position).sub(p).setLength(avance).add(p); g.attributes.position.setXYZ(o.nb, _w.x, _w.y, _w.z); g.attributes.color.setXYZ(o.nb++, c.r * k, c.g * k, c.b * k); };
+  o.fin = () => { g.setDrawRange(0, o.nb); g.attributes.position.needsUpdate = g.attributes.color.needsUpdate = true; o.nb = 0; };
+  return o;
+}
+const HALO = lueurs(900, 0.13, 0.07), GRAND = lueurs(80, 0.36, 0.14), PETIT = lueurs(60, 0.03, 0.01);
+
+// ------------------------------------------------------------------ particules : boules de neige, poussière, copeaux, tuiles, gouttes, ondes sonores, ronds dans l'eau
+const P = {
+  boule: mkInst(new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 700, true),
+  plaque: mkInst(BOITE1, toon(0xffffff), 400, true),
+  son: mkInst(new THREE.RingGeometry(0.82, 1, 24), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }), 60, true),
+  ride: mkInst(new THREE.RingGeometry(0.7, 1, 16).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75, depthWrite: false }), 160, true),
+};
+const parts = [];
+function particule(o) { if (parts.length < 1300) parts.push({ age: 0, vie: 1, g: 0, vx: 0, vy: 0, vz: 0, s: 0.01, genre: 'boule', col: 0xffffff, spin: 0, ...o }); }
+const C_FLAQUE = new THREE.Color(0x7f9db3), NOIR = new THREE.Color(0);
+function majParticules(dt) {
+  const n = { boule: 0, plaque: 0, son: 0, ride: 0 };
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i]; p.age += dt;
+    if (p.age > p.vie) { parts.splice(i, 1); if (p.fin) p.fin(p); continue; }
+    p.vy -= p.g * dt; p.x += (p.vx + (p.vent ? VENT_X * p.vent : 0)) * dt; p.y += p.vy * dt; p.z += (p.vz + (p.vent ? VENT_Z * p.vent : 0)) * dt;
+    if (p.sol != null && p.y < p.sol) { p.y = p.sol; p.vx *= 0.2; p.vz *= 0.2; p.vy = 0; p.spin = 0; p.vent = 0; }
+  }
+  for (const p of parts) {
+    const m = P[p.genre], k = n[p.genre]; if (k >= m.instanceMatrix.count) continue;
+    const u = p.age / p.vie;
+    if (p.genre === 'son') { const s = p.s * (0.35 + u * 1.8); _m.compose(_p.set(p.x, p.y, p.z), cam.quaternion, _s.set(s, s, s)); m.setColorAt(k, _col.setHex(p.col).lerp(NOIR, u)); }
+    else if (p.genre === 'ride') { const s = p.s * (0.25 + u); _m.compose(_p.set(p.x, p.y, p.z), _q.identity(), _s.set(s, s, s)); m.setColorAt(k, _col.setHex(0xe6f2fa).lerp(C_FLAQUE, u)); }
+    else { const s = p.s * (p.grandit ? 1 + u * p.grandit : 1); _q.setFromEuler(_e.set(p.age * p.spin, p.age * p.spin * 0.7, p.rz || 0)); _m.compose(_p.set(p.x, p.y, p.z), _q, p.forme ? _s.set(p.forme[0] * s, p.forme[1] * s, p.forme[2] * s) : _s.set(s, s, s)); m.setColorAt(k, _col.setHex(p.col)); }
+    m.setMatrixAt(k, _m); n[p.genre]++;
+  }
+  for (const g in P) { P[g].count = n[g]; P[g].instanceMatrix.needsUpdate = true; P[g].instanceColor.needsUpdate = true; }
+}
+
+// ------------------------------------------------------------------ fumées des cheminées (comme vie.js), poussées par le vent
+const NFUM = 500;
+const FUM = mkInst(new THREE.IcosahedronGeometry(0.05, 0), toon(0xffffff, { transparent: true, opacity: 0.82, depthWrite: false }), NFUM, true);
+const bouffees = [];
+const TEINTE = { blanche: new THREE.Color(0xf6f4ee), grise: new THREE.Color(0x8d8880), noire: new THREE.Color(0x55504a) };
+let VENT_X = 0.03, VENT_Z = 0;
+function bouffee(x, y, z, genre = 'blanche', k = 1) { if (bouffees.length >= NFUM) bouffees.shift(); bouffees.push({ x, y, z, age: 0, c: TEINTE[genre], k, vie: 3 }); }
+function majFumees(dt) {
+  let n = 0;
+  for (let i = bouffees.length - 1; i >= 0; i--) { const b = bouffees[i]; b.age += dt; if (b.age > b.vie) { bouffees.splice(i, 1); continue; } b.y += dt * 0.18 / (1 + VENT * 1.5); b.x += (VENT_X + 0.02) * dt; b.z += VENT_Z * dt; }
+  for (const b of bouffees) { const u = b.age / b.vie, s = (0.5 + b.age * 0.55) * b.k * (u > 0.75 ? (1 - u) / 0.25 : 1); _m.compose(_p.set(b.x, b.y, b.z), _q.identity(), _s.set(s, s, s)); FUM.setMatrixAt(n, _m); FUM.setColorAt(n++, b.c); }
+  FUM.count = n; FUM.instanceMatrix.needsUpdate = true; FUM.instanceColor.needsUpdate = true;
+}
+// le rythme du foyer : toutes au matin, la moitié le jour, plus le soir, peu la nuit ; épaisses l'hiver, rares l'été, presque aucune en canicule
+function partFoyers() {
+  const hiver = SAISON === 0 || METEO === 'neige';
+  let part = AUBE() ? 1 : SOIR() ? 0.75 : NUIT() ? 0.3 : 0.45;
+  if (hiver) part = Math.max(part, NUIT() ? 0.7 : 1); else if (SAISON === 3) part += 0.15; else if (SAISON === 2) part *= 0.5;
+  if (METEO === 'canicule') part = 0.06;
+  return { part, pas: hiver ? 0.55 : 0.85, k: hiver ? 1.15 : 0.9 };
+}
+function majCheminees(dt) {
+  const { part, pas, k } = partFoyers();
+  for (const c of CHEM) {
+    const actif = c.four ? (NUIT() && H.p > 35) || AUBE() || (JOUR() && H.p < 90) : c.rang < part;
+    if (!actif) continue;
+    c.prochain -= dt;
+    if (c.prochain <= 0) { c.prochain = pas * (0.8 + Math.random() * 0.5); bouffee(c.pos.x, c.pos.y, c.pos.z, c.noire ? 'noire' : EPOQUE === 'industrie' && c.k.cle === 'immeuble' ? 'grise' : 'blanche', c.four ? 1.2 : k); }
+  }
+}
+
+// ------------------------------------------------------------------ eau : gouttières qui ruissellent, flaques qui grandissent puis sèchent
+const RUISS_L = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(400 * 3 * 6), 3)), new THREE.LineBasicMaterial({ color: 0xcfe6f8, transparent: true, opacity: 0.9 }));
+RUISS_L.frustumCulled = false; scene.add(RUISS_L);
+const FLAQUES = mkInst(new THREE.CylinderGeometry(1, 1, 0.002, 14), toon(0x7f9db3), 120);
+function majEau(dt) {
+  const pl = PLUIE();
+  FLAQUE = THREE.MathUtils.clamp(FLAQUE + (pl ? dt * 0.12 : -dt * 0.035), 0, 1); // elles grandissent sous la pluie et sèchent ensuite
+  let n = 0;
+  if (FLAQUE > 0.01) FLAQUES_POS.forEach((p, i) => { const r = (0.028 + hache(i, 4, 4) * 0.03) * FLAQUE; _m.compose(p, _q.identity(), _s.set(r, 1, r * (0.7 + hache(i, 5, 4) * 0.5))); FLAQUES.setMatrixAt(n++, _m); });
+  FLAQUES.count = n; FLAQUES.instanceMatrix.needsUpdate = true;
+  if (pl && FLAQUE > 0.2 && FLAQUES_POS.length) for (let i = 0; i < 2; i++) if (Math.random() < dt * 9) { const j = Math.random() * FLAQUES_POS.length | 0, p = FLAQUES_POS[j], r = (0.028 + hache(j, 4, 4) * 0.03) * FLAQUE; particule({ genre: 'ride', x: p.x + (Math.random() - 0.5) * r, y: p.y + 0.002, z: p.z + (Math.random() - 0.5) * r * 0.6, s: r * 0.55, vie: 0.7 }); }
+  // filets d'eau qui tombent des avant-toits, et goutte à goutte dans les seaux
+  const a = RUISS_L.geometry.attributes.position; let k = 0;
+  RUISS_L.visible = pl && RUISS.length > 0;
+  if (RUISS_L.visible) for (const r of RUISS) for (let j = 0; j < (r.seau ? 2 : 3); j++) {
+    if (k >= 400 * 3) break;
+    const u = (t * (r.seau ? 1.1 : 1.8) + r.ph + j / 3) % 1, y = r.a.y + (r.b.y - r.a.y) * u * u;
+    a.setXYZ(k * 2, r.a.x, y, r.a.z); a.setXYZ(k * 2 + 1, r.a.x, y - (r.seau ? 0.006 : 0.016), r.a.z); k++;
+    if (r.seau && u > 0.95 && Math.random() < 0.3) particule({ genre: 'ride', x: r.b.x, y: r.b.y * 1, z: r.b.z, s: 0.014, vie: 0.5 });
+  }
+  RUISS_L.geometry.setDrawRange(0, k * 2); a.needsUpdate = true;
+}
+
+// ------------------------------------------------------------------ météo : pluie, neige, nuages et leur ombre, éclairs (comme la maquette rendu-power)
+const NG = 1200, GOUT = Float32Array.from({ length: NG * 3 }, Math.random);
+const PLUIE_L = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(NG * 6), 3)), new THREE.LineBasicMaterial({ color: 0xd8e6f2, transparent: true, opacity: 0.5, depthWrite: false }));
+const NEIGE_P = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(NG * 3), 3)), new THREE.PointsMaterial({ map: tache, size: 0.045, transparent: true, depthWrite: false }));
+for (const o of [PLUIE_L, NEIGE_P]) { o.frustumCulled = false; o.visible = false; scene.add(o); }
+const M_NUAGE = toon(0xffffff, { transparent: true, opacity: 0.85, depthWrite: false });
+const NUAGES = Array.from({ length: 10 }, (_, i) => {
+  const g = new THREE.Group();
+  for (let k = 0; k < 4; k++) { const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.5 + hache(i, k, 71) * 0.45, 1).scale(1, 0.55, 1), M_NUAGE); m.position.set((k - 1.5) * 0.6, hache(i, k, 73) * 0.2, (hache(i, k, 74) - 0.5) * 0.7); m.castShadow = true; g.add(m); }
+  g.userData = { x: (hache(i, 0, 75) - 0.5) * 16, z: (hache(i, 0, 77) - 0.5) * 14, y: 3.4 + hache(i, 0, 76) * 0.8 };
+  scene.add(g); return g;
+});
+const VENTS = { beau: 0.25, nuageux: 0.4, pluie: 0.5, orage: 0.8, brouillard: 0.05, tempete: 1.4, neige: 0.4, canicule: 0.08 };
+function majMeteo(dt) {
+  const c = vue.cible, neige = NEIGE_TOMBE(), pluie = PLUIE();
+  VENT = VENTS[METEO]; VENT_X = Math.cos(0.5) * VENT * 0.22; VENT_Z = Math.sin(0.5) * VENT * 0.1;
+  PLUIE_L.visible = pluie; NEIGE_P.visible = neige;
+  if (pluie) {
+    const p = PLUIE_L.geometry.attributes.position.array, vx = VENT * 0.6;
+    for (let i = 0; i < NG; i++) { const o = i * 3; GOUT[o + 1] -= dt * 1.6 * (0.8 + GOUT[o + 2] * 0.4); if (GOUT[o + 1] < 0) GOUT[o + 1] += 1; const x = c.x + (GOUT[o] - 0.5) * 7, y = GOUT[o + 1] * 3, z = c.z + (GOUT[o + 2] - 0.5) * 7; p.set([x, y, z, x - vx * 0.06, y + 0.09, z], i * 6); }
+    PLUIE_L.geometry.attributes.position.needsUpdate = true;
+  }
+  if (neige) {
+    const p = NEIGE_P.geometry.attributes.position.array;
+    for (let i = 0; i < NG; i++) { const o = i * 3; GOUT[o + 1] -= dt * 0.1; if (GOUT[o + 1] < 0) GOUT[o + 1] += 1; p[o] = c.x + (GOUT[o] - 0.5) * 7 + Math.sin(t + i) * 0.04 + VENT * 0.1; p[o + 1] = GOUT[o + 1] * 3; p[o + 2] = c.z + (GOUT[o + 2] - 0.5) * 7; }
+    NEIGE_P.geometry.attributes.position.needsUpdate = true;
+  }
+  if ((METEO === 'orage' || METEO === 'tempete') && (CIEL.tEclair -= dt) < 0) { CIEL.eclair = 1; CIEL.tEclair = 3 + Math.random() * 5; }
+  CIEL.eclair = Math.max(0, CIEL.eclair - dt * 5);
+  hemi.intensity = CIEL.hI + CIEL.eclair * 1.6; scene.background.copy(CIEL.fond).lerp(_col.setHex(0xdfe8ff), CIEL.eclair * 0.35);
+  const brume = METEO === 'brouillard' ? 1 : METEO === 'tempete' ? 0.4 : neige ? 0.3 : 0;
+  scene.fog.near = brume ? vue.d * (1.3 - brume * 0.75) : 1000; scene.fog.far = brume ? vue.d * (3.2 - brume * 1.6) : 2000;
+  scene.fog.color.setHex(0xb8c0c4).multiplyScalar(0.18 + 0.82 * (H.j + H.a * 0.7));
+  const nVis = { beau: 3, nuageux: 8, pluie: 10, orage: 10, brouillard: 0, tempete: 10, neige: 9, canicule: 1 }[METEO];
+  M_NUAGE.color.setHex(pluie ? 0x8d939c : 0xffffff);
+  M_NUAGE.opacity = Math.min(1, Math.max(0, (vue.d - 9) / 6)) * 0.85; M_NUAGE.colorWrite = M_NUAGE.opacity > 0.02; // de près, il ne reste que leur ombre
+  NUAGES.forEach((g, i) => { g.visible = i < nVis; const u = g.userData; u.x += dt * (0.15 + VENT * 0.5); if (u.x - c.x > 8) u.x -= 16; if (u.x - c.x < -8) u.x += 16; if (u.z - c.z > 7) u.z -= 14; if (u.z - c.z < -7) u.z += 14; g.position.set(u.x, u.y, u.z); });
+}
+
+// ------------------------------------------------------------------ ciel de nuit : étoiles autour du plateau, lune dont la phase suit le mois, étoiles filantes l'été
+const ETOILES = (() => {
+  const n = 700, a = new Float32Array(n * 3), col = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { const u = hache(i, 1, 91) * 2 - 1, th = hache(i, 2, 91) * Math.PI * 2, r = Math.sqrt(1 - u * u); a.set([Math.cos(th) * r * 70, u * 70, Math.sin(th) * r * 70], i * 3); const k = 0.45 + hache(i, 3, 91) * 0.55; col.set([k, k, k * (0.9 + hache(i, 4, 91) * 0.2)], i * 3); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(a, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const o = new THREE.Points(g, new THREE.PointsMaterial({ size: 2.2, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0, depthWrite: false, fog: false }));
+  o.frustumCulled = false; scene.add(o); return o;
+})();
+const TEX_LUNE = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; return new THREE.CanvasTexture(c); })();
+let phaseDessinee = -1;
+function dessinerLune(f) {
+  if (f === phaseDessinee) return; phaseDessinee = f;
+  const c = TEX_LUNE.image, g = c.getContext('2d'), R = 54, img = g.createImageData(128, 128), k = Math.cos(2 * Math.PI * f);
+  for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) {
+    const dx = x - 63.5, dy = y - 63.5, d = Math.hypot(dx, dy); if (d > R + 1) continue;
+    const hw = Math.sqrt(Math.max(0, R * R - dy * dy)), lit = f < 0.5 ? dx > hw * k : dx < -hw * k, a = Math.min(1, R + 1 - d), o = (y * 128 + x) * 4;
+    const mer = hache(x >> 3, y >> 3, 5) < 0.18 ? 0.86 : 1; // quelques mers lunaires
+    if (lit) img.data.set([246 * mer, 241 * mer, 214 * mer, 255 * a], o); else img.data.set([40, 48, 76, 120 * a], o);
+  }
+  g.putImageData(img, 0, 0); TEX_LUNE.needsUpdate = true;
+}
+// la lune reste dans le coin du ciel, par-dessus le plateau (la caméra regarde vers le sol : il n'y a presque pas de ciel dans le cadre)
+const LUNE = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX_LUNE, transparent: true, fog: false, depthWrite: false, depthTest: false }));
+LUNE.renderOrder = 10;
+const HALO_LUNE = new THREE.Sprite(new THREE.SpriteMaterial({ map: tache, color: 0x9fb4ff, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, fog: false, depthWrite: false, depthTest: false }));
+HALO_LUNE.renderOrder = 9;
+cam.add(HALO_LUNE, LUNE);
+const FILANTE = new THREE.Line(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3)), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, fog: false, depthWrite: false }));
+FILANTE.frustumCulled = false; cam.add(FILANTE);
+const fil = { t: 2, x: 0, y: 0, vx: 0, vy: 0 };
+function majCiel(dt) {
+  const nuit = Math.min(1, H.n + H.a * 0.35) * CLAIR();
+  ETOILES.material.opacity = nuit * 0.95; ETOILES.visible = nuit > 0.02; ETOILES.position.set(centre.x, 0, centre.z);
+  const f = PHASE_LUNE(MOIS); dessinerLune(f);
+  const D = 100, hh = D * Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)), hw = hh * cam.aspect;
+  LUNE.visible = HALO_LUNE.visible = nuit > 0.02 && Math.abs(f) > 0.01 && f !== 0;
+  LUNE.position.set(hw - hh * 0.24, hh * 0.76, -D); LUNE.scale.setScalar(hh * 0.16); LUNE.material.opacity = Math.min(1, nuit * 1.3);
+  HALO_LUNE.position.set(hw - hh * 0.24, hh * 0.76, -D - 1); HALO_LUNE.scale.setScalar(hh * 0.55 * (0.4 + Math.sin(f * Math.PI))); HALO_LUNE.material.opacity = 0.25 * nuit;
+  // étoile filante : une traînée qui traverse le haut du ciel, toutes les quelques secondes, les nuits claires d'été
+  fil.t -= dt;
+  const actif = NUIT() && SAISON === 2 && CLAIR() >= 1;
+  if (actif && fil.t <= 0 && fil.t > -0.7) {
+    if (!fil.vx) { fil.x = (Math.random() * 1.2 - 0.6) * hw; fil.y = hh * (0.45 + Math.random() * 0.35); const a = -0.35 - Math.random() * 0.5; fil.vx = Math.cos(a) * hw * 1.6 * (Math.random() < 0.5 ? 1 : -1); fil.vy = Math.sin(a) * hw * 1.6; }
+    const u = -fil.t, x = fil.x + fil.vx * u, y = fil.y + fil.vy * u, p = FILANTE.geometry.attributes.position;
+    p.setXYZ(0, x, y, -D + 2); p.setXYZ(1, x - fil.vx * 0.12, y - fil.vy * 0.12, -D + 2); p.needsUpdate = true;
+    FILANTE.material.opacity = Math.sin(u / 0.7 * Math.PI); FILANTE.visible = true;
+  } else { FILANTE.visible = false; if (fil.t <= -0.7) { fil.t = 3 + Math.random() * 4; fil.vx = 0; } if (!actif && fil.t < 0) fil.t = 1; }
+}
+
+// ------------------------------------------------------------------ personnages et bêtes (unités de web_power, face à +x), regroupés en InstancedMesh par modèle (comme vie.js)
+const PATTES = (dx, dz, h, w, c) => [[-dx, -dz], [-dx, dz], [dx, -dz], [dx, dz]].map(([x, z]) => [boite(w, h, w), x, h / 2, z, c]);
+const PAYSAN = (chemise, chapeau = 0xd9b45a) => [[boite(0.3, 0.9, 0.24), 0, 0.45, 0.16, 0x5a4632], [boite(0.3, 0.9, 0.24), 0, 0.45, -0.16, 0x5a4632], [boite(0.5, 0.95, 0.75), 0, 1.35, 0, chemise], [sphere(0.28, 1), 0.02, 2.1, 0, 0xf0c9a0], [cyl(0.55, 0.55, 0.08, 10), 0, 2.36, 0, chapeau], [cyl(0.25, 0.3, 0.25, 8), 0, 2.5, 0, chapeau]];
+const TETE_NUE = c => PAYSAN(c).slice(0, 4);
+const FEMME = (jupe, haut = 0xe9e2d0) => [[boite(0.7, 0.9, 0.7), 0, 0.45, 0, jupe], [boite(0.5, 0.6, 0.6), 0, 1.2, 0, haut], [sphere(0.28, 1), 0.02, 1.75, 0, 0xf0c9a0], [boite(0.4, 0.16, 0.45), 0, 2.02, 0, 0xf6f2ea]];
+const ENFANT = (c, bonnet) => [...TETE_NUE(c), ...(bonnet ? [[cone(0.3, 0.42, 6), 0.02, 2.48, 0, bonnet], [boite(0.55, 0.14, 0.8), 0, 1.78, 0, bonnet]] : [])];
+const PARAPLUIE = (c, toile) => [...PAYSAN(c, 0x2b2b30), [boite(0.06, 1.2, 0.06), 0.28, 2.15, 0.2, 0x3a2a20], [cone(1.05, 0.42, 8), 0.28, 2.95, 0.2, toile], [boite(0.08, 0.08, 0.08), 0.28, 3.2, 0.2, 0x3a2a20]];
+const CHAT = c => [[boite(0.75, 0.32, 0.28), 0, 0.4, 0, c], [boite(0.3, 0.3, 0.3), 0.46, 0.62, 0, c], [boite(0.07, 0.13, 0.08), 0.46, 0.83, 0.09, c], [boite(0.07, 0.13, 0.08), 0.46, 0.83, -0.09, c], [boite(0.07, 0.55, 0.07).rotateZ(0.55), -0.5, 0.64, 0, c], ...PATTES(0.28, 0.09, 0.26, 0.08, c)];
+const ASSIS = (c, femme) => femme
+  ? [[boite(0.7, 0.3, 0.7), 0.15, 0.8, 0, c], [boite(0.3, 0.68, 0.6), 0.4, 0.34, 0, c], [boite(0.5, 0.6, 0.6), -0.05, 1.25, 0, 0xe9e2d0], [sphere(0.28, 1), -0.03, 1.8, 0, 0xf0c9a0], [boite(0.4, 0.16, 0.45), -0.03, 2.07, 0, 0xf6f2ea]]
+  : [[boite(0.6, 0.22, 0.5), 0.2, 0.78, 0, 0x5a4632], [boite(0.22, 0.68, 0.45), 0.45, 0.34, 0, 0x5a4632], [boite(0.5, 0.85, 0.72), -0.05, 1.28, 0, c], [sphere(0.28, 1), -0.03, 1.96, 0, 0xf0c9a0]];
+const MODELES = {
+  passant0: PAYSAN(0x6a8aa4), passant1: PAYSAN(0xc0504a, 0x5a4632), passante0: FEMME(0x8a4a7a, 0xf2e6c8), passante1: FEMME(0x5a7a4a),
+  commere0: FEMME(0x4a6a9a), commere1: FEMME(0xb8603f, 0xf6f2ea),
+  enfant0: ENFANT(0xd9533a), enfant1: ENFANT(0x3a8ad9), enfant2: ENFANT(0xe0c040),
+  enfantH0: ENFANT(0xd9533a, 0xf6f2ea), enfantH1: ENFANT(0x3a8ad9, 0xd9322a), enfantH2: ENFANT(0x5a8a3a, 0xe0c040), enfantH3: ENFANT(0x8a4a7a, 0x3a6ad9),
+  sac: [...TETE_NUE(0xc9b28a), [boite(0.95, 0.3, 0.95), 0, 2.42, 0, 0x9a7a4a], [boite(0.25, 0.85, 0.95), -0.38, 1.95, 0, 0x9a7a4a]], // un sac sur la tête sous la pluie, en 1700
+  parapluieVert: PARAPLUIE(0x6a8aa4, 0x3f7a4a), parapluieRouge: PARAPLUIE(0x8a4a7a, 0xc0403a), parapluieNoir: PARAPLUIE(0x3a3a46, 0x1f1f24), parapluieNoir2: PARAPLUIE(0x6a5a4a, 0x2a2a30),
+  pelleteur: [...PAYSAN(0x7a3a3a, 0x3a3046), [boite(0.07, 1.5, 0.07).rotateZ(0.9), 0.55, 1.05, 0.3, 0x5b3a1e], [boite(0.5, 0.06, 0.45), 1.15, 0.5, 0.3, 0x8a8f96]],
+  veilleur: [[boite(0.3, 0.9, 0.24), 0, 0.45, 0.16, 0x3a3030], [boite(0.3, 0.9, 0.24), 0, 0.45, -0.16, 0x3a3030], [boite(0.62, 1.15, 0.85), 0, 1.4, 0, 0x3a3446], [sphere(0.28, 1), 0.02, 2.1, 0, 0xf0c9a0], [cone(0.55, 0.32, 3), 0, 2.42, 0, 0x1f1f1f], [boite(0.06, 0.5, 0.06), 0.45, 1.45, 0.38, 0x2b2b30], [boite(0.26, 0.32, 0.26), 0.45, 1.1, 0.38, 0xffd36a], [boite(0.07, 2.9, 0.07), 0.1, 1.45, -0.42, 0x5b3a1e], [cone(0.12, 0.42, 5), 0.1, 3.0, -0.42, 0xd9d9d9]],
+  cloche: [[cone(0.2, 0.3, 8), 0, -0.15, 0, 0xb08d57], [boite(0.05, 0.25, 0.05), 0, 0.1, 0, 0x5b3a1e]],
+  allumeur: [...PAYSAN(0x3a3a4a, 0x2b2b30), [boite(0.06, 2.2, 0.06), 0.35, 2, 0.2, 0x5b3a1e], [boite(0.14, 0.14, 0.14), 0.35, 3.1, 0.2, 0xffd36a]],
+  porteLanterne: [...PAYSAN(0x5a5a6a, 0x3a3046), [boite(0.06, 0.55, 0.06), 0.55, 1.7, 0.3, 0x2b2b30], [boite(0.26, 0.32, 0.26), 0.55, 1.3, 0.3, 0xffd36a]],
+  chat0: CHAT(0x2a2628), chat1: CHAT(0xd98a3a), chat2: CHAT(0x8a8a90),
+  hibou: [[boite(0.5, 0.7, 0.5), 0, 0.35, 0, 0x8a6a4a], [boite(0.42, 0.5, 0.42), 0.04, 0.35, 0, 0xd9c8a0], [boite(0.55, 0.42, 0.5), 0.02, 0.9, 0, 0x9a7a5a], [boite(0.05, 0.14, 0.14), 0.3, 0.95, 0.12, 0xffd34d], [boite(0.05, 0.14, 0.14), 0.3, 0.95, -0.12, 0xffd34d], [boite(0.1, 0.1, 0.06), 0.32, 0.82, 0, 0xd9a43a], [boite(0.1, 0.2, 0.08), 0.05, 1.18, 0.18, 0x7a5a3a], [boite(0.1, 0.2, 0.08), 0.05, 1.18, -0.18, 0x7a5a3a]],
+  chauvesouris: [[boite(0.35, 0.2, 0.2), 0, 0, 0, 0x2a2228], [boite(0.5, 0.04, 0.6), -0.05, 0, 0.38, 0x3a3038], [boite(0.5, 0.04, 0.6), -0.05, 0, -0.38, 0x3a3038], [boite(0.08, 0.14, 0.06), 0.18, 0.13, 0.06, 0x2a2228], [boite(0.08, 0.14, 0.06), 0.18, 0.13, -0.06, 0x2a2228]],
+  hirondelle: [[boite(0.6, 0.16, 0.18), 0, 0, 0, 0x1f2a4a], [boite(0.42, 0.08, 0.15), 0.04, -0.08, 0, 0xf4f1ea], [boite(0.14, 0.12, 0.14), 0.36, 0.03, 0, 0xb8322a], [boite(0.38, 0.04, 0.06), -0.45, 0, 0.07, 0x1f2a4a], [boite(0.38, 0.04, 0.06), -0.45, 0, -0.07, 0x1f2a4a], [boite(0.32, 0.04, 1.4), 0.02, 0.02, 0, 0x1f2a4a]],
+  coq: [[boite(0.6, 0.45, 0.35), 0, 0.55, 0, 0xb8502a], [boite(0.25, 0.38, 0.2), 0.3, 0.9, 0, 0xd9a43a], [boite(0.12, 0.16, 0.06), 0.33, 1.15, 0, 0xd9322a], [boite(0.13, 0.06, 0.06), 0.47, 0.92, 0, 0xf2b33d], [boite(0.08, 0.14, 0.05), 0.35, 0.77, 0, 0xd9322a], [boite(0.25, 0.62, 0.12).rotateZ(0.4), -0.38, 0.86, 0, 0x1f4a3a], [boite(0.06, 0.32, 0.06), 0, 0.16, 0.08, 0xf2b33d], [boite(0.06, 0.32, 0.06), 0, 0.16, -0.08, 0xf2b33d]],
+  rateleur: [...PAYSAN(0x5a6a3a), [boite(0.06, 2.0, 0.06).rotateZ(-0.75), 0.75, 1.1, 0.3, 0x8b5a2b], [boite(0.1, 0.12, 0.75), 1.45, 0.38, 0.3, 0x6b6f75]],
+  fendeur: [...PAYSAN(0x8a3a2a), [boite(0.08, 1.3, 0.08).rotateZ(-0.5), 0.6, 1.6, 0.28, 0x5b3a1e], [boite(0.08, 0.3, 0.32), 0.95, 2.1, 0.28, 0xb8b8b8]],
+  porteurBois: [...PAYSAN(0x6a4a3a, 0x5a4632), [cyl(0.22, 0.22, 0.95, 6).rotateX(Math.PI / 2), 0.42, 1.3, 0, 0xa0703f], [cyl(0.22, 0.22, 0.95, 6).rotateX(Math.PI / 2), 0.42, 1.68, 0, 0xa0703f]],
+  boulanger: [...TETE_NUE(0xf6f2ea), [cyl(0.3, 0.26, 0.5, 8), 0.02, 2.55, 0, 0xffffff], [boite(0.7, 0.3, 0.62), 0.48, 1.38, 0, 0xb08040], [sphere(0.18, 0).scale(1.6, 0.7, 1), 0.48, 1.58, 0.12, 0xd9a45a], [sphere(0.18, 0).scale(1.6, 0.7, 1), 0.48, 1.58, -0.16, 0xd9a45a]],
+  jardinier: [...PAYSAN(0x7a8a4a), [boite(0.45, 0.38, 0.28), 0.48, 1.0, 0.3, 0x6b8a9a], [boite(0.45, 0.06, 0.06).rotateZ(-0.6), 0.82, 1.12, 0.3, 0x6b8a9a]],
+  assis0: ASSIS(0x6a8aa4), assis1: ASSIS(0x8a4a7a, true), assis2: ASSIS(0xc0504a), assis3: ASSIS(0x5a7a4a, true),
+  buveur0: [...PAYSAN(0x8a5a3a, 0x5a4632), [cyl(0.14, 0.14, 0.3, 8), 0.42, 1.5, 0.3, 0xd9c08a]], buveur1: [...PAYSAN(0x4a6a5a), [cyl(0.14, 0.14, 0.3, 8), 0.42, 1.5, 0.3, 0xd9c08a]], buveur2: PAYSAN(0x7a3a6a, 0x2b2b30),
+  tapis0: [[boite(0.95, 1.15, 0.04), 0, -0.58, 0, 0xb8322a], [boite(0.72, 0.9, 0.045), 0, -0.58, 0, 0xe0b040], [boite(0.5, 0.65, 0.05), 0, -0.58, 0, 0x3a5a8a]],
+  tapis1: [[boite(0.95, 1.15, 0.04), 0, -0.58, 0, 0x3a6a4a], [boite(0.72, 0.9, 0.045), 0, -0.58, 0, 0xe8dcc0], [boite(0.5, 0.65, 0.05), 0, -0.58, 0, 0x8a3a2a]],
+};
+// ---- les gens de la rue selon l'époque (bourgeois, soldats, maîtres d'école, crieur) ; les paysans gardent PAYSAN et FEMME
+// Chaque modèle d'époque reçoit un nom propre (« homme_empire_1 ») : seul le jeu de modèles de l'époque affichée est assemblé.
+const PEAU = 0xf0c9a0, NOIR_H = 0x1f1f24;
+const TETE = (y, x = 0.02) => [sphere(0.28, 1), x, y, 0, PEAU];
+const CHAPEAUX = {
+  tricorne: (y = 2.4, c = NOIR_H) => [[cyl(0.62, 0.66, 0.2, 3).rotateY(Math.PI / 2), 0, y, 0, c]],
+  bicorne: (y = 2.4, c = NOIR_H) => [[boite(0.22, 0.38, 1.15), 0, y + 0.06, 0, c], [boite(0.36, 0.1, 0.8), 0, y - 0.08, 0, c]],
+  hautDeForme: (y = 2.34, c = NOIR_H) => [[cyl(0.44, 0.44, 0.06, 10), 0, y, 0, c], [cyl(0.25, 0.27, 0.62, 10), 0, y + 0.33, 0, c]],
+  shako: (y = 2.36) => [[cyl(0.3, 0.26, 0.56, 8), 0, y + 0.26, 0, NOIR_H], [boite(0.22, 0.04, 0.42), 0.24, y + 0.02, 0, NOIR_H], [sphere(0.12, 0), 0.02, y + 0.62, 0, 0xc0302a]],
+  kepi: (y = 2.34) => [[cyl(0.25, 0.29, 0.32, 8), 0, y + 0.14, 0, 0xb8322a], [cyl(0.295, 0.295, 0.1, 8), 0, y + 0.02, 0, 0x2f3f6a], [boite(0.2, 0.04, 0.4), 0.27, y - 0.02, 0, NOIR_H]],
+};
+const SAC_TETE = (y = 2.42) => [[boite(0.95, 0.3, 0.95), 0, y, 0, 0x9a7a4a], [boite(0.25, 0.85, 0.95), -0.38, y - 0.47, 0, 0x9a7a4a]];
+const OMBRELLE = (toile, y = 3.25) => [[boite(0.06, 1.45, 0.06), 0.28, y - 0.85, 0.22, 0x3a2a20], [cone(1.05, 0.42, 8), 0.28, y, 0.22, toile], [boite(0.08, 0.08, 0.08), 0.28, y + 0.25, 0.22, 0x3a2a20]];
+const JAMBES = (bas, haut) => [-0.16, 0.16].flatMap(z => [[boite(0.28, 0.48, 0.22), 0, 0.24, z, bas], [boite(0.3, 0.44, 0.24), 0, 0.68, z, haut]]);
+const HABITS = { ancien: [0x8a3a2a, 0x4a5a3a], lumieres: [0x6a4a8a, 0x3a6a8a], empire: [0x2f3f6a, 0x5a3a2a], industrie: [0x2a2a30, 0x4a4038] };
+const ROBES = { ancien: [0xb8604a, 0x6a8ab8], lumieres: [0xe8a0b0, 0x9fc4a8], empire: [0xf2eee4, 0xe8d8a8], industrie: [0x6a3a5a, 0x3a5a6a] };
+const TOILES = { lumieres: [0x3f7a4a, 0xc0403a], empire: [0x3f7a4a, 0xc0403a], industrie: [NOIR_H, 0x2a2a30] };
+/** Un bourgeois de l'époque : habit, culotte et tricorne (1700, Lumières), redingote et bicorne (Empire), redingote et haut-de-forme (Industrie). */
+function HOMME(ep, i, pluie = false, habit = HABITS[ep][i]) {
+  const vieux = ep === 'ancien' || ep === 'lumieres';
+  const corps = vieux ? [...JAMBES(0xece6d8, i ? 0x5a4632 : 0x3a3030), [boite(0.55, 1.2, 0.8), 0, 1.22, 0, habit], [boite(0.06, 0.62, 0.36), 0.29, 1.4, 0, 0xe9dcb0]]
+    : ep === 'empire' ? [...JAMBES(NOIR_H, 0xe8e0c8), [boite(0.56, 1.3, 0.8), 0, 1.17, 0, habit], [boite(0.3, 0.16, 0.5), 0.08, 1.86, 0, 0xf6f2ea]]
+      : [[boite(0.3, 0.9, 0.24), 0, 0.45, 0.16, 0x4a4a52], [boite(0.3, 0.9, 0.24), 0, 0.45, -0.16, 0x4a4a52], [boite(0.56, 1.25, 0.8), 0, 1.2, 0, habit], [boite(0.3, 0.14, 0.46), 0.08, 1.84, 0, 0xf6f2ea]];
+  const sac = pluie && (ep === 'ancien' || (ep === 'lumieres' && i === 0));
+  const chapeau = sac ? SAC_TETE() : vieux ? CHAPEAUX.tricorne() : ep === 'empire' ? CHAPEAUX.bicorne() : CHAPEAUX.hautDeForme();
+  return [...corps, TETE(2.1), ...chapeau, ...(pluie && !sac ? OMBRELLE(TOILES[ep][i]) : [])];
+}
+/** Une bourgeoise : robe à paniers (1700, Lumières, coiffure haute aux Lumières), robe Empire à taille haute et capote, crinoline et petit chapeau. */
+function DAME(ep, i, pluie = false, robe = ROBES[ep][i]) {
+  let corps, tete = 1.85, coiffe;
+  if (ep === 'ancien' || ep === 'lumieres') {
+    corps = [[boite(0.8, 0.95, 1.35), 0, 0.48, 0, robe], [boite(0.42, 0.62, 0.55), 0, 1.26, 0, robe], [boite(0.44, 0.16, 0.6), 0.02, 1.48, 0, 0xf6f2ea]];
+    coiffe = ep === 'ancien' ? [[boite(0.4, 0.2, 0.45), 0, 2.12, 0, 0xf6f2ea]] : [[boite(0.38, 0.42, 0.42), -0.02, 2.22, 0, 0xe4e0d8], [sphere(0.1, 0), 0.1, 2.42, 0.14, 0xd9322a]];
+  } else if (ep === 'empire') {
+    corps = [[boite(0.55, 1.38, 0.62), 0, 0.69, 0, robe], [boite(0.58, 0.09, 0.65), 0, 1.4, 0, i ? 0xc0403a : 0x3a6ad9], [boite(0.42, 0.32, 0.5), 0, 1.58, 0, robe]];
+    coiffe = [[boite(0.46, 0.4, 0.56), -0.04, 2.1, 0, i ? 0xc0403a : 0x3a6ad9], [boite(0.14, 0.44, 0.62), 0.24, 2.06, 0, i ? 0xc0403a : 0x3a6ad9]];
+  } else {
+    corps = [[cyl(0.34, 0.86, 1.05, 12), 0, 0.53, 0, robe], [boite(0.42, 0.62, 0.5), 0, 1.36, 0, robe], [boite(0.44, 0.1, 0.52), 0.01, 1.62, 0, NOIR_H]];
+    coiffe = [[cyl(0.3, 0.33, 0.13, 10), 0, 2.12, 0, NOIR_H], [sphere(0.11, 0), -0.12, 2.22, 0.18, 0xd9a43a]];
+  }
+  const sac = pluie && (ep === 'ancien' || (ep === 'lumieres' && i === 0));
+  return [...corps, TETE(tete), ...(sac ? SAC_TETE(2.12) : coiffe), ...(pluie && !sac ? OMBRELLE(TOILES[ep][i], 2.95) : [])];
+}
+/** Un écolier : couleurs vives (1700, Lumières), blouse bleue (Empire), blouse noire, casquette et cartable (Industrie) ; bûche pour le poêle l'hiver. */
+function ECOLIER(ep, i, buche = false) {
+  const c = ep === 'empire' ? [0x4a6aa8, 0x3a5a98][i] : ep === 'industrie' ? [0x2a2a30, 0x3a3a44][i] : [0xd9533a, 0x3a8ad9][i];
+  return [...TETE_NUE(c), ...(ep === 'industrie' ? [[cyl(0.3, 0.3, 0.12, 8), 0, 2.38, 0, 0x2f3f6a], [boite(0.2, 0.04, 0.34), 0.27, 2.34, 0, 0x2f3f6a], [boite(0.22, 0.5, 0.55), -0.36, 1.45, 0, 0x8a5a2b]]
+    : ep === 'empire' ? [[boite(0.52, 0.12, 0.77), 0, 1.78, 0, 0xf6f2ea]] : i ? [[cone(0.3, 0.42, 6), 0.02, 2.48, 0, 0xe0c040]] : []),
+  ...(buche ? [[cyl(0.18, 0.18, 0.8, 6).rotateX(Math.PI / 2), 0.4, 1.35, 0, 0xa0703f]] : [])];
+}
+const PANIER = (x = 0.12, z = 0.46, y = 1.0) => [[boite(0.45, 0.3, 0.36), x, y, z, 0xa8804a], [boite(0.05, 0.32, 0.05), x, y + 0.3, z, 0x8a6a3a], [sphere(0.1, 0), x + 0.08, y + 0.18, z, 0xd9322a]];
+/** Le soldat de la patrouille : habit blanc et tricorne (1700), habit blanc à revers bleus (Lumières), habit bleu et shako (Empire), capote bleue, pantalon garance et képi (Industrie). */
+function SOLDAT(ep) {
+  const fusil = [[boite(0.07, 1.7, 0.07).rotateZ(0.12), -0.02, 2.0, 0.42, 0x5b3a1e], [boite(0.03, 0.4, 0.03), -0.1, 3.0, 0.42, 0xc8ccd0]];
+  if (ep === 'industrie') return [[boite(0.3, 0.9, 0.24), 0, 0.45, 0.16, 0xb8322a], [boite(0.3, 0.9, 0.24), 0, 0.45, -0.16, 0xb8322a], [boite(0.58, 1.35, 0.82), 0, 1.15, 0, 0x3f4f7a], TETE(2.1), ...CHAPEAUX.kepi(), ...fusil];
+  const habit = ep === 'empire' ? 0x2f4a8a : 0xe4e0d4;
+  return [...JAMBES(NOIR_H, 0xece6d8), [boite(0.55, 1.2, 0.8), 0, 1.22, 0, habit], [boite(0.06, 0.62, 0.42), 0.29, 1.4, 0, ep === 'lumieres' ? 0x2f4a8a : ep === 'empire' ? 0xf6f2ea : 0xb8322a], TETE(2.1), ...(ep === 'empire' ? CHAPEAUX.shako() : CHAPEAUX.tricorne()), ...fusil];
+}
+/** Le maître : le curé en soutane (école de paroisse, 1700), le régent en tricorne (Lumières), l'instituteur en redingote (Empire, Industrie), une baguette à la main. */
+function MAITRE(ep) {
+  const baguette = [[boite(0.05, 0.05, 0.9).rotateX(0.5), 0.38, 1.35, 0.5, 0x5b3a1e]];
+  if (ep === 'ancien') return [[boite(0.62, 1.85, 0.78), 0, 0.93, 0, NOIR_H], [boite(0.06, 0.22, 0.24), 0.32, 1.66, 0, 0xf6f2ea], TETE(2.1), [cyl(0.62, 0.62, 0.07, 12), 0, 2.36, 0, NOIR_H], [cyl(0.24, 0.27, 0.2, 10), 0, 2.48, 0, NOIR_H], ...baguette];
+  return [...HOMME(ep, 0, false, ep === 'lumieres' ? 0x6a4a2a : NOIR_H), ...baguette];
+}
+/** Le crieur public : une feuille à lire ; une clochette (1700, Lumières), un tambour de ville (Empire, Industrie). */
+function CRIEUR(ep) {
+  const feuille = [[boite(0.05, 0.55, 0.42), 0.46, 1.68, 0, 0xf6f2ea]];
+  const vieux = ep === 'ancien' || ep === 'lumieres';
+  return [...HOMME(ep, 0, false, 0x8a2a2a), ...feuille, ...(vieux ? [[cone(0.16, 0.24, 8), 0.4, 1.15, -0.42, 0xd9a43a]] : [[cyl(0.32, 0.32, 0.38, 10), 0.3, 1.0, 0.4, 0xc0403a], [cyl(0.33, 0.33, 0.06, 10), 0.3, 1.2, 0.4, 0xf6f2ea]])];
+}
+// ---- les bêtes et les attelages
+const CHIEN = (c, oreille) => [[boite(0.85, 0.38, 0.32), 0, 0.56, 0, c], [boite(0.38, 0.34, 0.3), 0.5, 0.8, 0, c], [boite(0.2, 0.16, 0.18), 0.74, 0.74, 0, c], [boite(0.08, 0.2, 0.08), 0.44, 1.0, 0.1, oreille], [boite(0.08, 0.2, 0.08), 0.44, 1.0, -0.1, oreille], [boite(0.08, 0.42, 0.08).rotateZ(-0.6), -0.52, 0.82, 0, c], ...PATTES(0.3, 0.1, 0.4, 0.1, c)];
+const POULE = c => [[boite(0.45, 0.35, 0.3), 0, 0.42, 0, c], [boite(0.2, 0.25, 0.16), 0.25, 0.68, 0, c], [boite(0.1, 0.08, 0.04), 0.27, 0.85, 0, 0xd9322a], [boite(0.08, 0.05, 0.05), 0.38, 0.68, 0, 0xf2b33d], [boite(0.15, 0.25, 0.12), -0.26, 0.62, 0, c], [boite(0.04, 0.24, 0.04), 0, 0.12, 0.06, 0xf2b33d], [boite(0.04, 0.24, 0.04), 0, 0.12, -0.06, 0xf2b33d]];
+function CHEVAL(c, ox = 0, oz = 0, crin = 0x2a1f18, mince = 1) {
+  return [[boite(1.9, 0.75, 0.7 * mince), ox, 1.45, oz, c], ...[[-0.7, -0.22], [-0.7, 0.22], [0.7, -0.22], [0.7, 0.22]].map(([x, z]) => [boite(0.2, 1.1, 0.2), ox + x, 0.55, oz + z * mince, c]),
+    [boite(0.45, 0.95, 0.42).rotateZ(-0.55), ox + 1.0, 2.0, oz, c], [boite(0.8, 0.36, 0.34).rotateZ(-0.35), ox + 1.42, 2.36, oz, c], [boite(0.5, 0.12, 0.14).rotateZ(-0.55), ox + 0.86, 2.36, oz, crin], [boite(0.16, 0.8, 0.14).rotateZ(0.35), ox - 1.05, 1.32, oz, crin], [boite(0.08, 0.18, 0.08), ox + 1.2, 2.66, oz + 0.1, c], [boite(0.08, 0.18, 0.08), ox + 1.2, 2.66, oz - 0.1, c]];
+}
+const ROUE = (r, x, z, y = r) => [cyl(r, r, 0.1, 12).rotateX(Math.PI / 2), x, y, z, 0x3a2a20];
+/** Le cavalier de l'époque sur son cheval bai. */
+function CAVALIER(ep) {
+  const h = HOMME(ep, 1), chapeau = h.filter(p => p[2] >= 2.3).map(([g, x, y, z, c]) => [g, x, y + 0.98, z, c]);
+  return [...CHEVAL(0x7a4a2a), [boite(0.7, 0.12, 0.8), -0.05, 1.86, 0, 0x5a2a1e], [boite(0.25, 0.7, 0.2), 0.05, 1.62, 0.42, 0x3a3030], [boite(0.25, 0.7, 0.2), 0.05, 1.62, -0.42, 0x3a3030], [boite(0.5, 0.9, 0.72), -0.05, 2.38, 0, HABITS[ep][1]], TETE(3.08, -0.03), ...chapeau];
+}
+/** La calèche découverte (Empire) ou le fiacre fermé (Industrie), avec son cocher. */
+function VOITURE(ep) {
+  const cocher = ep === 'empire' ? CHAPEAUX.bicorne(3.32) : CHAPEAUX.hautDeForme(3.26);
+  const base = [...CHEVAL(0x2a2224, 1.7, 0, 0x151012), [boite(1.3, 0.08, 0.08), 0.75, 1.35, 0.45, 0x3a2a20], [boite(1.3, 0.08, 0.08), 0.75, 1.35, -0.45, 0x3a2a20], ROUE(0.62, -1.45, 0.62), ROUE(0.62, -1.45, -0.62), ROUE(0.42, -0.25, 0.6), ROUE(0.42, -0.25, -0.6), [boite(0.5, 0.82, 0.72), -0.2, 2.4, 0, ep === 'empire' ? 0x2f3f6a : 0x2a2a30], TETE(3.02, -0.18), ...cocher.map(([g, x, y, z, c]) => [g, x - 0.2, y, z, c])];
+  if (ep === 'empire') return [...base, [boite(1.7, 0.75, 1.15), -1.05, 1.35, 0, 0x3a6a4a], [boite(1.72, 0.08, 1.17), -1.05, 1.74, 0, 0xd9a43a], [boite(0.55, 0.65, 1.18), -1.75, 2.02, 0, NOIR_H], [boite(0.45, 0.6, 0.6), -1.2, 2.0, 0.2, ROBES.empire[0]], TETE(2.5, -1.2), [boite(0.46, 0.38, 0.5), -1.24, 2.76, 0.2, 0x3a6ad9]];
+  return [...base, [boite(1.75, 1.35, 1.15), -1.1, 1.62, 0, 0x3a1f24], [boite(0.62, 0.46, 1.18), -1.0, 1.9, 0, 0xa8c0cc], [boite(1.9, 0.1, 1.25), -1.1, 2.33, 0, NOIR_H], [boite(0.16, 0.2, 0.16), -0.2, 1.7, 0.62, 0xffe08a], [boite(0.16, 0.2, 0.16), -0.2, 1.7, -0.62, 0xffe08a]];
+}
+/** L'omnibus à cheval de l'ère industrielle : deux chevaux, caisse jaune et bordeaux, voyageurs sur l'impériale. */
+const OMNIBUS = () => [...CHEVAL(0xc8c4bc, 2.3, 0.42, 0x8a8680, 0.75), ...CHEVAL(0x7a4a2a, 2.3, -0.42, 0x2a1f18, 0.75),
+  [boite(1.2, 0.1, 0.1), 1.0, 1.35, 0, 0x3a2a20], [boite(3.5, 0.55, 1.3), -1.4, 1.15, 0, 0x7a2a24], [boite(3.5, 0.95, 1.3), -1.4, 1.88, 0, 0xd9b13a], [boite(3.1, 0.42, 1.32), -1.4, 1.95, 0, 0xa8c0cc],
+  [boite(3.7, 0.1, 1.42), -1.4, 2.4, 0, NOIR_H], [boite(3.1, 0.35, 0.3), -1.5, 2.62, 0, 0x5b3a1e], ...[-2.6, -1.8, -1.0].flatMap((x, i) => [TETE(2.95, x), ...CHAPEAUX.hautDeForme(3.2).map(([g, , y, z, c]) => [g, x, y, z, i === 1 ? 0x4a4038 : c])]),
+  [boite(0.5, 0.8, 0.7), 0.15, 2.65, 0, NOIR_H], TETE(3.25, 0.17), ...CHAPEAUX.hautDeForme(3.5).map(([g, x, y, z, c]) => [g, x + 0.17, y, z, c]),
+  ROUE(0.6, -2.6, 0.66), ROUE(0.6, -2.6, -0.66), ROUE(0.5, -0.2, 0.66), ROUE(0.5, -0.2, -0.66)];
+// ---- les métiers de la rue
+const PORTEUR_EAU = () => [...PAYSAN(0x7a6a5a, 0x5a4632), [boite(0.12, 0.12, 1.75), -0.05, 1.9, 0, 0x8a6a3a], [cyl(0.24, 0.2, 0.42, 8), 0, 1.0, 0.84, 0x8a6a4a], [cyl(0.24, 0.2, 0.42, 8), 0, 1.0, -0.84, 0x8a6a4a], [boite(0.03, 0.7, 0.03), 0, 1.55, 0.84, 0x3a2a20], [boite(0.03, 0.7, 0.03), 0, 1.55, -0.84, 0x3a2a20]];
+const COLPORTEUR = () => [...PAYSAN(0x5a6a7a, 0x3a3046), [boite(0.48, 1.05, 0.78), -0.5, 1.75, 0, 0x8a6a3a], [boite(0.5, 0.18, 0.8), -0.5, 2.36, 0, 0xb8453a], [boite(0.06, 2.4, 0.06), 0.45, 1.2, 0.36, 0x5b3a1e]];
+const REMOULEUR = () => [...PAYSAN(0x5a4a3a, 0x3a3030), ROUE(0.55, 1.35, 0), [boite(1.0, 0.08, 0.5), 1.0, 1.0, 0, BOIS], [cyl(0.34, 0.34, 0.14, 10).rotateX(Math.PI / 2), 1.0, 1.38, 0, 0xa8a8a8], [boite(0.85, 0.06, 0.06), 0.5, 1.1, 0.26, BOIS], [boite(0.85, 0.06, 0.06), 0.5, 1.1, -0.26, BOIS]];
+const FRUITS = [[0x9fbf8a, 0xc9a86a, 0x7a4a2a], [0x8fcf5a, 0xd94f6a, 0xff7ab8], [0xa01a2a, 0xf0a040, 0xc9d070], [0xe07a1a, 0xc0302a, 0x6a3a7a]]; // hiver, printemps, été, automne
+const CHARRETTE = s => [...FEMME(0x6a5a8a, 0xf2e6c8), [boite(1.3, 0.35, 0.95), 1.05, 0.95, 0, 0x9a6a3a], ROUE(0.42, 1.1, 0.56), ROUE(0.42, 1.1, -0.56), [boite(0.7, 0.06, 0.06), 0.3, 1.0, 0.34, BOIS], [boite(0.7, 0.06, 0.06), 0.3, 1.0, -0.34, BOIS],
+  ...[0, 1, 2, 3, 4, 5].map(n => [sphere(n % 3 === 2 ? 0.2 : 0.15, 0), 0.65 + (n % 3) * 0.38, 1.25, n < 3 ? 0.22 : -0.22, FRUITS[s][n % 3]])];
+const MARCHAND = (c, femme) => femme ? [...FEMME(c, 0xf2e6c8), [boite(0.1, 0.8, 0.62), 0.37, 0.75, 0, 0xf6f2ea]] : [...PAYSAN(c), [boite(0.12, 0.9, 0.6), 0.27, 1.1, 0, 0xf6f2ea]];
+// ---- les jeux d'enfants
+const CERCEAU = [[new THREE.TorusGeometry(0.55, 0.06, 4, 18), 0, 0.6, 0, 0xb07a45]];
+const BALLON = [[sphere(0.28, 1), 0, 0, 0, 0xd9322a], [boite(0.58, 0.08, 0.58), 0, 0, 0, 0xf6f2ea]];
+const CORDE = [[boite(0.26, 0.26, 4.4), 0, 1.25, 0, 0xf6f0d8], [boite(0.26, 1.25, 0.26), 0, 0.62, 2.2, 0xf6f0d8], [boite(0.26, 1.25, 0.26), 0, 0.62, -2.2, 0xf6f0d8]];
+const POOLS = new Map();
+function acteur(nom, s = ECH) {
+  let p = POOLS.get(nom);
+  if (!p) { const L = lot(); for (const [g, x, y, z, c] of MODELES[nom]) put(L, g, c, x, y, z, 0, 0.09); p = { g: fusion(L.g), o: L.o.length ? fusion(L.o) : null, list: [], mi: null, mo: null }; POOLS.set(nom, p); }
+  const o = new THREE.Object3D(); o.scale.setScalar(s); p.list.push(o); return o;
+}
+function installerPools() {
+  for (const p of POOLS.values()) {
+    const n = p.list.length;
+    if (p.mi && p.mi.instanceMatrix.count >= n) continue;
+    for (const m of [p.mi, p.mo]) if (m) { scene.remove(m); m.dispose(); }
+    p.mi = p.mo = null; if (!n) continue;
+    const cap = Math.ceil(n * 1.3) + 4;
+    p.mi = new THREE.InstancedMesh(p.g, MAT, cap); p.mi.castShadow = p.mi.receiveShadow = true;
+    if (p.o) p.mo = new THREE.InstancedMesh(p.o, CONT, cap);
+    for (const m of [p.mi, p.mo]) if (m) { m.count = 0; m.frustumCulled = false; scene.add(m); }
+  }
+}
+function dessinerActeurs() {
+  let tot = 0;
+  for (const p of POOLS.values()) {
+    if (!p.mi) continue; let n = 0;
+    for (const o of p.list) if (o.visible) { o.updateMatrix(); p.mi.setMatrixAt(n, o.matrix); if (p.mo) p.mo.setMatrixAt(n, o.matrix); n++; }
+    p.mi.count = n; p.mi.instanceMatrix.needsUpdate = true; if (p.mo) { p.mo.count = n; p.mo.instanceMatrix.needsUpdate = true; }
+    tot += n;
+  }
+  NB_DESSINES = tot; NB_DESSINES_MAX = Math.max(NB_DESSINES_MAX, tot);
+}
+// une pièce accrochée à un cadre (fenêtre, porte, toit) : le cadre est en unités de web_power, le modèle aussi (échelle 1 = 0,1 dans le monde)
+function surCadre(o, M, x, y, z, ry = 0, rx = 0, rz = 0, s = 1) { _m.copy(M).multiply(_m2.compose(_p.set(x, y, z), _q.setFromEuler(_e.set(rx, ry, rz, 'YXZ')), _s.set(s, s, s))); _m.decompose(o.position, o.quaternion, o.scale); }
+
+// ------------------------------------------------------------------ les animations et leurs libellés
+let ACT = [];
+const ETIQ = new Map();
+/** Un libellé du panneau « En ce moment » : cat = meteo, saison, heure ou epoque ; affiché tant qu'une de ses conditions est vraie. */
+function etiq(cat, txt, quand) { const e = ETIQ.get(txt); if (e) e.quand.push(quand); else ETIQ.set(txt, { cat, txt, quand: [quand] }); }
+/** o : l'acteur ; f(t, dt, o) : son mouvement ; quand() : visible ou non ; libellé facultatif. */
+function ajoute(o, f, quand, cat, txt) { ACT.push({ o, f, quand }); if (txt) etiq(cat, txt, quand); return o; }
+// une fenêtre tournée vers la caméra de départ, sans jardinière, la plus haute possible (tapis, chat sur le rebord)
+const fenetreLibre = (cle, rang = 0) => FEN.filter(f => f.k.cle === cle && f.n.z > 0.3 && hache(f.rec.x * 13, f.rec.z * 7, 21) >= 0.6).sort((a, b) => b.c.y - a.c.y || a.i - b.i)[rang];
+const pres = (k, lx, lz) => { const p = posB(k, lx, lz); return { x: p.x, z: p.z, y: k.top + DALLE }; };
+// marche le long d'une ligne brisée (points du monde), en boucle ou en va-et-vient
+function longer(o, pts, d, boucle, y = DALLE, saut = 0.004) {
+  const segs = []; let L = 0;
+  const n = boucle ? pts.length : pts.length - 1;
+  for (let i = 0; i < n; i++) { const a = pts[i], b = pts[(i + 1) % pts.length], l = Math.hypot(b.x - a.x, b.z - a.z); segs.push([a, b, l, L]); L += l; }
+  let u = boucle ? ((d % L) + L) % L : L - Math.abs(((d % (2 * L)) + 2 * L) % (2 * L) - L);
+  const sens = boucle || ((d % (2 * L)) + 2 * L) % (2 * L) < L ? 1 : -1;
+  const s = segs.find(x => u <= x[3] + x[2]) || segs[segs.length - 1], f = (u - s[3]) / s[2];
+  o.position.set(s[0].x + (s[1].x - s[0].x) * f, y + Math.abs(Math.sin(d * 60)) * saut, s[0].z + (s[1].z - s[0].z) * f);
+  o.rotation.set(0, -Math.atan2((s[1].z - s[0].z) * sens, (s[1].x - s[0].x) * sens), 0);
+}
+
+// ------------------------------------------------------------------ toute la vie du bourg (reconstruite avec les bâtiments)
+let VIE = null;
+const lampeAllumee = j => (SOIR() && H.p > 1.5 + j * 5) || NUIT() || (AUBE() && H.p < 1.5 + j * 5) || (METEO === 'brouillard' && !NUIT()); // l'allumeur passe toutes les 5 s
+function construireVie() {
+  for (const p of POOLS.values()) p.list.length = 0;
+  ACT = []; ETIQ.clear(); jeter(VIE); VIE = new THREE.Group(); scene.add(VIE);
+  const A = (nom, s = ECH) => acteur(nom, s);
+  const kc = parCle('cabane'), km = parCle('maison'), kp = parCle('maison_pierre'), kt = parCle('taverne'), kb = parCle('boulangerie'), kh = centre;
+  const S = 0.4; // échelle d'un personnage dans un cadre (unités de web_power)
+  const tourPlace = [0, 1, 2, 3, 4, 5].map(i => coin(i, 0.98)), portesDe = k => PORTES.filter(p => p.k === k);
+  const volets = EPOQUE === 'lumieres' || EPOQUE === 'empire';
+
+  // ---- la vie ordinaire par beau temps
+  const routes = [tourPlace, [coin(1, 2), coin(1), coin(2), coin(2, 2)], [coin(4, 2), coin(4), coin(5), coin(5, 2)], [coin(3, 2), coin(3), coin(2), coin(1), coin(0), coin(0, 2)]];
+  ['passant0', 'passante0', 'passant1', 'passante1'].forEach((nom, i) => { const v = 0.045 + i * 0.006, ph = i * 1.7; ajoute(A(nom), (t, dt, o) => longer(o, routes[i], t * v + ph, i === 0), () => DEHORS() && SEC() && METEO !== 'canicule', 'meteo', 'Passants dans les rues'); });
+  { const d = portesDe(km)[1] || portesDe(km)[0]; [['commere0', -0.5, 0], ['commere1', 0.5, Math.PI]].forEach(([nom, x, ry], i) => ajoute(A(nom), (t, dt, o) => surCadre(o, d.m, x, 0.25, 1.1, ry, 0, Math.sin(t * 2.2 + i * 2) * 0.06, S), () => DEHORS() && DOUX(), 'meteo', 'Des voisines bavardent sur le pas de la porte')); }
+  ['enfant0', 'enfant1', 'enfant2'].forEach((nom, i) => ajoute(A(nom, ECH * 0.75), (t, dt, o) => { const a = i * 2.1 + t * 1.1, p = pres(kh, 1.8 + Math.cos(a) * 1.15, 2.6 + Math.sin(a) * 1.15); o.position.set(p.x, p.y + Math.abs(Math.sin(t * 9 + i)) * 0.01, p.z); o.rotation.y = capB(kh, -Math.sin(a), Math.cos(a)); }, () => DEHORS() && DOUX() && !NEIGE_SOL(), 'meteo', 'Enfants qui jouent autour de la fontaine'));
+  ['enfant1', 'enfant2'].forEach((nom, i) => { const fo = pres(kh, 1.8, 2.6); ajoute(A(nom, ECH * 0.75), (t, dt, o) => { const a = i * Math.PI + Math.sin(t * 0.7) * 0.6, p = pres(kh, 1.8 + Math.cos(a) * 0.95, 2.6 + Math.sin(a) * 0.95), saut = Math.max(0, Math.sin(t * 5 + i * 2)); o.position.set(p.x, p.y + saut * 0.02, p.z); o.rotation.y = capB(kh, -Math.cos(a), -Math.sin(a)); if (saut > 0.97 && Math.random() < 0.5) for (let n = 0; n < 3; n++) particule({ x: fo.x + (Math.random() - 0.5) * 0.04, y: 0.08, z: fo.z + (Math.random() - 0.5) * 0.04, vx: (p.x - fo.x) * 2 + (Math.random() - 0.5) * 0.1, vy: 0.35 + Math.random() * 0.2, vz: (p.z - fo.z) * 2 + (Math.random() - 0.5) * 0.1, g: 1.4, s: 0.004, col: 0x9fd4f2, vie: 0.6 }); }, () => DEHORS() && METEO === 'canicule', 'meteo', 'Canicule : les enfants s\'aspergent à la fontaine'); });
+  { const d = portesDe(kc)[0]; ajoute(A('chat1', ECH * 1.3), (t, dt, o) => surCadre(o, d.m, 0.62, 0.25, 0.4, -Math.PI / 2 + Math.sin(t * 0.4) * 0.5, 0, 0, S * 1.3), () => JOUR() && DOUX(), 'meteo', 'Un chat somnole devant une porte'); }
+  { const f = fenetreLibre('maison', 1) || FEN[0]; ajoute(A('chat0', ECH * 1.3), (t, dt, o) => { surCadre(o, f.m, 0, -f.h / 2 - 0.01, 0.2, 0, 0, 0, S * 1.3); o.scale.y *= 0.7; }, () => JOUR() && METEO === 'canicule', 'meteo', 'Canicule : un chat s\'étire sur le rebord d\'une fenêtre'); }
+  // ---- le linge sur sa corde (cabane) : il sèche, claque dans la tempête, on le décroche quand le ciel se couvre
+  {
+    const g = new THREE.Group(), p = pres(kc, LINGE.x, LINGE.z); g.position.set(p.x, kc.top, p.z); g.rotation.y = kc.rot + LINGE.cap; g.scale.setScalar(ECH_BAT); VIE.add(g);
+    const draps = [0xf6f2ea, 0x9fc4e8, 0xf2d6d6, 0xe8dcc0].map((c, j) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.6).translate(0, -0.3, 0), toon(c, { side: THREE.DoubleSide })); m.position.set(-1.0 + j * 0.66, 2.34, 0); m.castShadow = true; g.add(m); return m; });
+    const nb = () => METEO === 'nuageux' ? 4 - Math.min(4, Math.floor((t % 20) / 3)) : 4;
+    ajoute(g, (t) => draps.forEach((m, j) => { m.visible = j < nb(); const a = Math.sin(t * (2 + VENT * 4) + j * 1.3) * (0.15 + VENT * 0.5); m.rotation.x = METEO === 'tempete' ? -1.2 + Math.sin(t * 9 + j) * 0.35 : a; }), () => (DEHORS() && SEC()) || (METEO === 'tempete' && !NUIT()), 'meteo', 'Le linge sèche sur la corde');
+    etiq('meteo', 'Tempête : le linge claque à l\'horizontale', () => METEO === 'tempete' && !NUIT());
+    const a = posB(kc, LINGE.x + Math.cos(-LINGE.cap) * 0, LINGE.z + 0.7);
+    ajoute(A('commere1'), (t, dt, o) => { const u = Math.min(4, Math.floor((t % 20) / 3)), q = posB(kc, LINGE.x + Math.cos(LINGE.cap) * (-1 + Math.min(u, 3) * 0.66) + Math.sin(LINGE.cap) * 0.6, LINGE.z - Math.sin(LINGE.cap) * (-1 + Math.min(u, 3) * 0.66) + Math.cos(LINGE.cap) * 0.6); o.position.set(q.x, kc.top + DALLE, q.z); o.rotation.y = kc.rot + LINGE.cap + Math.PI / 2; void a; }, () => DEHORS() && METEO === 'nuageux', 'meteo', 'Nuageux : on décroche le linge, au cas où');
+  }
+
+  // ---- la pluie : on court ou on s'abrite selon l'époque
+  const modelesPluie = { ancien: ['sac', 'sac', 'sac'], lumieres: ['sac', 'parapluieVert', 'parapluieRouge'], empire: ['parapluieVert', 'parapluieRouge', 'parapluieNoir2'], industrie: ['parapluieNoir', 'parapluieNoir2', 'parapluieNoir'] }[EPOQUE];
+  modelesPluie.forEach((nom, i) => { const v = nom === 'sac' ? 0.13 : 0.06, ph = i * 2.3; ajoute(A(nom), (t, dt, o) => longer(o, routes[(i + 1) % 4], t * v + ph, (i + 1) % 4 === 0, DALLE, nom === 'sac' ? 0.012 : 0.004), () => DEHORS() && PLUIE() && METEO === 'pluie', 'meteo', EPOQUE === 'ancien' ? 'Pluie : on court, un sac sur la tête' : 'Pluie : on court ou on passe sous son parapluie'); });
+  etiq('epoque', { ancien: '1700 : pas encore de parapluie, un sac sur la tête', lumieres: 'Lumières : premiers parapluies (verts, rouges)', empire: 'Empire : parapluies de couleur', industrie: 'Industrie : parapluies noirs' }[EPOQUE], () => DEHORS() && PLUIE());
+  if (volets) etiq('meteo', 'Les volets se ferment un à un', () => PLUVIEUX() || (METEO === 'neige' && !DEHORS()));
+  etiq('meteo', 'L\'eau ruisselle des avant-toits', () => PLUIE());
+  etiq('meteo', 'Les flaques grandissent, la pluie y fait des ronds', () => PLUIE());
+  etiq('meteo', 'Les flaques sèchent au soleil revenu', () => !PLUIE() && FLAQUE > 0.03);
+  if (EPOQUE === 'ancien') etiq('meteo', 'Seaux sous les fuites des chaumières', () => PLUIE());
+  etiq('meteo', 'Orage : rideaux tirés, les vitres flashent à chaque éclair', () => METEO === 'orage');
+  etiq('meteo', 'Personne dehors par ce temps', () => (METEO === 'orage' || METEO === 'tempete') && DEHORS());
+  if (volets) etiq('meteo', 'Tempête : les volets mal attachés battent', () => METEO === 'tempete');
+  etiq('meteo', 'Tempête : fumées couchées par le vent', () => METEO === 'tempete');
+  // tuiles qui s'envolent
+  { let pro = 0; const toits = TOITS.filter(r => r.petit); ajoute(new THREE.Object3D(), (t, dt) => { if ((pro -= dt) > 0 || !toits.length) return; pro = 0.5 + Math.random() * 0.8; const r = toits[Math.random() * toits.length | 0], p = dansCadre(r.m, (Math.random() - 0.5) * r.w * 0.4, r.h * 0.75, (Math.random() - 0.5) * r.d * 0.7); particule({ genre: 'plaque', x: p.x, y: p.y, z: p.z, vx: 0.25 + Math.random() * 0.2, vy: 0.3 + Math.random() * 0.25, vz: 0.1 + Math.random() * 0.1, g: 0.55, spin: 7 + Math.random() * 6, s: 0.03, forme: [1, 0.15, 0.7], col: r.col, vie: 2.6, sol: 0.004, vent: 0.6 }); }, () => METEO === 'tempete', 'meteo', 'Tempête : des tuiles s\'envolent des toits'); }
+
+  // ---- la neige
+  etiq('meteo', 'Toits blanchis, stalactites de glace sous les avant-toits', () => NEIGE_SOL());
+  etiq('meteo', 'Bonhomme de neige près des chaumières', () => NEIGE_SOL());
+  etiq('meteo', 'Cheminées qui fument plus fort et plus épais', () => METEO === 'neige');
+  { const d = portesDe(km)[0]; ajoute(A('pelleteur'), (t, dt, o) => { const u = t * 0.45, x = Math.sin(u) * 0.7, sens = Math.cos(u) > 0 ? 0 : Math.PI, pelle = Math.max(0, Math.sin(t * 3.5)); surCadre(o, d.m, x, 0.25, 1.35, sens, 0, -pelle * 0.5, S); if (pelle > 0.98 && Math.random() < 0.35) { const p = dansCadre(d.m, x, 0.4, 1.9); for (let n = 0; n < 4; n++) particule({ x: p.x, y: p.y, z: p.z, vx: (Math.random() - 0.5) * 0.15, vy: 0.2 + Math.random() * 0.15, vz: (Math.random() - 0.5) * 0.15, g: 0.9, s: 0.005, col: 0xf6f8fb, vie: 0.8, sol: 0.026 }); } }, () => NEIGE_SOL() && DEHORS() && METEO !== 'tempete', 'meteo', 'On déneige devant sa porte, à la pelle'); }
+  {
+    const equipes = [[-2.6, 0.9, 0], [-2.3, -1.0, 0], [2.6, 1.3, Math.PI], [2.9, -0.1, Math.PI]], gamins = [];
+    equipes.forEach(([x, z, ry], i) => gamins.push(ajoute(A(`enfantH${i}`, ECH * 0.75), (t, dt, o) => { const p = pres(kp, x + Math.sin(t * 0.8 + i) * 0.4, z + Math.cos(t * 0.6 + i) * 0.3); o.position.set(p.x, p.y + Math.max(0, Math.sin(t * 4 + i * 1.7)) * 0.008, p.z); o.rotation.y = kp.rot + ry; }, () => NEIGE_SOL() && DEHORS() && ['beau', 'nuageux', 'neige'].includes(METEO), 'meteo', 'Bataille de boules de neige')));
+    let pro = 0;
+    ajoute(new THREE.Object3D(), (t, dt) => { if ((pro -= dt) > 0) return; pro = 0.45 + Math.random() * 0.4; const a = Math.random() * 4 | 0, b = a < 2 ? 2 + (Math.random() * 2 | 0) : Math.random() * 2 | 0, A_ = gamins[a].position, B = gamins[b].position, T = 0.75, g = 0.7; particule({ x: A_.x, y: A_.y + 0.07, z: A_.z, vx: (B.x - A_.x) / T, vz: (B.z - A_.z) / T, vy: (0.5 * g * T * T) / T, g, s: 0.0055, col: 0xffffff, vie: T, fin: p => { for (let n = 0; n < 4; n++) particule({ x: p.x, y: p.y, z: p.z, vx: (Math.random() - 0.5) * 0.2, vy: 0.1 + Math.random() * 0.1, vz: (Math.random() - 0.5) * 0.2, g: 0.8, s: 0.0028, col: 0xffffff, vie: 0.4 }); } }); }, () => NEIGE_SOL() && DEHORS() && ['beau', 'nuageux', 'neige'].includes(METEO));
+  }
+
+  // ---- brouillard et canicule
+  ajoute(A('porteLanterne'), (t, dt, o) => { longer(o, tourPlace, t * 0.04 + 2, true); o.updateMatrix(); GRAND.mettre(_v.set(0.55, 1.3, 0.3).applyMatrix4(o.matrix), _col.setHex(RUE[EPOQUE]), 0.55); }, () => METEO === 'brouillard' && !NUIT(), 'meteo', 'Brouillard : un passant éclaire son chemin à la lanterne');
+  etiq('meteo', 'Brouillard : lanternes des portes et réverbères allumés en plein jour', () => METEO === 'brouillard' && JOUR());
+  etiq('meteo', 'Canicule : fenêtres grandes ouvertes, voilages qui ondulent', () => METEO === 'canicule' && JOUR());
+  etiq('meteo', 'Canicule : presque plus de fumée', () => METEO === 'canicule');
+  etiq('meteo', 'Les ombres des nuages glissent sur les toits', () => ['nuageux', 'pluie', 'orage', 'tempete', 'neige'].includes(METEO) && JOUR());
+  [['assis0', 0.4, 4.0, -0.4], ['assis1', 2.7, 3.7, Math.PI + 0.5]].forEach(([nom, x, z, ry], i) => ajoute(A(nom), (t, dt, o) => { const p = pres(kc, x, z); o.position.set(p.x, p.y, p.z); o.rotation.set(0, kc.rot + ry, Math.sin(t * 7 + i) * 0.05); }, () => METEO === 'canicule' && JOUR(), 'meteo', 'Canicule : deux voisins s\'éventent à l\'ombre de l\'arbre'));
+
+  // ---- les saisons
+  etiq('saison', 'Jardinières fleuries sous les fenêtres', () => SAISON === 1);
+  etiq('saison', 'Géraniums rouges aux fenêtres', () => SAISON === 2);
+  etiq('saison', 'Nids d\'hirondelles sous les avant-toits', () => SAISON === 1 || SAISON === 2);
+  etiq('saison', 'Potager : pousses au printemps, tomates et choux l\'été, citrouilles l\'automne', () => SAISON !== 0 && !NEIGE_SOL());
+  etiq('saison', 'Citrouilles devant les portes, confitures sur les rebords', () => SAISON === 3);
+  etiq('saison', 'Couronnes de houx aux portes, guirlande sur la mairie', () => SAISON === 0);
+  etiq('saison', 'Bois de chauffage empilé : grand tas à l\'automne, entamé l\'hiver', () => SAISON === 3 || SAISON === 0);
+  etiq('saison', 'Hiver : toutes les cheminées fument épais', () => SAISON === 0);
+  etiq('saison', 'Été : peu de feux, seulement pour la cuisine', () => SAISON === 2 && METEO !== 'canicule' && !NEIGE_SOL());
+  // ménage de printemps : tapis battus aux fenêtres
+  ['maison', 'maison_pierre', 'immeuble'].map(fenetreLibre).filter(Boolean).forEach((f, i) => ajoute(A(`tapis${i % 2}`), (t, dt, o) => { const cy = (t + i * 1.1) % 3, bat = cy < 1.2 ? Math.max(0, Math.sin(cy * 13)) : 0; surCadre(o, f.m, 0, -f.h / 2 + 0.02, 0.09, 0, -bat * 0.35, 0, 0.7); if (bat > 0.95 && Math.random() < 0.5) { const p = dansCadre(f.m, 0, -f.h / 2 - 0.35, 0.3); for (let n = 0; n < 3; n++) particule({ x: p.x + (Math.random() - 0.5) * 0.03, y: p.y, z: p.z, vx: f.n.x * 0.05 + (Math.random() - 0.5) * 0.04, vy: 0.03, vz: f.n.z * 0.05 + (Math.random() - 0.5) * 0.04, s: 0.008, grandit: 2.5, col: 0xd9c9a0, vie: 1.3 }); } }, () => SAISON === 1 && DEHORS() && SEC(), 'saison', 'Ménage de printemps : tapis battus aux fenêtres'));
+  // hirondelles
+  { const c = { x: (km.x + kc.x) / 2, z: (km.z + kc.z) / 2 }; for (let i = 0; i < 5; i++) ajoute(A('hirondelle', 0.02), (t, dt, o) => { const a = t * (1.3 + i * 0.12) + i * 1.3, r = 0.35 + 0.2 * Math.sin(t * 0.7 + i); o.position.set(c.x + Math.cos(a) * r, 0.25 + Math.sin(t * 2.1 + i) * 0.07, c.z + Math.sin(a) * r * 0.8); o.rotation.set(0, -a - Math.PI / 2, Math.sin(t * 2.1 + i) * 0.3); o.scale.set(0.02, 0.02, 0.02 * (0.25 + Math.abs(Math.sin(t * 15 + i)))); }, () => (SAISON === 1 || SAISON === 2) && JOUR() && SEC(), 'saison', 'Hirondelles qui virevoltent autour des toits'); }
+  // jardinier qui arrose le potager
+  { const [px, pz] = ROND(0), a0 = 0.4 + Math.PI / 4, tg = [Math.cos(a0 - Math.PI / 2 + Math.PI), Math.sin(a0 - Math.PI / 2 + Math.PI)]; let pro = 0;
+    ajoute(A('jardinier'), (t, dt, o) => { const u = Math.sin(t * 0.25) * 1.1, p = pres(kc, px + Math.cos(a0) * 1.15 + tg[0] * u, pz + Math.sin(a0) * 1.15 + tg[1] * u); o.position.set(p.x, p.y, p.z); o.rotation.y = capB(kc, -Math.cos(a0), -Math.sin(a0)); o.updateMatrix(); if ((pro -= dt) <= 0) { pro = 0.12; const b = _v.set(1.05, 0.95, 0.3).applyMatrix4(o.matrix); particule({ x: b.x, y: b.y, z: b.z, vx: (Math.random() - 0.5) * 0.02 - Math.cos(o.rotation.y) * -0.05, vy: 0, vz: (Math.random() - 0.5) * 0.02, g: 0.6, s: 0.003, col: 0x9fd4f2, vie: 0.35 }); } }, () => SAISON === 2 && JOUR() && SEC() && METEO !== 'brouillard', 'saison', 'Le jardinier arrose le potager'); }
+  // on dîne dehors les soirs d'été
+  TABLES.forEach((T, n) => {
+    const M = cadre(T.k, T.x, 0.25, T.z, T.ry);
+    [[-0.5, 0.95, Math.PI / 2], [0.5, 0.95, Math.PI / 2], [-0.5, -0.95, -Math.PI / 2], [0.5, -0.95, -Math.PI / 2]].forEach(([x, z, ry], i) => ajoute(A(`assis${(i + n) % 4}`), (t, dt, o) => surCadre(o, M, x, 0, z, ry, 0, Math.sin(t * 1.7 + i * 2 + n) * 0.07, S), () => SAISON === 2 && SEC() && (SOIR() || (NUIT() && H.p < 35)), 'saison', 'Les soirs d\'été, on dîne dehors à la lanterne'));
+  });
+  // râteau et feuilles mortes
+  { const arbre = monde(kp, 1.8, 1.6, -1.6);
+    ajoute(A('rateleur'), (t, dt, o) => { const u = (Math.sin(t * 0.3) + 1) / 2, p = pres(kp, -0.6 + 2.4 * u, 2.5 - 0.4 * u); o.position.set(p.x, p.y, p.z); o.rotation.set(0, capB(kp, 0.3, 1), Math.sin(t * 3.2) * 0.12); if (Math.random() < dt * 3) particule({ genre: 'plaque', x: arbre.x + (Math.random() - 0.5) * 0.1, y: arbre.y + 0.02, z: arbre.z + (Math.random() - 0.5) * 0.1, vx: 0.02 + (Math.random() - 0.5) * 0.04, vy: -0.03, vz: (Math.random() - 0.5) * 0.04, g: 0.02, spin: 3, s: 0.012, forme: [1, 0.2, 0.7], col: [0xd9822b, 0xc9a13a, 0xb5562a, 0xe0b040][Math.random() * 4 | 0], vie: 4, sol: 0.026 }); }, () => SAISON === 3 && DEHORS() && SEC(), 'saison', 'On ratisse les feuilles mortes en tas');
+  }
+  // on fend du bois à l'automne, on le rentre l'hiver
+  { const [bx, bz] = ROND(1), bil = monde(kc, bx + 1.4, 0.8, bz + 0.6);
+    ajoute(A('fendeur'), (t, dt, o) => { const p = pres(kc, bx + 0.55, bz + 0.6), s = Math.sin(t * 4); o.position.set(p.x, p.y, p.z); o.rotation.set(0, capB(kc, 1, 0), -Math.max(0, s) * 0.6); if (s < -0.97 && Math.random() < 0.4) for (let n = 0; n < 3; n++) particule({ genre: 'plaque', x: bil.x, y: bil.y, z: bil.z, vx: (Math.random() - 0.5) * 0.25, vy: 0.2 + Math.random() * 0.2, vz: (Math.random() - 0.5) * 0.25, g: 1.2, spin: 10, s: 0.006, forme: [1, 0.4, 0.6], col: 0xd9b07a, vie: 0.7, sol: 0.026 }); }, () => SAISON === 3 && DEHORS() && SEC(), 'saison', 'On fend des bûches, les copeaux volent');
+    const tas = pres(kc, bx, bz + 1.4), porte = portesDe(kc).map(d => dansCadre(d.m, 0, 0, 1.0)).sort((a, b) => Math.hypot(a.x - tas.x, a.z - tas.z) - Math.hypot(b.x - tas.x, b.z - tas.z))[0];
+    ajoute(A('porteurBois'), (t, dt, o) => longer(o, [tas, porte], t * 0.04, false), () => SAISON === 0 && DEHORS() && METEO !== 'tempete' && METEO !== 'orage', 'saison', 'L\'hiver, on rentre le bois du tas à la maison');
+  }
+
+  // ---- l'heure : fenêtres, volets, fumées, allumeur, veilleur, bêtes de la nuit, boulanger, coq, taverne
+  etiq('heure', 'Les fenêtres s\'allument une à une', () => SOIR());
+  etiq('heure', 'Les fenêtres s\'éteignent tard, une à une' + (volets ? ', et leurs volets se ferment' : ''), () => NUIT() && H.p < 56);
+  etiq('heure', 'Quelques veilleurs gardent leur lampe toute la nuit', () => NUIT() && H.p >= 56);
+  etiq('heure', 'Ombres chinoises derrière les rideaux, on danse à la taverne', () => (NUIT() || SOIR()) && H.p > 4);
+  etiq('heure', 'Quelques lève-tôt ont allumé leur lampe', () => AUBE() && H.p < 20);
+  if (volets) etiq('heure', 'Les volets s\'ouvrent un à un', () => AUBE() && !PLUVIEUX());
+  etiq('heure', 'Fumée du matin : on rallume tous les feux', () => AUBE() && METEO !== 'canicule');
+  etiq('heure', 'Une cheminée sur deux fume', () => JOUR() && SAISON !== 0 && SAISON !== 2 && METEO !== 'canicule' && METEO !== 'neige');
+  etiq('heure', 'On allume le feu pour le souper', () => SOIR() && METEO !== 'canicule');
+  etiq('heure', 'Les lanternes des portes s\'allument', () => SOIR() || NUIT());
+  etiq('heure', () => `Ciel étoilé, ${NOM_PHASE(PHASE_LUNE(MOIS))} (${NOMS_MOIS[MOIS]})`, () => (NUIT() || (AUBE() && H.p < 15)) && CLAIR() > 0);
+  etiq('heure', 'Étoiles filantes des nuits d\'été', () => NUIT() && SAISON === 2 && CLAIR() >= 1);
+  etiq('heure', 'Ciel couvert : ni lune ni étoiles', () => NUIT() && !CLAIR());
+  // l'allumeur de réverbères, à toutes les époques
+  if (LAMPES.length) {
+    const pts = LAMPES.map(l => ({ x: l.p.x - 0.03, z: l.p.z }));
+    ajoute(A('allumeur'), (t, dt, o) => {
+      const q = Math.max(0, H.p - 1), j = Math.min(LAMPES.length - 1, Math.floor(q / 5)), tau = q - j * 5;
+      const a = pts[j], b = pts[Math.min(LAMPES.length - 1, j + 1)], f = tau < 1 ? 0 : Math.min(1, (tau - 1) / 4);
+      o.position.set(a.x + (b.x - a.x) * f, kh.top + DALLE + (f > 0 && f < 1 ? Math.abs(Math.sin(t * 9)) * 0.004 : 0), a.z + (b.z - a.z) * f);
+      o.rotation.set(0, f > 0 ? -Math.atan2(b.z - a.z, b.x - a.x) : o.rotation.y, tau < 1 ? 0.35 : 0);
+    }, () => (SOIR() || AUBE()) && H.p < 5 * LAMPES.length + 1, 'heure', 'L\'allumeur passe de réverbère en réverbère');
+    etiq('epoque', { ancien: 'Lanternes à chandelle sur la place', lumieres: 'Réverbères à huile sur potence', empire: 'Réverbères à huile sur potence', industrie: 'Réverbères à gaz, lumière blanche et fixe' }[EPOQUE], () => LAMPES.some((l, j) => lampeAllumee(j)));
+  }
+  etiq('epoque', { ancien: 'Chandelles orangées qui vacillent aux fenêtres', lumieres: 'Lampes à huile aux fenêtres', empire: 'Lampes à huile plus claires aux fenêtres', industrie: 'Becs de gaz aux fenêtres : plus de lumières, et plus tard' }[EPOQUE], () => FEN.some(f => f.lum > 0.3));
+  etiq('epoque', { ancien: 'Colombages, pas de volets', lumieres: 'Volets peints, ouverts le jour, fermés la nuit', empire: 'Volets, ouverts le jour, fermés la nuit', industrie: 'Brique et ardoise, pas de volets' }[EPOQUE], () => true);
+  if (EPOQUE === 'industrie') etiq('epoque', 'Fumée de charbon grise aux cheminées des immeubles', () => partFoyers().part > 0.2);
+  // le veilleur de nuit, sa lanterne et sa cloche
+  { const ronde = [0, 1, 2, 3, 4, 5].map(i => coin(-i, 0.95)), cloche = A('cloche', ECH * 1.4); let avant = 0;
+    const v = ajoute(A('veilleur'), (t, dt, o) => {
+      longer(o, ronde, t * 0.035, true, DALLE, 0.003); o.updateMatrix();
+      HALO.mettre(_v.set(0.45, 1.1, 0.38).applyMatrix4(o.matrix), _col.setHex(RUE[EPOQUE]), 1); GRAND.mettre(_v, _col, 0.35);
+      const cy = t % 6, ag = cy < 1.6 ? Math.sin(cy * 12) * 0.7 : 0;
+      _v.set(0.1, 3.1, -0.42).applyMatrix4(o.matrix); cloche.position.copy(_v); cloche.rotation.set(0, o.rotation.y, ag);
+      if (cy < 1.6 && Math.floor(cy * 12 / Math.PI) !== avant) { avant = Math.floor(cy * 12 / Math.PI); if (avant % 2 === 0) particule({ genre: 'son', x: _v.x, y: _v.y + 0.01, z: _v.z, s: 0.035, col: 0xfff0c0, vie: 0.6 }); }
+    }, () => NUIT() || (SOIR() && H.p > 18), 'heure', 'Le veilleur de nuit fait sa ronde, lanterne et cloche');
+    ajoute(cloche, null, () => v.visible);
+  }
+  // chat sur un faîtage
+  { const r = TOITS.find(x => x.k === km && x.petit) || TOITS[0];
+    ajoute(A('chat0', ECH * 1.3), (t, dt, o) => { const u = t * 0.22, z = Math.sin(u) * r.d * 0.36, sens = Math.cos(u) >= 0; surCadre(o, r.m, 0, r.h - 0.05, z, sens ? -Math.PI / 2 : Math.PI / 2, 0, 0, S * 1.3); o.updateMatrix(); if (NUIT()) for (const e of [0.07, -0.07]) PETIT.mettre(_v.set(0.62, 0.66, e).applyMatrix4(o.matrix), _col.setHex(0xd8ff6a), 1); }, () => (SOIR() || NUIT()) && SEC(), 'heure', 'Un chat se promène sur un faîtage, les yeux brillants');
+  }
+  // hibou de la lisière
+  ajoute(A('hibou', ECH * 1.5), (t, dt, o) => { o.position.set(ARBRE_HIBOU.x + 0.115, 0.02 + 0.205, ARBRE_HIBOU.z); const vif = Math.sin(t * 0.37) > 0.6 ? 1.6 : 0; o.rotation.y = Math.atan2(cam.position.x - o.position.x, cam.position.z - o.position.z) - Math.PI / 2 + Math.sin(t * 0.5) * 1.1 + vif; o.updateMatrix(); for (const e of [0.12, -0.12]) PETIT.mettre(_v.set(0.33, 0.95, e).applyMatrix4(o.matrix), _col.setHex(0xffd34d), NUIT() ? 1 : 0.4); }, () => (NUIT() || (SOIR() && H.p > 15)) && !PLUVIEUX(), 'heure', 'Un hibou tourne la tête dans l\'arbre de la lisière');
+  // chauves-souris
+  for (let i = 0; i < 4; i++) ajoute(A('chauvesouris', 0.022), (t, dt, o) => { const a = t * (0.9 + i * 0.25) + i * 1.6, r = 0.55 + 0.3 * Math.sin(t * 0.8 + i * 2); o.position.set(centre.x + Math.cos(a) * r + Math.sin(t * 3.1 + i) * 0.08, 0.36 + Math.sin(t * 2.3 + i) * 0.1, centre.z + Math.sin(a) * r + Math.cos(t * 2.7 + i) * 0.08); o.rotation.set(0, -a - Math.PI / 2, Math.sin(t * 3 + i) * 0.4); o.scale.set(0.022, 0.022, 0.022 * (0.2 + Math.abs(Math.sin(t * 18 + i)))); }, () => (SOIR() || NUIT()) && SAISON !== 0 && SEC() && METEO !== 'brouillard', 'heure', 'Chauves-souris autour des toits');
+  // le coq sur la meule de la chaumière
+  { const p = pres(kc, 0, 0); let avant = 0;
+    ajoute(A('coq', ECH * 1.4), (t, dt, o) => { const cy = t % 2.6, chante = cy < 0.9; o.position.set(p.x, p.y + 0.108, p.z); o.rotation.set(0, Math.atan2(cam.position.x - p.x, cam.position.z - p.z) - Math.PI / 2 + 0.7, chante ? 0.45 : Math.sin(t * 3) * 0.05); if (chante && avant >= 0.9) { o.updateMatrix(); const b = _v.set(0.5, 1.0, 0).applyMatrix4(o.matrix); for (let n = 0; n < 3; n++) particule({ genre: 'son', x: b.x, y: b.y + 0.004, z: b.z, s: 0.018 + n * 0.008, col: 0xfff6d0, vie: 0.5 + n * 0.25 }); } avant = cy; }, () => AUBE() || (JOUR() && H.p < 25 && HEURE === 'cycle'), 'heure', 'Le coq chante sur la meule'); }
+  // le boulanger : il allume son four avant l'aube, puis sort ses pains
+  { const four = monde(kb, 3.2, 0.55, 0.4);
+    ajoute(A('boulanger'), (t, dt, o) => { const p = pres(kb, 3.2, 1.35); o.position.set(p.x, p.y, p.z); o.rotation.set(0, capB(kb, 0, -1), -Math.max(0, Math.sin(t * 1.4)) * 0.45); }, () => NUIT() && H.p > 35, 'heure', 'Le boulanger allume son four avant l\'aube');
+    ajoute(A('boulanger'), (t, dt, o) => longer(o, [pres(kb, 3.2, 1.35), pres(kb, 1.2, 1.9)], t * 0.03, false), () => AUBE() || (JOUR() && H.p < 60 && HEURE === 'cycle'), 'heure', 'Le boulanger sort ses pains du four');
+    ajoute(new THREE.Object3D(), (t) => GRAND.mettre(four, _col.setHex(0xff7a1c), 0.75 + Math.sin(t * 11) * 0.12 + Math.sin(t * 23) * 0.08), () => (NUIT() && H.p > 32) || AUBE() || (JOUR() && H.p < 90));
+  }
+  // la taverne s'anime le soir
+  { const d = portesDe(kt)[0], quand = () => ((SOIR() && H.p > 3) || (NUIT() && H.p < 50)) && METEO !== 'orage' && METEO !== 'tempete';
+    if (d) {
+      const a = dansCadre(d.m, 0, 0, 0.35), b = dansCadre(d.m, 2.2, 0, 3.4), c2 = dansCadre(d.m, -1.8, 0, 3.0);
+      ajoute(A('buveur0'), (t, dt, o) => longer(o, [{ x: a.x, z: a.z }, { x: b.x, z: b.z }], t * 0.03, false, DALLE + kt.top), quand, 'heure', 'La taverne s\'anime : on entre, on sort');
+      ajoute(A('buveur1'), (t, dt, o) => longer(o, [{ x: a.x, z: a.z }, { x: c2.x, z: c2.z }], t * 0.026 + 0.1, false, DALLE + kt.top), quand);
+      ajoute(A('buveur2'), (t, dt, o) => { surCadre(o, d.m, 0.9 + Math.sin(t * 0.5) * 0.35, 0.25, 1.4 + Math.sin(t * 0.37) * 0.2, Math.sin(t * 0.8) * 1.2, 0, Math.sin(t * 2.1) * 0.3, S); }, quand, 'heure', 'Un buveur titube devant la taverne');
+    }
+  }
+  const nAvant = [...POOLS.values()].reduce((s, p) => s + p.list.length, 0);
+  construireRues(A, portesDe);
+  NB_NOUVEAUX = [...POOLS.values()].reduce((s, p) => s + p.list.length, 0) - nAvant;
+  installerPools();
+}
+
+// ===================================================================== rues, marché et école
+// Promeneurs sur le graphe des rues, métiers ambulants, crieur, patrouille, attelages ; la halle du marché et la petite école.
+// Tout suit foule() : la météo, la saison et l'heure déjà gérées plus haut. Les personnages sont ceux de vie.js (boîtes, InstancedMesh).
+let FORCE_MARCHE = false, JOUR_N = 0, NB_DESSINES = 0, NB_DESSINES_MAX = 0, NB_NOUVEAUX = 0;
+const JOUR_MARCHE = () => FORCE_MARCHE || (HEURE === 'cycle' && JOUR_N % 2 === 0); // en lecture accélérée, un jour sur deux est jour de marché
+const mod = (nom, f) => { if (!MODELES[nom]) MODELES[nom] = f(); return nom; };
+const ARDOISE_Q = 0x5d6f80;
+/** La part des promeneurs dehors (0 : personne, 1 : tout le monde) selon le temps, la saison et l'heure. */
+function foule() {
+  if (METEO === 'orage' || METEO === 'tempete' || NUIT()) return 0;
+  let f = { beau: 1, nuageux: 0.85, pluie: 0.35, brouillard: 0.45, neige: 0.5, canicule: 0.3 }[METEO];
+  if (SAISON === 0 && METEO !== 'neige') f *= 0.75;
+  if (AUBE()) return H.p > 15 ? 0.2 * f : 0;
+  if (SOIR()) return (SAISON === 2 && (SEC() || METEO === 'canicule') ? 1 : 0.3 * f) * (H.p < 20 ? 1 : 0.35); // la promenade du soir l'été, même après la canicule
+  return f;
+}
+const PROMENADE_SOIR = () => SOIR() && SAISON === 2 && foule() > 0.5;
+const MARCHE_OUVERT = () => (JOUR() || (SOIR() && H.p < 8)) && METEO !== 'orage' && METEO !== 'tempete';
+const MARCHE = { etal: null, bache: null, carreau: null, braise: null };
+// l'horaire de l'école sur la journée du jeu (300 s) ; en heure fixe « Jour », la journée d'école se rejoue toutes les 30 s
+const S_ECOLE = () => HEURE === 'cycle' ? H.p : (H.p * 10) % 300;
+function ECOLE() {
+  if (SAISON === 2) return 'vacances';
+  if (!JOUR()) return 'fermee';
+  const s = S_ECOLE();
+  return s < 90 ? 'arrivee' : s < 120 ? 'classe' : s < 200 ? 'recre' : s < 225 ? 'classe' : s < 295 ? 'sortie' : 'fermee';
+}
+const EN_CLASSE = () => ['arrivee', 'classe', 'recre'].includes(ECOLE());
+const DEHORS_ECOLE = () => METEO !== 'orage' && METEO !== 'tempete'; // par orage ou tempête, les écoliers restent en classe
+/** Les cases d'une marelle (1, 2, 3, 4-5, 6, 7-8, ciel) le long de (ux, uz), de côté c ; dessin = true sépare les cases doubles. */
+function cellsMarelle(x0, z0, ux, uz, c, dessin = false) {
+  const r = [];
+  [1, 1, 1, 2, 1, 2, 1].forEach((n, i) => { const x = x0 + ux * c * i, z = z0 + uz * c * i; if (n === 2 && dessin) for (const s of [-0.5, 0.5]) r.push({ x: x - uz * c * s, z: z + ux * c * s }); else r.push({ x, z }); });
+  return r;
+}
+const MARELLE_RUE = (() => { const a = coinK(KM, 4), b = coinK(KM, 5); return { x: a.x, z: a.z + 0.24, ux: 0, uz: 1 }; })(); // dans la ruelle sans issue à gauche de la halle
+const STALLS = [[-3.2, -2.6], [3, -2.8], [-3, 3], [3.2, 2.8]]; // les étals du modèle marche (modeles.js)
+const ETALAGE = (x, z) => [x - 0.55, z + Math.sign(z) * 1.85]; // l'étalage, côté extérieur de l'étal (la caisse du modèle est en x + 1)
+const PLACE_MARCHAND = (x, z) => [x + Math.sign(x) * 1.9, z + Math.sign(z) * 0.4]; // le marchand, à côté de son étal
+
+// ------------------------------------------------------------------ décor de la halle du marché (coordonnées locales du modèle)
+function decorMarche(k, Dl) {
+  const ep = EPOQUE, zs = [-4.6, -0.9], blanc = NEIGE_SOL();
+  const T = (L, w, d, h, col, x, y, z, ry) => { MOD.toit(L, w, d, h, col, x, y, z, ry); if (blanc) prisme(L, w + 0.14, d - 0.06, h + 0.04, 0xf4f7fb, x, y + 0.07, z, ry, 0.12); }; // toit de la halle, blanchi par la neige
+  const xs = ep === 'industrie' ? [-5.2, -2.6, 0, 2.6, 5.2] : [-5.2, -1.75, 1.75, 5.2];
+  if (ep === 'ancien' || ep === 'lumieres') { // halle en bois : poteaux, liens, sablières et grand toit de tuiles ; sur socles de pierre avec un lanternon aux Lumières
+    const hp = ep === 'lumieres' ? 3.0 : 3.6;
+    for (const x of xs) for (const z of zs) {
+      if (ep === 'lumieres') put(Dl, boite(0.62, 0.6, 0.62), PIERRE, x, 0.3, z, 0, 0.06);
+      put(Dl, boite(0.32, hp, 0.32), BOIS, x, 3.6 - hp / 2, z, 0, 0.06);
+      const s = z < -2 ? 1 : -1; put(Dl, boite(0.16, 1.1, 0.16).rotateX(0.7 * s), BOIS, x, 3.2, z + 0.35 * s, 0, 0);
+    }
+    for (const z of zs) put(Dl, boite(10.8, 0.3, 0.32), BOIS, 0, 3.65, z, 0, 0.05);
+    for (const x of xs) put(Dl, boite(0.3, 0.3, 4.0), BOIS, x, 3.65, -2.75, 0, 0.05);
+    T(Dl, 5.0, 11.6, 2.6, ep === 'ancien' ? 0x8a4a34 : 0xa8553a, 0, 3.8, -2.75, Math.PI / 2);
+    if (ep === 'lumieres') { put(Dl, boite(0.8, 0.8, 0.8), 0xf1e4c4, 0, 6.6, -2.75, 0, 0.1); put(Dl, cone(0.75, 0.9, 4), ARDOISE_Q, 0, 7.45, -2.75, Math.PI / 4, 0.1); }
+  } else if (ep === 'empire') { // halle de pierre : piliers, linteaux, consoles d'arcades, toit d'ardoise
+    for (const x of xs) for (const z of zs) { put(Dl, boite(0.62, 3.4, 0.62), PIERRE, x, 1.7, z, 0, 0.08); put(Dl, boite(0.82, 0.26, 0.82), 0xd8d2c4, x, 0.13, z, 0, 0.05); }
+    for (const z of zs) put(Dl, boite(11.2, 0.6, 0.68), 0xd8d2c4, 0, 3.7, z, 0, 0.08);
+    for (const x of xs) put(Dl, boite(0.6, 0.6, 4.3), 0xd8d2c4, x, 3.7, -2.75, 0, 0.05);
+    for (let i = 0; i < xs.length - 1; i++) for (const z of zs) for (const x of [xs[i] + 0.55, xs[i + 1] - 0.55]) put(Dl, boite(0.5, 0.36, 0.64), PIERRE, x, 3.22, z, 0, 0);
+    T(Dl, 5.2, 11.8, 2.0, ARDOISE_Q, 0, 4.0, -2.75, Math.PI / 2);
+  } else { // halle métallique de type Baltard : colonnes de fonte, impostes vitrées, toit de zinc et lanterneau vitré, becs de gaz
+    const FONTE = 0x3d4a4a, ZINC = 0x8a96a0, VERRE = 0xa8c8d8;
+    for (const x of xs) for (const z of zs) { put(Dl, cyl(0.13, 0.16, 3.8, 8), FONTE, x, 1.9, z, 0, 0.05); put(Dl, boite(0.4, 0.2, 0.4), FONTE, x, 3.75, z, 0, 0.03); }
+    for (const z of zs) { put(Dl, boite(10.8, 0.22, 0.2), FONTE, 0, 3.85, z, 0, 0.04); for (let i = 0; i < xs.length - 1; i++) put(Dl, boite(2.3, 0.7, 0.04), VERRE, (xs[i] + xs[i + 1]) / 2, 3.35, z, 0, 0); }
+    for (const x of xs) put(Dl, boite(0.16, 0.2, 3.9), FONTE, x, 3.85, -2.75, 0, 0.03);
+    T(Dl, 4.8, 11.2, 1.0, ZINC, 0, 3.95, -2.75, Math.PI / 2);
+    put(Dl, boite(10.6, 0.7, 1.6), VERRE, 0, 5.2, -2.75, 0, 0.06);
+    T(Dl, 2.2, 11.0, 0.65, ZINC, 0, 5.55, -2.75, Math.PI / 2);
+    for (const [x, z] of [[-6.2, 0.4], [6.2, 0.4]]) { MOD.reverbere(Dl, x, z); LANTERNES.push({ p: monde(k, x, 2.8, z), k, r: 0.2 }); }
+  }
+  // la table de la halle (volailles et œufs), les étals garnis selon la saison, les bâches de la nuit, le carreau du jour de marché
+  put(Dl, boite(2.4, 0.12, 1.0), BOIS, 0, 0.95, -2.75, 0, 0.05);
+  for (const [a, b] of [[-1.05, -0.4], [1.05, -0.4], [-1.05, 0.4], [1.05, 0.4]]) put(Dl, boite(0.1, 0.9, 0.1), BOIS, a, 0.45, -2.75 + b, 0, 0);
+  const Le = lot(), Lb = lot(), Lc = lot(), s = SAISON;
+  const PROD = [ // [couleurs, taille] : hiver (choux, pommes de terre, poireaux, marrons), printemps (salades, radis, asperges, fleurs), été (cerises, abricots, melons, fraises), automne (citrouilles, pommes, raisin, champignons)
+    [[[0x9fbf8a, 0xb5d0a0], 0.17], [[0xc9a86a, 0xb8945a], 0.1], [[0xe8e4d0, 0x6a9a4a], 0.08], [[0x7a4a2a, 0x8a5a3a], 0.07]],
+    [[[0x8fcf5a, 0x6fbf4a], 0.15], [[0xd94f6a, 0xe86a8a], 0.07], [[0xe9e2c0, 0xc9d0a0], 0.06], [[0xff7ab8, 0xffd34d, 0xb57bff, 0xf6f2ea], 0.08]],
+    [[[0xa01a2a, 0xc0202a], 0.06], [[0xf0a040, 0xe89030], 0.09], [[0xc9d070, 0xa8b858], 0.17], [[0xe0303a, 0xd9322a], 0.07]],
+    [[[0xe07a1a, 0xd96a10], 0.2], [[0xc0302a, 0x9fbf3a], 0.09], [[0x6a3a7a, 0x8a9a3a], 0.07], [[0xc9a070, 0x8a5a3a], 0.08]],
+  ][s];
+  const cageot = (L, x, y, z, [cols, r]) => { put(L, boite(0.85, 0.16, 0.6), 0xb08a55, x, y + 0.08, z, 0, 0.03); for (let n = 0; n < 6; n++) put(L, sphere(r, 0), cols[n % cols.length], x + ((n % 3) - 1) * 0.26, y + 0.16 + r * 0.7, z + ((n / 3 | 0) - 0.5) * 0.26, 0, 0); };
+  const panier = (L, x, z, [cols, r]) => { put(L, cyl(0.3, 0.24, 0.3, 8), 0xa8804a, x, 0.4, z, 0, 0.03); for (let n = 0; n < 4; n++) put(L, sphere(Math.min(r, 0.12), 0), cols[n % cols.length], x + Math.cos(n * 1.6) * 0.13, 0.6, z + Math.sin(n * 1.6) * 0.13, 0, 0); };
+  STALLS.forEach(([x, z], i) => {
+    for (let a = 0; a < 3; a++) for (let b = 0; b < 2; b++) cageot(Le, x + (a - 1) * 0.95, 1.0, z + (b - 0.5) * 0.75, PROD[(i + a + b) % 4]);
+    put(Lb, boite(3.2, 0.22, 2.4), 0xcfc3a0, x, 1.1, z, 0, 0.05);
+    // l'étalage sur tréteaux, hors de l'auvent (sinon on ne voit rien d'en haut)
+    const [ex_, ez] = ETALAGE(x, z); put(Dl, boite(1.9, 0.1, 0.8), BOIS, ex_, 0.7, ez, 0, 0.04); for (const a of [-0.8, 0.8]) put(Dl, boite(0.1, 0.65, 0.7), BOIS, ex_ + a, 0.33, ez, 0, 0);
+    for (const a of [-0.45, 0.45]) cageot(Le, ex_ + a, 0.75, ez, PROD[(i + (a > 0 ? 1 : 2)) % 4]); put(Lb, boite(2.0, 0.2, 0.9), 0xcfc3a0, ex_, 0.82, ez, 0, 0.04);
+  });
+  for (const x of [-0.6, 0.6]) { put(Le, boite(0.8, 0.55, 0.62), 0xc9a46a, x, 1.3, -2.75, 0, 0.04); put(Le, sphere(0.15, 0), x < 0 ? 0xf6f2ea : 0xb8602a, x + 0.1, 1.64, -2.7, 0, 0); put(Le, boite(0.08, 0.1, 0.05), 0xd9322a, x + 0.12, 1.8, -2.7, 0, 0); }
+  put(Lb, boite(2.5, 0.2, 1.1), 0xcfc3a0, 0, 1.08, -2.75, 0, 0.05);
+  // l'étal de saison, devant la halle à gauche : brasero de marrons (hiver), fleurs (printemps), melons (été), citrouilles (automne)
+  if (s === 0) {
+    put(Le, cyl(0.38, 0.3, 0.7, 8), 0x2b2b30, 5.9, 0.6, 0.6, 0, 0.05); put(Le, cyl(0.4, 0.4, 0.06, 8), 0xd9531a, 5.9, 0.97, 0.6, 0, 0); MARCHE.braise = monde(k, 5.9, 1.15, 0.6);
+    if (ep === 'empire' || ep === 'industrie') for (const [x, z] of [[-6.0, 0.2], [-5.5, 1.3], [-6.4, -0.8]]) { put(Le, cyl(0.08, 0.1, 0.5, 5), 0x7a5233, x, 0.5, z, 0, 0.03); put(Le, cone(0.55, 1.5, 6), 0x3e7f34, x, 1.4, z, 0, 0.05); put(Le, cone(0.35, 0.8, 6), 0x4c9440, x, 2.1, z, 0, 0.04); }
+  } else for (let n = 0; n < 5; n++) {
+    const x = -5.9 + (n % 3) * 0.7 - 0.35, z = 0.2 + (n / 3 | 0) * 0.75;
+    if (s === 3) put(Le, sphere(0.36, 1).scale(1, 0.72, 1), 0xe07a1a, x, 0.5, z, 0, 0.04);
+    else if (s === 2) put(Le, sphere(0.26, 1).scale(1.2, 0.9, 1), 0xc9d070, x, 0.47, z, 0, 0.04);
+    else { put(Le, cyl(0.22, 0.18, 0.4, 8), 0x6a7a8a, x, 0.45, z, 0, 0.03); for (let m = 0; m < 3; m++) put(Le, sphere(0.11, 0), [0xff7ab8, 0xffd34d, 0xb57bff, 0xf6f2ea][(n + m) % 4], x + (m - 1) * 0.1, 0.78, z, 0, 0); }
+  }
+  // le carreau : marchandes assises au sol sur leur toile, cages de volailles
+  [[0, 5.6, 0, 0xb8453a], [-6.0, 2.9, Math.PI / 2, 0x3a6a9a], [6.0, 3.0, Math.PI / 2, 0xd9a43a]].forEach(([x, z, ry, c], i) => {
+    put(Lc, boite(1.9, 0.05, 1.0), c, x, 0.27, z, ry, 0.02);
+    for (let n = 0; n < 3; n++) { const o = (n - 1) * 0.55; panier(Lc, x + (ry ? 0 : o), z + (ry ? o : 0), PROD[(i + n) % 4]); }
+  });
+  for (const x of [1.5, 2.3]) { put(Lc, boite(0.7, 0.5, 0.55), 0xc9a46a, x, 0.5, 6.2, 0, 0.04); put(Lc, sphere(0.14, 0), x < 2 ? 0xf6f2ea : 0x3a3a3a, x + 0.1, 0.82, 6.2, 0, 0); }
+  const grp = L => { const W = lot(); versMonde(L, k.M, W); return fige(W, BATIS); };
+  MARCHE.etal = grp(Le); MARCHE.bache = grp(Lb); MARCHE.carreau = grp(Lc);
+}
+
+// ------------------------------------------------------------------ décor de la petite école selon l'époque (coordonnées locales du modèle)
+function decorEcole(k, E, Dl, neige, ex) {
+  const ep = EPOQUE, hm = 2.4 * E.h, top = hm + 2.0; // le clocheton : boîte de 1,2 centrée à hm + 1,4, cône jusqu'à hm + 3,2
+  put(Dl, boite(0.5, 0.62, 0.04), 0x2a1f18, 1.4, hm + 1.42, -1.53, 0, 0); // l'ouverture où pend la cloche
+  if (neige) put(Dl, boite(6, 0.02, 3.4), 0xeef2f6, 0, 0.46, 2.4, 0, 0); // la cour sous la neige
+  if (!neige) for (const c of cellsMarelle(-1.6, 3.5, 1, 0, 0.42, true)) put(Dl, boite(0.36, 0.012, 0.36), 0xf4f2ea, c.x, 0.456, c.z, 0, 0); // marelle à la craie dans la cour
+  if (ep === 'ancien') { put(Dl, boite(0.1, 0.62, 0.1), 0xd9a43a, 1.4, top + 1.45, -2, 0, 0.04); put(Dl, boite(0.36, 0.1, 0.1), 0xd9a43a, 1.4, top + 1.55, -2, 0, 0.03); } // école de paroisse : la croix
+  if (ep === 'lumieres') { put(Dl, boite(0.55, 0.5, 0.04), 0xf2ead2, 0, hm - 0.38, -0.46, 0, 0.02); put(Dl, boite(0.04, 0.3, 0.06).rotateZ(0.6), 0x2b2b30, 0, hm - 0.38, -0.42, 0, 0); } // cadran solaire
+  if (ep === 'empire' || ep === 'industrie') { // la plaque « École » (communale à l'ère industrielle) ; le drapeau sur le clocheton
+    const w = ep === 'empire' ? 1.0 : 1.8; put(Dl, boite(w, 0.3, 0.05), 0xf2eee0, 0.65, 1.56, -0.45, 0, 0.02);
+    for (let n = 0; n < (ep === 'empire' ? 4 : 8); n++) put(Dl, boite(0.08, 0.14, 0.02), 0x2b2b30, 0.65 - w / 2 + 0.18 + n * (w - 0.36) / ((ep === 'empire' ? 4 : 8) - 1), 1.56, -0.42, 0, 0);
+    put(Dl, boite(0.07, 1.3, 0.07), 0x5b3a1e, 1.4, top + 1.8, -2, 0, 0.03); ex.drap.push([1.44, top + 2.25, -2, 0.45]);
+  }
+  if (ep === 'industrie') { // école de la loi Guizot : préau, cour fermée d'un muret à grille
+    for (const [x, z] of [[3.0, -3.2], [5.0, -3.2], [3.0, -0.8], [5.0, -0.8]]) put(Dl, boite(0.14, 2.0, 0.14), BOIS, x, 1.0, z, 0, 0.04);
+    put(Dl, boite(2.5, 0.12, 2.9).rotateZ(-0.12), 0x8a96a0, 4.0, 2.08, -2.0, 0, 0.06);
+    for (const s of [-1, 1]) { put(Dl, boite(2.65, 0.55, 0.16), PIERRE, s * 1.875, 0.5, 4.3, 0, 0.04); put(Dl, boite(0.16, 0.55, 3.6), PIERRE, s * 3.2, 0.5, 2.5, 0, 0.04); put(Dl, boite(0.25, 0.95, 0.25), PIERRE, s * 0.55, 0.62, 4.3, 0, 0.04); }
+    for (let x = -3.05; x <= 3.06; x += 0.3) if (Math.abs(x) > 0.7) put(Dl, boite(0.04, 0.4, 0.04), 0x2b2b30, x, 0.97, 4.3, 0, 0);
+  }
+}
+
+// ------------------------------------------------------------------ les promeneurs : de carrefour en carrefour, chacun son allure, on se salue en se croisant
+const PROMENEURS = [];
+let NB_SALUTS = 0;
+function promeneur(i, v, o = {}) {
+  const a = (i * 5 + 3) % GRAPHE.length;
+  const w = { a, b: GRAPHE[a].v[i % GRAPHE[a].v.length], u: hache(i, 3, 61), v, pause: 0, salut: 0, attente: 1 + (i % 4), d: i, x: 0, z: 0, cap: 0, dx: 1, dz: 0, lat: 0.04, f: 50 + hache(i, 4, 61) * 35, saut: 0.002 + hache(i, 5, 61) * 0.004, flane: 0.25, pauseL: 2, veh: false, vis: false, salue: true, ...o };
+  PROMENEURS.push(w); pasPromeneur(w, 0); return w;
+}
+function pasPromeneur(w, dt) {
+  if (w.salut > 0) w.salut -= dt;
+  w.attente -= dt;
+  if (w.pause > 0) { w.pause -= dt; return; }
+  let A = GRAPHE[w.a], B = GRAPHE[w.b], L = Math.hypot(B.x - A.x, B.z - A.z);
+  w.u += w.v * dt / L; w.d += w.v * dt;
+  if (w.u >= 1) { // au carrefour : une autre rue au hasard (pas celle d'où l'on vient, sauf au bout d'une impasse) ; les attelages évitent les impasses
+    const prec = w.a; w.a = w.b;
+    let vs = GRAPHE[w.a].v.filter(j => j !== prec);
+    if (w.veh) { const ok = vs.filter(j => GRAPHE[j].v.length > 1); if (ok.length) vs = ok; }
+    w.b = vs.length ? vs[Math.random() * vs.length | 0] : prec; w.u = 0;
+    if (Math.random() < w.flane) w.pause = 0.8 + Math.random() * w.pauseL;
+    A = GRAPHE[w.a]; B = GRAPHE[w.b]; L = Math.hypot(B.x - A.x, B.z - A.z);
+  }
+  w.dx = (B.x - A.x) / L; w.dz = (B.z - A.z) / L;
+  w.x = A.x + (B.x - A.x) * w.u - w.dz * w.lat; w.z = A.z + (B.z - A.z) * w.u + w.dx * w.lat; w.cap = -Math.atan2(w.dz, w.dx); // chacun garde sa droite
+}
+/** Pose un acteur sur un promeneur, décalé de av le long de la marche et de cote sur le côté (unités du monde). */
+function poser(o, w, av = 0, cote = 0, y = DALLE, sautK = 1) {
+  const marche = w.pause <= 0;
+  o.position.set(w.x + w.dx * av - w.dz * cote, y + (marche ? Math.abs(Math.sin(w.d * w.f)) * w.saut * sautK : 0), w.z + w.dz * av + w.dx * cote);
+  o.rotation.set(0, w.cap, w.salut > 0 ? -Math.sin(w.salut / 1.6 * Math.PI) * 0.35 : marche ? Math.sin(w.d * w.f * 0.5) * 0.04 : 0);
+}
+function saluts() {
+  for (let i = 0; i < PROMENEURS.length; i++) {
+    const a = PROMENEURS[i]; if (!a.vis || !a.salue || a.pause > 0 || a.attente > 0) continue;
+    for (let j = i + 1; j < PROMENEURS.length; j++) {
+      const b = PROMENEURS[j]; if (!b.vis || !b.salue || b.pause > 0 || b.attente > 0) continue;
+      if (Math.abs(a.x - b.x) + Math.abs(a.z - b.z) > 0.11) continue;
+      if (Math.random() < 0.65) { for (const [p, q] of [[a, b], [b, a]]) { p.pause = 1.8; p.salut = 1.6; p.attente = 9; p.cap = -Math.atan2(q.z - p.z, q.x - p.x); } NB_SALUTS++; }
+      else a.attente = b.attente = 3;
+      break;
+    }
+  }
+}
+
+// ------------------------------------------------------------------ toute la vie des rues, du marché et de l'école (appelée par construireVie)
+function construireRues(A, portesDe) {
+  PROMENEURS.length = 0;
+  const ep = EPOQUE, kh = centre, kt = parCle('taverne'), S = 0.4;
+  const nomH = i => mod(`homme_${ep}_${i}`, () => HOMME(ep, i)), nomF = i => mod(`dame_${ep}_${i}`, () => DAME(ep, i));
+  const pluieH = i => mod(`hommeP_${ep}_${i}`, () => HOMME(ep, i, true)), pluieF = i => mod(`dameP_${ep}_${i}`, () => DAME(ep, i, true));
+  const gamin = (i, b = false) => mod(`ecolier_${ep}_${i}${b ? 'b' : ''}`, () => ECOLIER(ep, i, b));
+  const pluieP = { ancien: 'sac', lumieres: 'parapluieVert', empire: 'parapluieRouge', industrie: 'parapluieNoir' }[ep];
+  const vieux = ep === 'ancien' || ep === 'lumieres';
+  // le chef d'orchestre : il fait avancer tous les promeneurs (visibles ou non) et déclenche les saluts
+  ajoute(new THREE.Object3D(), (t, dt) => { for (const w of PROMENEURS) { w.vis = w.visible(); pasPromeneur(w, dt); } saluts(); }, null);
+
+  // ---- promeneurs seuls : bourgeois de l'époque et gens du peuple ; le rang décide qui reste dehors quand la foule baisse
+  const SOLO = [['h', 0, 0.05, 0.05], ['f', 1, 0.12, 0.042], ['p', 'passante0', 0.2, 0.055], ['h', 1, 0.28, 0.062], ['f', 0, 0.33, 0.038], ['p', 'passant1', 0.42, 0.066],
+    ['p', 'commere1', 0.5, 0.045], ['h', 0, 0.58, 0.032, 0.6], ['f', 1, 0.66, 0.05], ['p', 'passant0', 0.75, 0.072], ['f', 0, 0.83, 0.04], ['p', 'passante1', 0.92, 0.052]];
+  const solos = SOLO.map(([g, m, r, v, flane = 0.25], i) => {
+    const w = promeneur(i, v, { flane, visible: () => r < foule() });
+    const nom = g === 'h' ? nomH(m) : g === 'f' ? nomF(m) : m, np = g === 'h' ? pluieH(m) : g === 'f' ? pluieF(m) : pluieP;
+    ajoute(A(nom), (t, dt, o) => poser(o, w), () => w.vis && !PLUIE(), 'rue', 'Promeneurs dans les rues, chacun à son allure');
+    ajoute(A(np), (t, dt, o) => poser(o, w), () => w.vis && PLUIE());
+    return w;
+  });
+  etiq('rue', 'On s\'arrête pour se saluer en se croisant', () => foule() > 0.3);
+  etiq('epoque', vieux ? 'Tricornes et robes à paniers' + (ep === 'lumieres' ? ', coiffures hautes' : '') : ep === 'empire' ? 'Bicornes, redingotes et robes Empire à taille haute' : 'Hauts-de-forme, redingotes noires et crinolines', () => foule() > 0);
+  etiq('meteo', ep === 'ancien' ? 'Pluie : moins de monde dehors, un sac sur la tête' : 'Pluie : moins de monde dehors, sous les parapluies', () => PLUIE() && foule() > 0);
+  // les chiens qui suivent leur maître
+  [[0, 'chien0'], [3, 'chien1']].forEach(([n, nom]) => ajoute(A(mod(nom, () => n ? CHIEN(0xd9c8a0, 0x8a6a4a) : CHIEN(0x5a3a2a, 0x2a1f18)), ECH * 1.1), (t, dt, o) => poser(o, solos[n], -0.03, 0.014, DALLE, 2.2), () => solos[n].vis, 'rue', 'Des chiens suivent leur maître'));
+
+  // ---- couples bras dessus bras dessous : tous dehors à la promenade du soir l'été
+  [[0, 1, 0.55], [1, 0, 0.7], [0, 0, 0.85]].forEach(([h, f, r], i) => {
+    const w = promeneur(20 + i, 0.03, { flane: 0.35, visible: () => (r < foule() && !PLUIE()) || PROMENADE_SOIR() });
+    ajoute(A(nomH(h)), (t, dt, o) => poser(o, w, 0, -0.011), () => w.vis, 'rue', 'Couples bras dessus bras dessous');
+    ajoute(A(nomF(f)), (t, dt, o) => poser(o, w, 0, 0.011), () => w.vis);
+  });
+  etiq('heure', 'Promenade du soir : tout le bourg est dehors', () => PROMENADE_SOIR());
+  // ---- mères avec leurs enfants
+  [['commere0', 0.38, 2], [nomF(0), 0.62, 1]].forEach(([nom, r, nb], i) => {
+    const w = promeneur(30 + i, 0.035, { flane: 0.4, visible: () => r < foule() && !PLUIE() });
+    ajoute(A(nom), (t, dt, o) => poser(o, w), () => w.vis, 'rue', 'Une mère et ses enfants');
+    for (let n = 0; n < nb; n++) ajoute(A(gamin(n), ECH * 0.72), (t, dt, o) => poser(o, w, -0.008 - n * 0.012, n ? -0.016 : 0.016, DALLE, 1.8), () => w.vis);
+  });
+  // ---- les enfants qui courent : pas pendant l'école (sauf les vacances), ni sous la pluie
+  const libres = () => DEHORS() && SEC() && METEO !== 'canicule' && !EN_CLASSE();
+  [0.1, 0.4, 0.7].forEach((r, i) => {
+    const w = promeneur(40 + i, 0.1 + i * 0.012, { flane: 0.4, saut: 0.008, f: 90, lat: 0.03, salue: false, visible: () => libres() && r < foule() });
+    ajoute(A(gamin(i % 2), ECH * 0.72), (t, dt, o) => poser(o, w), () => w.vis, 'rue', 'Des enfants courent dans les rues');
+  });
+  { // le cerceau poussé à la baguette
+    const w = promeneur(45, 0.085, { flane: 0.2, saut: 0.006, f: 80, salue: false, visible: () => libres() && foule() > 0.4 });
+    ajoute(A(gamin(1), ECH * 0.72), (t, dt, o) => poser(o, w), () => w.vis, 'rue', 'Un enfant pousse son cerceau');
+    ajoute(A(mod('cerceau', () => CERCEAU), ECH * 0.72), (t, dt, o) => { poser(o, w, 0.022, 0.004); o.position.y = DALLE; o.rotation.set(0, w.cap, -w.d / (0.55 * ECH * 0.72)); }, () => w.vis);
+  }
+  { // la marelle de la ruelle : on saute à cloche-pied jusqu'au ciel, puis on revient
+    const M = MARELLE_RUE, cases = cellsMarelle(M.x, M.z, M.ux, M.uz, 0.034);
+    ajoute(A(gamin(0), ECH * 0.72), (t, dt, o) => {
+      const n = cases.length, u = (t / 0.45) % (2 * n), i = Math.floor(u), f = u - i, a = i < n ? i : 2 * n - 1 - i, b = Math.min(n - 1, Math.max(0, i < n ? a + 1 : a - 1));
+      const ca = cases[a], cb = i === n - 1 || i === 2 * n - 1 ? ca : cases[b], g = f < 0.6 ? 0 : (f - 0.6) / 0.4;
+      o.position.set(ca.x + (cb.x - ca.x) * g, DALLE + Math.sin(Math.PI * g) * 0.012, ca.z + (cb.z - ca.z) * g); o.rotation.set(0, -Math.atan2(M.uz * (i < n ? 1 : -1), M.ux * (i < n ? 1 : -1)), 0);
+    }, () => libres(), 'rue', 'Marelle à la craie dans la ruelle');
+    ajoute(A(gamin(1), ECH * 0.72), (t, dt, o) => { o.position.set(M.x - 0.03, DALLE, M.z - 0.04); o.rotation.set(0, -Math.atan2(1, 0.6), Math.sin(t * 1.3) * 0.04); }, () => libres());
+  }
+  { // deux chiens qui se poursuivent dans le pré, à gauche du marché
+    const kp = CASES.find(k => k.c === KM.c - 1 && k.r === KM.r);
+    ['chien1', 'chien0'].forEach((nom, i) => ajoute(A(nom, ECH * 1.1), (t, dt, o) => { const sens = Math.sin(t * 0.21) > 0 ? 1 : -1, a = t * 1.9 * sens - i * 0.7 * sens, r = 0.2 + Math.sin(t * 0.7) * 0.06; o.position.set(kp.x + 0.2 + Math.cos(a) * r, kp.top + Math.abs(Math.sin(t * 9 + i)) * 0.006, kp.z - 0.1 + Math.sin(a) * r * 0.7); o.rotation.set(0, -Math.atan2(Math.cos(a) * 0.7 * sens, -Math.sin(a) * sens), 0); }, () => DEHORS() && SEC() && METEO !== 'canicule', 'rue', 'Deux chiens se poursuivent dans le pré'));
+  }
+
+  // ---- les métiers de la rue
+  const matin = () => (AUBE() && H.p > 10) || (JOUR() && S_ECOLE() < 160);
+  { const w = promeneur(50, 0.034, { flane: 0.6, saut: 0.002, visible: () => matin() && METEO !== 'orage' && METEO !== 'tempete' });
+    ajoute(A(mod('porteurEau', PORTEUR_EAU)), (t, dt, o) => poser(o, w), () => w.vis, 'rue', 'Le porteur d\'eau fait sa tournée du matin, palanche sur l\'épaule'); }
+  { const w = promeneur(51, 0.03, { flane: 0.5, visible: () => JOUR() && SEC() && foule() > 0.3 });
+    ajoute(A(mod('colporteur', COLPORTEUR)), (t, dt, o) => poser(o, w), () => w.vis, 'rue', 'Le colporteur passe avec sa hotte'); }
+  { const w = promeneur(52, 0.028, { flane: 0.8, pauseL: 4, salue: false, visible: () => JOUR() && SEC() && foule() > 0.3 });
+    ajoute(A(mod('remouleur', REMOULEUR)), (t, dt, o) => { poser(o, w); if (w.pause > 0.4 && Math.random() < 0.6) { o.updateMatrix(); const p = _v.set(1.0, 1.72, 0).applyMatrix4(o.matrix); particule({ x: p.x, y: p.y, z: p.z, vx: (Math.random() - 0.5) * 0.2, vy: 0.08 + Math.random() * 0.2, vz: (Math.random() - 0.5) * 0.2, g: 1.4, s: 0.0022, col: Math.random() < 0.5 ? 0xffd04a : 0xff8a2a, vie: 0.35 }); } }, () => w.vis, 'rue', 'Le rémouleur s\'arrête aux carrefours et affûte : gerbes d\'étincelles'); }
+  { const w = promeneur(53, 0.03, { flane: 0.6, pauseL: 3, salue: false, visible: () => JOUR() && SEC() && foule() > 0.3 });
+    ajoute(A(mod(`charrette${SAISON}`, () => CHARRETTE(SAISON))), (t, dt, o) => poser(o, w), () => w.vis, 'saison', ['L\'hiver, la marchande des quatre-saisons vend choux et marrons', 'La marchande des quatre-saisons vend salades et radis', 'La marchande des quatre-saisons vend cerises et abricots', 'La marchande des quatre-saisons vend pommes et raisin'][SAISON]); }
+
+  // ---- le crieur public lit une annonce devant la mairie : roulement de tambour (clochette avant l'Empire), lecture, on s'attroupe
+  { const d = portesDe(kh).at(-1), quand = () => JOUR() && foule() >= 0.3 && !PLUIE(), cy = () => t % 22;
+    ajoute(A(mod(`crieur_${ep}`, () => CRIEUR(ep))), (t, dt, o) => {
+      const c = cy(), appel = c < 3; surCadre(o, d.m, -1.3, 0.25, 1.2, -Math.PI / 2, 0, appel ? Math.sin(t * 18) * 0.06 : c < 14 ? 0.12 + Math.sin(t * 1.5) * 0.03 : 0, S);
+      if (appel && Math.random() < 0.15) { o.updateMatrix(); const p = _v.set(0.35, 1.3, 0.4).applyMatrix4(o.matrix); particule({ genre: 'son', x: p.x, y: p.y + 0.01, z: p.z, s: 0.03, col: 0xfff0c0, vie: 0.5 }); }
+    }, quand, 'rue', vieux ? 'Le crieur public agite sa clochette et lit une annonce devant la mairie' : 'Le tambour de ville bat un roulement et lit une annonce devant la mairie');
+    [['passant1', -2.1, 2.3, 0.2], [nomF(0), -1.25, 2.6, 0], ['commere0', -0.5, 2.35, -0.25]].forEach(([nom, x, z, a], i) => ajoute(A(nom), (t, dt, o) => surCadre(o, d.m, x, 0.25, z, Math.PI / 2 + a, 0, Math.sin(t * 1.1 + i) * 0.03, S), () => quand() && cy() > 2 + i * 0.6 && cy() < 15 - i * 0.4));
+  }
+  // ---- la patrouille : deux soldats au pas, l'uniforme de l'époque
+  { const w = promeneur(60, 0.045, { veh: true, lat: 0, flane: 0.15, saut: 0.004, f: 70, salue: false, visible: () => (JOUR() || SOIR() || (AUBE() && H.p > 10)) && METEO !== 'orage' && METEO !== 'tempete' });
+    const nom = mod(`soldat_${ep}`, () => SOLDAT(ep));
+    ajoute(A(nom), (t, dt, o) => poser(o, w, 0, -0.014), () => w.vis, 'rue', 'Une patrouille de deux soldats fait sa ronde, au pas');
+    ajoute(A(nom), (t, dt, o) => poser(o, w, 0, 0.014), () => w.vis);
+    etiq('epoque', { ancien: 'Patrouille en habit blanc et tricorne', lumieres: 'Patrouille en habit blanc à revers bleus et tricorne', empire: 'Patrouille en habit bleu et shako', industrie: 'Patrouille en capote bleue, pantalon garance et képi' }[ep], () => w.vis);
+  }
+  // ---- les attelages : un cavalier à toutes les époques, la calèche (Empire) ou le fiacre (Industrie), l'omnibus à cheval (Industrie)
+  { const w = promeneur(70, 0.085, { veh: true, lat: 0.01, flane: 0.1, saut: 0.005, f: 60, salue: false, visible: () => JOUR() && foule() >= 0.3 });
+    ajoute(A(mod(`cavalier_${ep}`, () => CAVALIER(ep))), (t, dt, o) => poser(o, w), () => w.vis, 'rue', 'Un cavalier passe au trot'); }
+  if (ep === 'empire' || ep === 'industrie') {
+    const w = promeneur(71, 0.06, { veh: true, lat: 0, flane: 0.1, saut: 0.002, f: 60, salue: false, visible: ep === 'empire' ? () => JOUR() && SEC() && foule() >= 0.45 : () => (JOUR() || (SOIR() && H.p < 20)) && METEO !== 'orage' && METEO !== 'tempete' });
+    ajoute(A(mod(`voiture_${ep}`, () => VOITURE(ep))), (t, dt, o) => poser(o, w), () => w.vis, 'rue', ep === 'empire' ? 'Une calèche découverte passe' : 'Un fiacre passe, lanternes allumées le soir');
+    if (ep === 'industrie') ajoute(new THREE.Object3D(), () => { if (!(SOIR() || METEO === 'brouillard')) return; const o = POOLS.get('voiture_industrie').list[0]; o.updateMatrix(); for (const z of [0.62, -0.62]) HALO.mettre(_v.set(-0.2, 1.7, z).applyMatrix4(o.matrix), _col.setHex(RUE.industrie), 0.8); }, () => w.vis);
+  }
+  if (ep === 'industrie') { // l'omnibus fait le tour de la place et de l'immeuble, et s'arrête au coin du marché
+    const tour = [coin(0), coin(5), coin(4), coin(3), coin(2), coin(1), coin(1, 2), coinK(KE, 3), coinK(KM, 2), coin(0, 2)];
+    let Lt = 0, dArret = 0; tour.forEach((p, i) => { const q = tour[(i + 1) % tour.length]; if (i === 8) dArret = Lt; Lt += Math.hypot(q.x - p.x, q.z - p.z); });
+    const v = 0.05, arret = 4, T = Lt / v + arret;
+    ajoute(A(mod('omnibus', OMNIBUS)), (t, dt, o) => { const tt = t % T, d = v * tt < dArret ? v * tt : v * tt < dArret + arret * v ? dArret : v * (tt - arret); longer(o, tour, d + 0.0001, true, DALLE, d === dArret ? 0 : 0.002); }, () => (JOUR() || (SOIR() && H.p < 20)) && METEO !== 'orage' && METEO !== 'tempete', 'rue', 'L\'omnibus à cheval fait le tour du bourg et s\'arrête au marché');
+  }
+  // ---- la nuit : on rentre de la taverne en zigzag, la lanterne à la main
+  { const d = portesDe(kt)[0], p0 = d ? dansCadre(d.m, 0, 0, 1) : V(kt.x, 0, kt.z);
+    const proche = GRAPHE.map((n, i) => [Math.hypot(n.x - p0.x, n.z - p0.z), i]).sort((a, b) => a[0] - b[0])[0][1];
+    ['porteLanterne', 'buveur2'].forEach((nom, i) => {
+      const w = promeneur(80 + i, 0.022, { flane: 0.5, salue: false, visible: () => NUIT() && H.p < 50 && METEO !== 'orage' && METEO !== 'tempete' });
+      w.a = proche; w.b = GRAPHE[proche].v[i % GRAPHE[proche].v.length];
+      ajoute(A(nom), (t, dt, o) => { w.lat = 0.03 + Math.sin(t * 1.7 + i) * 0.02; poser(o, w); o.rotation.z = Math.sin(t * 2.1 + i * 2) * 0.22; if (i === 0) { o.updateMatrix(); HALO.mettre(_v.set(0.55, 1.3, 0.3).applyMatrix4(o.matrix), _col.setHex(RUE[ep]), 1); } }, () => w.vis, 'heure', 'Sortie de taverne : on rentre en zigzag, la lanterne à la main');
+    });
+  }
+  etiq('heure', 'Nuit : les rues se vident, seuls le veilleur et les buveurs de la taverne sont dehors', () => NUIT());
+  etiq('meteo', 'Orage ou tempête : rues désertes, marché fermé, écoliers gardés en classe', () => METEO === 'orage' || METEO === 'tempete');
+
+  // ---- le marché : marchands derrière leurs étals, clients d'étal en étal, paniers au bras ; plus de monde le jour de marché
+  const kM = KM, yM = kM.top + DALLE;
+  ajoute(new THREE.Object3D(), () => { const o = MARCHE_OUVERT(); MARCHE.etal.visible = o; MARCHE.bache.visible = !o; MARCHE.carreau.visible = o && JOUR_MARCHE() && SEC(); }, null);
+  const ANG = [...STALLS.map(([x, z]) => Math.atan2(z, x)), -Math.PI / 2];
+  const clients = [];
+  const nbClients = () => !MARCHE_OUVERT() ? 0 : Math.round((JOUR_MARCHE() ? 8 : 3) * (PLUIE() ? 0.5 : 1) * (SAISON === 0 || METEO === 'neige' ? 0.75 : 1) * (METEO === 'canicule' ? 0.5 : 1));
+  const panierF = (n, f) => mod(n, () => f());
+  const nomsClients = [panierF('clienteP0', () => [...FEMME(0x8a4a7a, 0xf2e6c8), ...PANIER()]), panierF('clienteP1', () => [...FEMME(0x5a7a4a), ...PANIER()]), panierF(`dameP_${ep}`, () => [...DAME(ep, 0), ...PANIER(0.1, 0.72, 0.95)]), panierF('clientP', () => [...PAYSAN(0x6a8aa4), ...PANIER(0.12, 0.46, 1.1)])];
+  for (let i = 0; i < 8; i++) {
+    const c = { ang: i * 0.8, r: 2.0 + (i % 3) * 0.18, cible: i % 5, pause: i * 0.4, sens: 1 };
+    clients.push(c);
+    ajoute(A(nomsClients[i % 4]), (t, dt, o) => {
+      const cible = ANG[c.cible], diff = Math.atan2(Math.sin(cible - c.ang), Math.cos(cible - c.ang));
+      if (c.pause > 0) { c.pause -= dt; if (c.pause <= 0) { let n; do n = Math.random() * 5 | 0; while (n === c.cible); c.cible = n; } } // fini à cet étal : on en choisit un autre
+      else if (Math.abs(diff) < 0.01) c.pause = 2 + Math.random() * 3;
+      else { c.sens = Math.sign(diff); c.ang += c.sens * Math.min(Math.abs(diff), 0.036 / (c.r * ECH_BAT) * dt); }
+      const p = pres(kM, Math.cos(c.ang) * c.r, Math.sin(c.ang) * c.r), arret = c.pause > 0;
+      o.position.set(p.x, yM + (arret ? 0 : Math.abs(Math.sin(t * 9 + i)) * 0.003), p.z);
+      o.rotation.set(0, arret ? capB(kM, Math.cos(c.ang), Math.sin(c.ang)) : capB(kM, -Math.sin(c.ang) * c.sens, Math.cos(c.ang) * c.sens), arret ? Math.sin(t * 2 + i) * 0.05 - 0.08 : 0);
+    }, () => i < nbClients(), 'rue', 'Marché ouvert : les clients vont d\'étal en étal, panier au bras');
+  }
+  [['marchand_0', [0xc0504a, false]], ['marchande_1', [0x6a8aa4, true]], ['marchand_2', [0x5a7a4a, false]], ['marchande_3', [0xb8603f, true]], ['volaillere', [0x8a6a4a, true]]].forEach(([nom, [c, femme]], i) => {
+    const [sx, sz] = i < 4 ? STALLS[i] : [0, -2.6], [mx, mz] = i < 4 ? PLACE_MARCHAND(sx, sz) : [0, -3.6];
+    ajoute(A(mod(nom, () => MARCHAND(c, femme))), (t, dt, o) => {
+      const p = pres(kM, mx, mz), client = clients.some((c2, j) => j < nbClients() && c2.cible === i && c2.pause > 0);
+      o.position.set(p.x, yM, p.z); o.rotation.set(0, capB(kM, -sx, -sz) + (client ? 0 : Math.sin(t * 0.6 + i) * 0.5), client ? -0.18 + Math.sin(t * 5 + i) * 0.05 : Math.sin(t * 2.2 + i) * 0.04);
+    }, MARCHE_OUVERT, 'rue', 'Les marchands servent à côté de leur étal (volailles et œufs sous la halle)');
+  });
+  etiq('rue', 'Marché fermé : étals bâchés', () => !MARCHE_OUVERT());
+  // le jour de marché : le carreau (marchandes assises au sol), des poules échappées, plus de clients
+  const jm = () => JOUR_MARCHE() && MARCHE_OUVERT() && SEC();
+  [['assis1', 0, 6.45, 0, -1], ['assis3', -6.85, 2.9, 1, 0], ['assis1', 6.85, 3.0, -1, 0]].forEach(([nom, x, z, dx, dz], i) => ajoute(A(nom), (t, dt, o) => { const p = pres(kM, x, z); o.position.set(p.x, yM, p.z); o.rotation.set(0, capB(kM, dx, dz), Math.sin(t * 1.2 + i) * 0.05); }, jm, 'rue', 'Jour de marché : foule, marchandes assises au carreau, volailles en cage'));
+  [[nomF(1), 0.3, 4.75, 0, 1], ['passant0', -5.05, 2.6, -1, 0.1]].forEach(([nom, x, z, dx, dz], i) => ajoute(A(nom), (t, dt, o) => { const p = pres(kM, x + Math.sin(t * 0.3 + i) * 0.4, z); o.position.set(p.x, yM, p.z); o.rotation.set(0, capB(kM, dx, dz) + Math.sin(t * 0.5 + i) * 0.4, -0.06); }, () => jm() && foule() > 0.4));
+  for (let i = 0; i < 5; i++) ajoute(A(mod(`poule${i % 2}`, () => POULE(i % 2 ? 0xb8602a : 0xf2eee4)), ECH * 0.9), (t, dt, o) => {
+    const a = t * 0.3 * (1 + i * 0.2) + i * 1.3, rr = 0.35 + 0.25 * Math.sin(t * 0.5 + i), p = pres(kM, 2.4 + Math.cos(a) * rr, 6.95 + Math.sin(a) * rr * 0.6);
+    o.position.set(p.x, yM, p.z); o.rotation.set(0, capB(kM, -Math.sin(a), Math.cos(a) * 0.8), -Math.max(0, Math.sin(t * 4 + i * 2)) * 0.7);
+  }, jm, 'rue', 'Des poules picorent entre les étals');
+  // l'hiver : marrons chauds au brasero, et des sapins à vendre à partir de l'Empire
+  ajoute(A(mod('marronnier', () => [...MARCHAND(0x5a4a3a), [cyl(0.3, 0.3, 0.06, 8), 0.6, 1.35, 0.2, 0x2b2b30]])), (t, dt, o) => {
+    const p = pres(kM, 5.25, 1.35); o.position.set(p.x, yM, p.z); o.rotation.set(0, capB(kM, 0.6, -0.7), Math.sin(t * 6) * 0.08);
+    if (MARCHE.braise) { GRAND.mettre(MARCHE.braise, _col.setHex(0xff7a1c), 0.55 + Math.sin(t * 11) * 0.1); if (Math.random() < 0.08) bouffee(MARCHE.braise.x, MARCHE.braise.y + 0.02, MARCHE.braise.z, 'grise', 0.5); }
+  }, () => SAISON === 0 && MARCHE_OUVERT(), 'saison', 'Hiver : marrons chauds au brasero du marché');
+  etiq('saison', ['Marché d\'hiver : choux, pommes de terre, poireaux, marrons', 'Marché de printemps : salades, radis, asperges, seaux de fleurs', 'Marché d\'été : cerises, abricots, melons, fraises', 'Marché d\'automne : citrouilles, pommes, raisin, champignons'][SAISON], () => MARCHE_OUVERT());
+  if (SAISON === 0 && (ep === 'empire' || ep === 'industrie')) etiq('saison', 'Sapins à vendre devant la halle (la mode vient d\'Alsace)', () => MARCHE_OUVERT());
+  etiq('epoque', { ancien: 'Halle en bois : charpente, liens et grand toit de tuiles', lumieres: 'Halle en bois sur socles de pierre, lanternon sur le faîte', empire: 'Halle de pierre à arcades, toit d\'ardoise', industrie: 'Halle métallique type Baltard : fonte, zinc et lanterneau vitré' }[ep], () => true);
+
+  // ---- l'école : cloche, arrivée du matin, classe, récréation, sortie ; fermée l'été, vide la nuit
+  const kE = KE, E = MOD.EPOQUES[ep], hm = 2.4 * E.h, yE = kE.top + DALLE, yC = kE.top + 0.045; // yC : la cour, un peu surélevée
+  const dE = portesDe(kE)[0], loc = (x, z) => { const p = pres(kE, x, z); return { x: p.x, z: p.z }; };
+  const SONNE = [[0, 7], [90, 96], [120, 126], [200, 206], [225, 231]], sonne = () => JOUR() && SAISON !== 2 && SONNE.some(([a, b]) => S_ECOLE() >= a && S_ECOLE() < b);
+  { const cl = A('cloche', 0.1), pos = monde(kE, 1.4, hm + 1.62, -1.47); let pro = 0;
+    ajoute(cl, (t, dt, o) => { o.position.copy(pos); const s = sonne(); o.rotation.set(0, 0, s ? Math.sin(t * 13) * 0.55 : 0); if (s && (pro -= dt) <= 0) { pro = 0.28; particule({ genre: 'son', x: pos.x, y: pos.y + 0.01, z: pos.z + 0.01, s: 0.035, col: 0xfff0c0, vie: 0.6 }); } }, null);
+    etiq('rue', 'La cloche de l\'école sonne', sonne);
+  }
+  const CHEMINS = [[[-7.8, 2.0], [-3.6, 0.35], [-0.6, 0.3], [0.65, 0.05]], [[-7.4, -4.0], [-3.5, -0.2], [-0.6, 0.25], [0.65, 0.05]], [[2.4, -6.0], [3.4, -4.2], [3.5, 0.15], [1.7, 0.3], [0.65, 0.05]]].map(c => c.map(([x, z]) => loc(x, z)));
+  const lg = c => c.slice(1).reduce((s, p, i) => s + Math.hypot(p.x - c[i].x, p.z - c[i].z), 0);
+  const hiver = SAISON === 0;
+  for (let j = 0; j < 10; j++) {
+    const ch = CHEMINS[j % 3], L = lg(ch), retour = [...ch].reverse(), s0 = j * 3, s1 = 228 + j * 2.2;
+    ajoute(A(gamin(j % 2, hiver), ECH * 0.72), (t, dt, o) => {
+      const s = S_ECOLE(), ar = ECOLE() === 'arrivee';
+      longer(o, ar ? ch : retour, Math.min(0.9999, Math.max(0, (s - (ar ? s0 : s1)) / (ar ? 60 : 45))) * L, false, yE, ar ? 0.006 : 0.012);
+    }, () => { const e = ECOLE(), s = S_ECOLE(); return DEHORS_ECOLE() && ((e === 'arrivee' && s > s0 && s < s0 + 60) || (e === 'sortie' && s > s1 && s < s1 + 45)); }, 'rue', hiver ? 'Les écoliers arrivent, chacun avec sa bûche pour le poêle de la classe' : 'Les écoliers arrivent à l\'école en courant');
+  }
+  etiq('rue', 'Sortie de l\'école : les enfants rentrent en courant, les mères attendent à la grille', () => ECOLE() === 'sortie' && DEHORS_ECOLE());
+  ajoute(A('commere0'), (t, dt, o) => longer(o, CHEMINS[0].slice(0, 2), Math.max(0, S_ECOLE() - 2) / 85 * 2 * lg(CHEMINS[0].slice(0, 2)), false, yE), () => ECOLE() === 'arrivee' && DEHORS_ECOLE() && S_ECOLE() > 2, 'rue', 'Une mère accompagne le plus petit jusqu\'à l\'école');
+  [['commere1', -1.1, 5.0], [nomF(1), 1.2, 5.1]].forEach(([nom, x, z], i) => ajoute(A(nom), (t, dt, o) => { const p = loc(x, z); o.position.set(p.x, yE, p.z); o.rotation.set(0, capB(kE, 0.3 - i * 0.6, -1) + Math.sin(t * 0.4 + i) * 0.3, 0); }, () => ECOLE() === 'sortie' && DEHORS_ECOLE()));
+  ajoute(A(mod(`maitre_${ep}`, () => MAITRE(ep))), (t, dt, o) => { const p = loc(1.55, 0.05); o.position.set(p.x, yE, p.z); o.rotation.set(0, capB(kE, 0, 1) + Math.sin(t * 0.5) * 0.6, sonne() ? -0.1 : 0); },
+    () => ['arrivee', 'recre', 'sortie'].includes(ECOLE()) && DEHORS_ECOLE(), 'rue', { ancien: 'Le curé surveille depuis le perron (école de paroisse)', lumieres: 'Le maître (le régent) surveille depuis le perron', empire: 'L\'instituteur surveille depuis le perron', industrie: 'L\'instituteur surveille depuis le perron' }[ep]);
+  etiq('epoque', { ancien: 'École de paroisse : croix sur le clocheton, le curé fait la classe', lumieres: 'Petite école des Lumières : cadran solaire, maître en tricorne', empire: 'École communale : plaque « École », drapeau, écoliers en blouse bleue', industrie: 'École de la loi Guizot : préau, cour fermée, blouses noires et cartables' }[ep], () => true);
+  // la classe : on récite, les voix sortent par les fenêtres
+  { const fens = FEN.filter(f => f.k === kE && f.n.z > 0.5); let pro = 0;
+    ajoute(new THREE.Object3D(), (t, dt) => { if ((pro -= dt) > 0 || !fens.length) return; pro = 0.7; const f = fens[Math.random() * fens.length | 0]; particule({ genre: 'son', x: f.c.x + f.n.x * 0.01, y: f.c.y, z: f.c.z + f.n.z * 0.01, s: 0.022, col: 0xfff6d0, vie: 0.7 }); }, () => ECOLE() === 'classe' && SEC(), 'rue', 'Classe : on récite, on l\'entend par les fenêtres'); }
+  // la récréation : marelle, ballon, corde à sauter ; sous la neige, boules de neige et glissades ; sous la pluie, en classe (sous le préau à l'ère industrielle)
+  const recre = () => ECOLE() === 'recre' && DEHORS_ECOLE() && (SEC() || METEO === 'neige'), neige = NEIGE_SOL(), preau = () => ECOLE() === 'recre' && PLUVIEUX() && DEHORS_ECOLE() && ep === 'industrie';
+  const enCour = (o, x, z, cap, y = yC) => { const p = loc(x, z); o.position.set(p.x, y, p.z); o.rotation.set(0, cap, 0); };
+  if (!neige) {
+    const cases = cellsMarelle(-1.6, 3.5, 1, 0, 0.42).map(c => loc(c.x, c.z)), n = cases.length;
+    ajoute(A(gamin(0), ECH * 0.72), (t, dt, o) => {
+      const u = (t / 0.45) % (2 * n), i = Math.floor(u), f = u - i, a = i < n ? i : 2 * n - 1 - i, b = i === n - 1 || i === 2 * n - 1 ? a : i < n ? a + 1 : a - 1, g = f < 0.6 ? 0 : (f - 0.6) / 0.4;
+      o.position.set(cases[a].x + (cases[b].x - cases[a].x) * g, yC + Math.sin(Math.PI * g) * 0.012, cases[a].z + (cases[b].z - cases[a].z) * g); o.rotation.set(0, capB(kE, i < n ? 1 : -1, 0), 0);
+    }, recre, 'rue', 'Récréation : marelle, ballon et corde à sauter dans la cour');
+    ajoute(A(gamin(1), ECH * 0.72), (t, dt, o) => enCour(o, -2.25, 3.0, capB(kE, 1, 0.5)), recre);
+    // la corde : deux enfants la font tourner, un troisième saute quand elle passe sous ses pieds
+    const corde = A(mod('corde', () => CORDE), 0.034), mil = loc(0.15, 1.5);
+    ajoute(A(gamin(1), ECH * 0.72), (t, dt, o) => enCour(o, -0.6, 1.5, capB(kE, 1, 0)), recre);
+    ajoute(A(gamin(0), ECH * 0.72), (t, dt, o) => enCour(o, 0.9, 1.5, capB(kE, -1, 0)), recre);
+    ajoute(corde, (t, dt, o) => { o.position.set(mil.x, yC + 0.0005, mil.z); o.rotation.set(0, kE.rot + Math.PI / 2, t * 7); }, recre);
+    ajoute(A(gamin(1), ECH * 0.72), (t, dt, o) => { enCour(o, 0.15, 1.5, capB(kE, 0, 1), yC + Math.pow(Math.max(0, -Math.cos(t * 7)), 3) * 0.016); }, recre);
+  }
+  { // le ballon (ou les boules de neige) entre trois enfants
+    const K = [[-1.7, 2.4], [1.6, 2.5], [0.1, 2.95]].map(([x, z]) => loc(x, z)), ball = A(mod('ballon', () => BALLON), ECH * 0.6);
+    const passe = t => { const n = Math.floor(t / 1.1), f = (t / 1.1) % 1; return { a: n % 3, b: (n + 1) % 3, f }; };
+    K.forEach((p, i) => ajoute(A(gamin(i % 2), ECH * 0.72), (t, dt, o) => { const { a, b, f } = passe(t), q = a === i ? K[b] : K[a]; o.position.set(p.x, yC + (b === i && f > 0.85 ? 0.004 : 0), p.z); o.rotation.set(0, -Math.atan2(q.z - p.z, q.x - p.x), a === i && f < 0.15 ? -0.25 : 0); }, recre));
+    let avant = -1;
+    ajoute(ball, (t, dt, o) => { const { a, b, f } = passe(t); o.position.set(K[a].x + (K[b].x - K[a].x) * f, yC + 0.007 + Math.sin(Math.PI * f) * 0.03, K[a].z + (K[b].z - K[a].z) * f); o.rotation.set(t * 5, t * 3, 0); }, () => recre() && !neige);
+    ajoute(new THREE.Object3D(), (t) => { const { a, b } = passe(t), n = Math.floor(t / 1.1); if (n === avant) return; avant = n; const T = 1.0, g = 0.7, A_ = K[a], B = K[b]; particule({ x: A_.x, y: yC + 0.06, z: A_.z, vx: (B.x - A_.x) / T, vz: (B.z - A_.z) / T, vy: 0.5 * g * T, g, s: 0.005, col: 0xffffff, vie: T }); }, () => recre() && neige, 'rue', 'Récréation sous la neige : boules de neige et glissades');
+    if (neige) [0, 1].forEach(i => ajoute(A(gamin(i), ECH * 0.72), (t, dt, o) => { const u = ((t * 0.5 + i * 0.5) % 1); enCour(o, -1.8 + u * 3.2, 3.4 - i * 0.5, capB(kE, 1, 0)); o.rotation.z = -0.15; }, recre));
+    // sous le préau quand il pleut (ère industrielle)
+    [[3.4, -2.8], [4.1, -2.2], [4.6, -1.3], [3.5, -1.3], [4.5, -3.0]].forEach(([x, z], i) => ajoute(A(gamin(i % 2), ECH * 0.72), (t, dt, o) => { enCour(o, x, z, capB(kE, Math.cos(i * 2.3 + t * 0.2), Math.sin(i * 2.3)), yE); o.position.y += Math.abs(Math.sin(t * 3 + i)) * 0.003; }, preau, 'rue', 'Pluie : la récréation se passe sous le préau'));
+  }
+  etiq('rue', ep === 'industrie' ? 'Pluie : pas de récréation dans la cour' : 'Pluie : la récréation se passe en classe', () => ECOLE() === 'recre' && PLUVIEUX() && ep !== 'industrie');
+  etiq('rue', 'Orage : les écoliers restent en classe', () => EN_CLASSE() && !DEHORS_ECOLE() && SAISON !== 2);
+  etiq('saison', 'Vacances d\'été : l\'école est fermée, les enfants aident aux moissons', () => SAISON === 2);
+  etiq('saison', 'L\'hiver, l\'école reste ouverte même sous la neige', () => SAISON === 0 && EN_CLASSE());
+  etiq('heure', 'L\'école est vide le soir et la nuit, la halle est fermée', () => NUIT() || (SOIR() && H.p > 8));
+}
+
+// ------------------------------------------------------------------ réverbères, lanternes des portes, lanternes des tables
+function majLampes() {
+  const vac = EPOQUE === 'ancien' ? 0.85 + Math.sin(t * 13) * 0.08 + Math.sin(t * 29) * 0.05 : 1, c = _col.setHex(RUE[EPOQUE]);
+  LAMPES.forEach((l, j) => { if (lampeAllumee(j)) GRAND.mettre(l.p, c, (JOUR() ? 0.55 : 1) * vac); });
+  for (const L of LANTERNES) {
+    const tav = L.k.cle === 'taverne' || L.k.cle === 'boulangerie';
+    if (METEO === 'brouillard' || (SOIR() && H.p > 4 + L.r * 18) || (NUIT() && (tav || H.p < 30 + L.r * 50))) HALO.mettre(L.p, c, (JOUR() ? 0.7 : 0.95) * vac);
+  }
+  if (SAISON === 2 && SEC() && (SOIR() || (NUIT() && H.p < 35))) for (const T of TABLES) if (T.lampe) { HALO.mettre(T.lampe, c, vac); GRAND.mettre(T.lampe, c, 0.3 * vac); }
+}
+
+// ------------------------------------------------------------------ panneau « En ce moment » et bandeau de l'heure
+const NOM_HEURE = { jour: 'Jour', aube: 'Aube', crepuscule: 'Crépuscule', nuit: 'Nuit' };
+let signature = '';
+function panneau() {
+  const par = { rue: [], meteo: [], saison: [], heure: [], epoque: [] };
+  for (const e of ETIQ.values()) if (e.quand.some(q => q())) par[e.cat].push(typeof e.txt === 'function' ? e.txt() : e.txt);
+  const sig = JSON.stringify(par);
+  if (sig !== signature) {
+    signature = sig;
+    for (const c in par) {
+      const ul = document.getElementById('l-' + c); if (!ul) continue;
+      const voulu = par[c].length ? par[c] : ['Rien de particulier'];
+      for (const li of [...ul.children]) if (!voulu.includes(li.textContent)) li.remove();
+      const deja = new Set([...ul.children].map(li => li.textContent));
+      for (const x of voulu) if (!deja.has(x)) { const li = document.createElement('li'); li.textContent = x; ul.append(li); }
+    }
+  }
+  const fr = HEURE === 'cycle' ? horloge / CYCLE : { jour: 0.36, crepuscule: 0.75, nuit: 0.86, aube: 0.96 }[HEURE];
+  document.getElementById('h-curseur').style.left = `calc(${(fr * 100).toFixed(1)}% - 2px)`;
+  document.getElementById('h-texte').textContent = `${NOM_HEURE[H.phase]}${HEURE === 'cycle' ? ' · cycle accéléré' : ''} · ${Math.floor(H.p)} s${JOUR_MARCHE() ? ' · jour de marché' : ''}`;
+  document.getElementById('h-lune').textContent = `${NOMS_MOIS[MOIS][0].toUpperCase() + NOMS_MOIS[MOIS].slice(1)} · ${NOM_PHASE(PHASE_LUNE(MOIS))}`;
+}
+
+// ------------------------------------------------------------------ caméra : glisser pour tourner, molette ou pincer pour zoomer
+const reduit = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const vue = { lacet: 0.55, tangage: 0.7, d: 8, cible: V(centre.x + 0.75, 0, centre.z + 1.75), auto: !reduit };
+const pointeurs = new Map(); let pince = 0;
+toile.addEventListener('pointerdown', e => { pointeurs.set(e.pointerId, [e.clientX, e.clientY]); toile.setPointerCapture(e.pointerId); vue.auto = false; });
+toile.addEventListener('pointermove', e => {
+  if (!pointeurs.has(e.pointerId)) return;
+  const [x0, y0] = pointeurs.get(e.pointerId); pointeurs.set(e.pointerId, [e.clientX, e.clientY]);
+  if (pointeurs.size === 2) { const [a, b] = [...pointeurs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pince) vue.d = THREE.MathUtils.clamp(vue.d * pince / d, 2.2, 14); pince = d; return; }
+  vue.lacet -= (e.clientX - x0) * 0.008; vue.tangage = THREE.MathUtils.clamp(vue.tangage + (e.clientY - y0) * 0.005, 0.3, 1.35);
+});
+const lacher = e => { pointeurs.delete(e.pointerId); pince = 0; };
+toile.addEventListener('pointerup', lacher); toile.addEventListener('pointercancel', lacher);
+toile.addEventListener('wheel', e => { e.preventDefault(); vue.d = THREE.MathUtils.clamp(vue.d * (1 + Math.sign(e.deltaY) * 0.1), 2.2, 14); vue.auto = false; }, { passive: false });
+
+// ------------------------------------------------------------------ boucle
+function maj(dt) {
+  t += dt; tMeteo += dt;
+  majHeure(dt); majLumiere(); majMeteo(dt); majCiel(dt);
+  majFenetres(dt); majLampes(); majCheminees(dt);
+  for (const a of ACT) { if (a.quand) { a.o.visible = a.quand(); if (!a.o.visible) continue; } if (a.f) a.f(t, dt, a.o); }
+  for (const f of DRAPS) { const p = f.geometry.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i); p.setZ(i, Math.sin(t * (4 + VENT * 8) - x * 30) * x * 0.25); } p.needsUpdate = true; }
+  majEau(dt); majParticules(dt); majFumees(dt); dessinerActeurs();
+  HALO.fin(); GRAND.fin(); PETIT.fin();
+}
+let avantT = performance.now(), prochainPanneau = 0;
+function image(now) {
+  const dt = Math.max(0, Math.min(0.05, (now - avantT) / 1000)); avantT = now; // la première image de requestAnimationFrame peut dater d'avant avantT
+  const w = toile.clientWidth, h = toile.clientHeight;
+  if (toile.width !== Math.round(w * renderer.getPixelRatio()) || toile.height !== Math.round(h * renderer.getPixelRatio())) { renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
+  if (vue.auto) vue.lacet += dt * 0.05;
+  cam.position.set(vue.cible.x + Math.sin(vue.lacet) * Math.cos(vue.tangage) * vue.d, Math.sin(vue.tangage) * vue.d, vue.cible.z + Math.cos(vue.lacet) * Math.cos(vue.tangage) * vue.d);
+  cam.lookAt(vue.cible); cam.updateMatrixWorld();
+  soleil.target.position.copy(vue.cible); soleil.position.set(vue.cible.x - 8 - (1 - CIEL.el) * 6, 2 + 12 * CIEL.el, vue.cible.z + 7);
+  maj(dt);
+  if (now > prochainPanneau) { prochainPanneau = now + 400; panneau(); }
+  renderer.render(scene, cam);
+  requestAnimationFrame(image);
+}
+
+// ------------------------------------------------------------------ réglages
+function construireTout() { construirePlateau(); construireBatiments(); construireVie(); signature = ''; }
+const MOIS_SAISON = { 0: 0, 1: 3, 2: 6, 3: 9 };
+function boutons() {
+  const marque = (attr, v) => document.querySelectorAll(`[${attr}]`).forEach(b => b.setAttribute('aria-pressed', String(b.getAttribute(attr) === String(v))));
+  document.querySelector('[data-marche]').setAttribute('aria-pressed', String(FORCE_MARCHE));
+  marque('data-epoque', EPOQUE); marque('data-saison', SAISON); marque('data-meteo', METEO); marque('data-heure', HEURE);
+}
+function choisir(attr, fn) { document.querySelectorAll(`[${attr}]`).forEach(b => b.addEventListener('click', () => { fn(b.getAttribute(attr)); boutons(); })); }
+choisir('data-epoque', v => { EPOQUE = v; construireTout(); });
+choisir('data-saison', v => { SAISON = +v; MOIS = MOIS_SAISON[SAISON]; construireTout(); });
+choisir('data-meteo', v => { METEO = v; tMeteo = 0; construireTout(); });
+choisir('data-heure', v => { HEURE = v; pFixe = 0; if (v === 'cycle') horloge = 285; });
+document.querySelector('[data-marche]').addEventListener('click', () => { FORCE_MARCHE = !FORCE_MARCHE; boutons(); signature = ''; panneau(); });
+document.querySelector('[data-mois]').addEventListener('click', () => { MOIS = (MOIS + 1) % 12; const s = SAISON_MOIS(MOIS); if (s !== SAISON) { SAISON = s; construireTout(); boutons(); } panneau(); });
+// pour les captures : régler d'un coup, avancer la simulation sans dessiner
+window.MAQ = {
+  regler(o) {
+    if (o.epoque) EPOQUE = o.epoque;
+    if (o.saison != null) { SAISON = o.saison; MOIS = o.mois ?? MOIS_SAISON[SAISON]; }
+    if (o.meteo) { METEO = o.meteo; tMeteo = o.tMeteo ?? 0; }
+    if (o.flaque != null) FLAQUE = o.flaque;
+    if (o.eclair) { CIEL.eclair = o.eclair; CIEL.tEclair = 9; }
+    if (o.heure) HEURE = o.heure;
+    if (o.marche != null) FORCE_MARCHE = o.marche;
+    if (o.p != null) { if (HEURE === 'cycle') horloge = o.p; else pFixe = o.p; }
+    if (o.d) vue.d = o.d; if (o.lacet != null) vue.lacet = o.lacet; if (o.tangage) vue.tangage = o.tangage; if (o.cible) vue.cible.set(o.cible[0], 0, o.cible[1]);
+    vue.auto = false; construireTout(); boutons(); for (const f of FEN) { f.lum = cibleLum(f); }
+  },
+  avancer(s) { const e = CIEL.eclair; for (let i = 0; i < s / 0.05; i++) maj(0.05); if (e) CIEL.eclair = e; panneau(); },
+  etat: () => ({ EPOQUE, SAISON, METEO, HEURE, H: { ...H }, fen: FEN.length, allumees: FEN.filter(f => f.lum > 0.5).length, parts: parts.length, visibles: ACT.filter(a => a.o.visible).length, lampes: LAMPES.length, centre: [centre.x, centre.z], persos: NB_DESSINES, persosMax: NB_DESSINES_MAX, nouveaux: NB_NOUVEAUX, acteurs: [...POOLS.values()].reduce((s, p) => s + p.list.length, 0), modeles: [...POOLS.values()].filter(p => p.list.length).length, foule: +foule().toFixed(2), marche: JOUR_MARCHE(), ecole: ECOLE(), saluts: NB_SALUTS }),
+  panneau: () => [...document.querySelectorAll('.direct li')].map(li => li.textContent),
+  ou: nom => { const o = POOLS.get(nom)?.list[0]; return o ? [+o.position.x.toFixed(2), +o.position.z.toFixed(2)] : null; }, // pour viser un personnage dans les captures
+  tapis: () => ['maison', 'maison_pierre', 'immeuble'].map(fenetreLibre).filter(Boolean).map(f => [+f.c.x.toFixed(2), +f.c.z.toFixed(2), +Math.atan2(f.n.x, f.n.z).toFixed(2)]),
+};
+construireTout(); boutons();
+requestAnimationFrame(image);

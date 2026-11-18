@@ -1,0 +1,204 @@
+<title>Guerre et diplomatie</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap">
+<style>
+/* Layout : la scène 3D en grand (légende et fenêtres du jeu par-dessus), les réglages dessous, puis la liste de ce qu'elle montre. Une seule ambiance sombre, celle de web_power. */
+:root {
+  color-scheme: dark;
+  --fond: #141813; --carte: #1b211a; --carte2: #253021; --bord: #0f130e; --txt: #f6f4ea; --doux: #b3bca5; --or: #ffc94d; --encre: #1b211a;
+  --titre: Fredoka, "Trebuchet MS", system-ui, sans-serif; --corps: Nunito, "Segoe UI", system-ui, sans-serif;
+  --ombre: 0 4px 0 rgba(0,0,0,.35);
+}
+body { background: var(--fond); color: var(--txt); font-family: var(--corps); font-size: 15px; line-height: 1.55; }
+main { max-width: 1180px; margin: 0 auto; padding-block: 24px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 18px; }
+h1 { font-family: var(--titre); font-weight: 700; font-size: clamp(1.7rem, 4vw, 2.4rem); margin: 0; color: var(--or); text-wrap: balance; }
+h2 { font-family: var(--titre); font-weight: 600; font-size: 1.25rem; margin: 0 0 8px; }
+.intro p { margin: 4px 0 0; max-width: 68ch; color: var(--doux); }
+.scene { position: relative; border-radius: 16px; overflow: hidden; border: 2px solid var(--bord); box-shadow: var(--ombre); background: #1b211a; }
+#scene { display: block; width: 100%; height: min(68vh, 640px); min-height: 340px; touch-action: none; cursor: grab; }
+.aide { position: absolute; left: 12px; bottom: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(15,19,14,.78); color: var(--doux); font-weight: 700; font-size: .82rem; pointer-events: none; }
+.barres { display: flex; flex-wrap: wrap; gap: 12px 28px; }
+.groupe { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.groupe > span { color: var(--doux); font-weight: 800; margin-right: 4px; }
+button { font: inherit; font-weight: 800; border: 2px solid var(--bord); background: var(--carte2); color: var(--txt); padding: 6px 14px; border-radius: 12px; cursor: pointer; box-shadow: 0 3px 0 rgba(0,0,0,.35); }
+button[aria-pressed="true"] { background: var(--or); color: var(--encre); }
+button:focus-visible { outline: 3px solid var(--or); outline-offset: 2px; }
+.deux { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; align-items: start; }
+.bloc { background: var(--carte); border: 2px solid var(--bord); border-radius: 16px; padding: 16px 18px; box-shadow: var(--ombre); min-width: 0; }
+.bloc ul { margin: 0; padding-left: 1.2em; color: var(--doux); display: grid; gap: 4px; }
+.bloc img { width: 100%; max-width: 100%; border-radius: 10px; display: block; }
+.bloc figcaption { color: var(--doux); font-size: .88rem; margin-top: 6px; }
+figure { margin: 0; }
+
+.legende { position: absolute; left: 12px; top: 12px; right: 12px; width: fit-content; max-width: calc(100% - 24px); padding: 5px 12px; border-radius: 12px; background: rgba(15,19,14,.82); color: var(--txt); font-weight: 800; font-size: .9rem; pointer-events: none; }
+.legende:empty { display: none; }
+.barres { flex-direction: column; gap: 10px; }
+.groupe > span { min-width: 6.5em; }
+/* fenêtre d'événement : reprise telle quelle du jeu (web/css/style.css : #modale, #modale-boite, .btn, .annonce) */
+.jeu-modale { position: absolute; inset: 0; background: rgba(3,12,24,.6); z-index: 40; display: none; align-items: center; justify-content: center; padding: 18px; font-family: Nunito, system-ui, sans-serif; color: #eef3f8; line-height: normal; }
+.jeu-modale.ouverte { display: flex; }
+.jeu-boite { background: linear-gradient(170deg,#173d64,#0c2541); border: 1px solid rgba(255,255,255,.2); border-radius: 18px; padding: 16px; max-width: 430px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,.5); max-height: 86%; overflow: auto; }
+.jeu-boite h3 { margin: 0 0 8px; font: 600 20px Fredoka, sans-serif; color: #ffd56b; }
+.jeu-boite p { margin: 6px 0; font-size: 13.5px; line-height: 1.45; }
+.jeu-boite .mini { font-size: 11.5px; color: #a9bfd4; line-height: 1.35; margin: -4px 0 6px; }
+.jeu-boite .illus { margin: -4px -4px 10px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,.18); background: #0c2541; }
+.jeu-boite .illus svg { display: block; width: 100%; height: auto; }
+.jeu-boite .btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.jeu-boite .btn { font-family: inherit; cursor: pointer; background: linear-gradient(#f7c254,#e39a1f); color: #2c1a00; border: 0; border-radius: 10px; padding: 7px 11px; font-weight: 900; font-size: 12.5px; line-height: normal; box-shadow: 0 2px 0 #9a6210; }
+.jeu-boite .btn.b2 { background: linear-gradient(#3d7dbf,#285d96); color: #fff; box-shadow: 0 2px 0 #16365a; }
+.jeu-boite .btn.rouge { background: linear-gradient(#d9554a,#a8332a); color: #fff; box-shadow: 0 2px 0 #5e1a14; }
+.jeu-boite .btn.vert { background: linear-gradient(#5cc25a,#3a8f39); color: #fff; box-shadow: 0 2px 0 #1e5220; }
+.jeu-annonces { position: absolute; left: 12px; right: 12px; margin: 0 auto; top: 52px; z-index: 15; display: flex; flex-direction: column; gap: 5px; align-items: center; pointer-events: none; max-width: 440px; font-family: Nunito, system-ui, sans-serif; color: #eef3f8; line-height: normal; }
+.annonce { background: rgba(9,29,52,.94); border: 1px solid rgba(255,255,255,.18); border-left: 4px solid #5bb8ff; border-radius: 10px; padding: 6px 11px; font-size: 12.5px; font-weight: 700; animation: entree .25s; box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+.annonce.guerre { border-left-color: #ff5a4a; } .annonce.bon { border-left-color: #6cdc68; } .annonce.or { border-left-color: #f5b53d; }
+@keyframes entree { from { opacity: 0; transform: translateY(-8px); } }
+@media (prefers-reduced-motion: reduce) { .annonce { animation: none; } }
+.bloc h3 { font-family: var(--titre); font-weight: 600; font-size: 1.02rem; margin: 12px 0 4px; color: var(--or); }
+.bloc h3:first-of-type { margin-top: 4px; }
+</style>
+<main>
+  <section class="intro">
+    <h1>Royaumes des Rives, guerre et diplomatie</h1>
+    <p>Maquette 3D des nouveautés graphiques de sept fonctions : brouillard de guerre, marine, espionnage, sièges, remparts des villes, forts d'armée et événements à choix, aux quatre époques, dans le rendu façon web_power (ombrage dessin animé en trois tons, contours bruns, plateau d'hexagones). Toutes les scènes vivent en même temps ; les boutons « Voir » y mènent la caméra et les relancent. Rien n'est encore changé dans le jeu.</p>
+  </section>
+  <div class="scene">
+    <canvas id="scene" aria-label="Plateau de démonstration : notre royaume à l'ouest, une baie, le royaume rival fortifié à l'est, une île alliée, des navires, un espion, deux sièges et des forts d'armée"></canvas>
+    <div class="legende" id="legende" aria-live="polite"></div>
+    <div class="jeu-annonces" id="annonces" aria-live="polite"></div>
+    <div class="jeu-modale" id="evt"><div class="jeu-boite" id="evt-boite" role="dialog" aria-modal="true" aria-labelledby="evt-titre"></div></div>
+    <span class="aide">Glisser : tourner · molette ou pincer : zoomer</span>
+  </div>
+  <div class="barres">
+    <div class="groupe" role="group" aria-label="Voir une scène"><span>Voir</span>
+      <button data-voir="ensemble" aria-pressed="true">Vue d'ensemble</button><button data-voir="brouillard" aria-pressed="false">Brouillard</button><button data-voir="revue" aria-pressed="false">Flotte</button><button data-voir="bataille" aria-pressed="false">Bataille navale</button><button data-voir="debarquement" aria-pressed="false">Débarquement</button><button data-voir="blocus" aria-pressed="false">Blocus</button><button data-voir="commerce" aria-pressed="false">Commerce</button><button data-voir="espion" aria-pressed="false">Espion</button><button data-voir="siege" aria-pressed="false">Siège d'une petite ville</button><button data-voir="siege2" aria-pressed="false">Siège d'une grande ville</button><button data-voir="remparts" aria-pressed="false">Remparts</button><button data-voir="forts" aria-pressed="false">Forts d'armée</button></div>
+    <div class="groupe" role="group" aria-label="Niveau des remparts de notre capitale"><span>Remparts</span>
+      <button data-rempart="1" aria-pressed="false">1 · Palissade</button><button data-rempart="2" aria-pressed="false">2 · Murailles</button><button data-rempart="3" aria-pressed="true">3 · Bastions</button><button data-rempart="4" aria-pressed="false">4 · Citadelle</button></div>
+    <div class="groupe" role="group" aria-label="Brouillard de guerre"><span>Brouillard</span>
+      <button data-brouillard="oui" aria-pressed="true">Activé</button><button data-brouillard="non" aria-pressed="false">Désactivé</button></div>
+    <div class="groupe" role="group" aria-label="Mission de l'espion"><span>Espion</span>
+      <button data-mission="renseignement" aria-pressed="false">Renseignement</button><button data-mission="vol" aria-pressed="false">Vol de plans</button><button data-mission="sabotage" aria-pressed="false">Sabotage</button><button data-mission="demasque" aria-pressed="false">Démasqué</button></div>
+    <div class="groupe" role="group" aria-label="Siège de la ville regardée (la petite ville par défaut)"><span>Siège</span><button data-mois>Mois suivant</button><button data-assaut>Assaut !</button></div>
+    <div class="groupe" role="group" aria-label="Forts d'armée"><span>Forts</span>
+      <button data-fort="1" aria-pressed="true">1 · Redoute</button><button data-fort="2" aria-pressed="false">2 · Fort</button><button data-fort="3" aria-pressed="false">3 · Fort à batteries</button><button data-retranche="oui">Se retrancher</button><button data-retranche="non">Lever le camp</button></div>
+    <div class="groupe" role="group" aria-label="Événements à choix"><span>Événement</span>
+      <button data-evt="disette">La disette (1709)</button><button data-evt="philosophe">Le philosophe (1762)</button><button data-evt="inventeur">L'inventeur (1824)</button></div>
+    <div class="groupe" role="group" aria-label="Époque"><span>Époque</span>
+      <button data-epoque="ancien" aria-pressed="true">1700</button><button data-epoque="lumieres" aria-pressed="false">Lumières</button><button data-epoque="empire" aria-pressed="false">Empire</button><button data-epoque="industrie" aria-pressed="false">Industrie</button></div>
+    <div class="groupe" role="group" aria-label="Saison"><span>Saison</span>
+      <button data-saison="1" aria-pressed="false">Printemps</button><button data-saison="2" aria-pressed="true">Été</button><button data-saison="3" aria-pressed="false">Automne</button><button data-saison="0" aria-pressed="false">Hiver</button></div>
+    <div class="groupe" role="group" aria-label="Heure"><span>Heure</span>
+      <button data-heure="jour" aria-pressed="true">Jour</button><button data-heure="aube" aria-pressed="false">Aube</button><button data-heure="nuit" aria-pressed="false">Nuit</button></div>
+  </div>
+  <div class="deux">
+    <section class="bloc">
+      <h2>Ce que montre la maquette</h2>
+      <h3>Brouillard de guerre</h3>
+      <ul>
+        <li>Les cases jamais explorées dorment sous une brume crème qui ondule doucement, posée sur les tuiles beiges de web_power et cernée de traits bruns ; ses bords s'arrondissent en petits nuages là où commence le connu. Rien n'en dépasse, pas même les montagnes.</li>
+        <li>Les cases explorées mais hors de vue restent ternes et bleutées : on y voit le terrain et les villes connues, jamais les armées (l'armée rouge au nord n'apparaît qu'en vue).</li>
+        <li>La zone en vue suit nos villes (deux cases autour de la capitale), nos armées, nos flottes (deux cases) et nos espions (une case) ; quand un navire ou l'espion avance, la brume se dissipe en s'élevant et la carte s'éclaire.</li>
+        <li>Bouton pour activer ou couper le brouillard.</li>
+      </ul>
+      <h3>Marine</h3>
+      <ul>
+        <li>Les navires aux couleurs du royaume (pavillon, flamme et liston de coque), qui tanguent et laissent un sillage d'écume : flûte marchande ventrue, corvette à deux mâts, frégate à une batterie, vaisseau de ligne à deux batteries (à partir des Lumières) ; à l'ère industrielle, vapeur à roues à aubes, frégate et vaisseau à hélice, cheminée qui fume noir.</li>
+        <li>Coques selon l'époque : bois et dorures en 1700, bois sombre et bandes jaunes aux Lumières, noir à bandes ocre sous l'Empire, noir à bande blanche à l'ère industrielle.</li>
+        <li>Bataille navale : deux lignes de file, bordées qui crachent sabord après sabord (éclairs et fumée blanche de poudre), gerbes des boulets, un navire rival qui brûle, s'incline et coule.</li>
+        <li>Débarquement : la flûte vient mouiller devant la plage, deux chaloupes font deux allers-retours et seize soldats se forment en ligne, puis le porte-drapeau.</li>
+        <li>Blocus : trois de nos navires de guerre mouillés en arc devant le port rival, voiles serrées, ligne de bouées ; au quai, la flûte rivale ne bouge plus.</li>
+        <li>Commerce : la flûte (le vapeur à l'ère industrielle) fait la navette entre notre port et celui de l'île alliée, avec un demi-tour à chaque escale.</li>
+      </ul>
+      <h3>Espionnage</h3>
+      <ul>
+        <li>L'espion en cape à l'écharpe du royaume, tricorne et lanterne (1700, Lumières), bicorne et sacoche (Empire), haut-de-forme (Industrie), avec un anneau à ses pieds et grossi quand on dézoome. Il se faufile par bonds, s'accroupit pour guetter.</li>
+        <li>Missions : renseignement (longue-vue, onde dorée, la brume se lève sur une armée cachée), vol de technologie (il entre et ressort avec le rouleau de plans), sabotage (l'arsenal prend feu), démasqué (« ! », trois gardes sortent de la porte, la cage tombe).</li>
+      </ul>
+      <h3>Sièges</h3>
+      <ul>
+        <li>Les boutons « Mois suivant » et « Assaut ! » agissent sur le siège qu'on regarde (la petite ville si on regarde autre chose).</li>
+        <li>Siège d'une petite ville : une place forte sans faubourgs sur la côte, enceinte à cinq bastions et fossé en eau (Vauban en 1700), demi-lunes aux Lumières et sous l'Empire, fort bas de brique sans échauguettes à l'ère industrielle ; donjon, arsenal, église et maisons dedans, jetée vers la mer.</li>
+        <li>Un mois toutes les quatre secondes : parallèles et tranchées en zigzag qui avancent, gabions, deux batteries qui tirent (éclairs, fumée, poussière à l'impact), canons de la ville qui répondent, brèche qui s'ouvre avec ses gravats, de moins en moins de cheminées qui fument, drapeau blanc au huitième mois.</li>
+        <li>« Assaut ! » : huit soldats montent à la brèche, les défenseurs tirent puis cèdent, notre drapeau flotte sur la brèche puis sur le donjon. Canons, uniformes et murs suivent l'époque.</li>
+        <li>Siège d'une grande ville : la ville rivale de l'est, mairie et six quartiers dans une enceinte bastionnée agrandie (remparts de niveau 3), quatre faubourgs hors les murs de part et d'autre de nos tranchées, notre camp sur la colline. Les deux choses avancent ensemble, un mois toutes les six secondes (ou « Mois suivant ») :</li>
+        <li>le siège en règle, comme pour la petite ville mais en plus grand : parallèles et boyaux en zigzag de la colline vers la courtine ouest, gabions, deux batteries qui tirent, canons des bastions qui répondent, brèche qui s'ouvre au milieu de la courtine, de moins en moins de cheminées qui fument dans les murs, drapeau blanc sur la mairie au huitième mois, et « Assaut ! » (soldats à la brèche, défenseurs, notre drapeau sur la brèche puis sur la mairie) ;</li>
+        <li>et le pillage : les faubourgs sont arrêtés (plus une fumée, ailes du moulin immobiles) ; chaque mois quatre de nos soldats sortent du camp par un chemin dégagé, le faubourg suivant flambe, ils rentrent chargés de sacs et de caisses de butin, et le faubourg reste noirci (murs et toits charbonnés, grange comprise), quelques braises qui fument.</li>
+      </ul>
+      <h3>Remparts des villes</h3>
+      <ul>
+        <li>Une grande ville, c'est la mairie au centre et ses quartiers, ateliers et fermes sur les cases voisines. Les remparts sont une amélioration à quatre niveaux, dont l'aspect suit aussi l'époque (seize combinaisons, boutons Remparts et Époque).</li>
+        <li>Niveau 1, Palissade : pieux de bois, fossé, porte de bois (1700) ; pieux clairs et banquette de terre, porte couverte (Lumières) ; pieux sur un rempart gazonné (Empire) ; poteaux goudronnés, lisses et porte de fer (Industrie).</li>
+        <li>Niveau 2, Murailles : pierre crénelée, tours rondes aux six angles et châtelet sur chaque route ; toits de tuiles en 1700, d'ardoise aux Lumières, tours basses à plate-forme et canon sous l'Empire, brique et meurtrières à l'ère industrielle.</li>
+        <li>Aux niveaux 1 et 2 l'enceinte n'entoure que la case de la mairie. Au niveau 3, Bastions à la Vauban, elle s'agrandit et englobe les six quartiers voisins : le tracé suit le contour extérieur du groupe d'hexagones, avec un bastion à chaque angle saillant, un fossé et un glacis ; ce qui reste au-delà devient faubourg. Échauguettes en 1700 et aux Lumières, canons ensuite, remparts bas de brique et de terre à l'ère industrielle.</li>
+        <li>Niveau 4, Citadelle : la même enceinte, plus haute, avec des demi-lunes dans les angles rentrants et un fossé en eau, et l'ancienne muraille garde la mairie (double enceinte).</li>
+        <li>Les murs se posent sur la hauteur de chaque case et descendent jusqu'au sol le plus bas autour ; une porte s'ouvre là où passe une route (un pont sur le fossé), une arche là où passe une rivière. Les maisons des quartiers restent à l'intérieur, rien ne les chevauche.</li>
+        <li>Monter d'un niveau lance quelques secondes de travaux : échafaudages, blocs de pierre, poussière, la nouvelle enceinte qui s'élève, puis l'ancienne disparaît.</li>
+      </ul>
+      <h3>Forts d'armée</h3>
+      <ul>
+        <li>Sur trois collines libres de la frontière nord, loin des villes, nos armées (l'icône d'armée, uniformes et canons de l'époque). L'anneau léger trace le contour exact des cases que voit le fort : deux cases pour la redoute et le fort, trois pour le fort à batteries (une seule pour une armée en campagne) ; la brume se lève dessus et l'armée rivale voisine apparaît.</li>
+        <li>Se retrancher (ordre gratuit et temporaire, case de gauche) : en un mois, six soldats à la pelle creusent une tranchée basse en arc devant l'armée, le parapet monte, puis viennent gabions et fascines (sacs de terre sous l'Empire et à l'ère industrielle) : l'armée est retranchée. « Lever le camp » : l'armée repart et le retranchement s'efface ; elle revient ensuite en campagne, sans retranchement.</li>
+        <li>Le fort permanent (case du fond), avec l'armée qui le garde sur le glacis devant la porte, est une amélioration à trois niveaux dont l'aspect suit aussi l'époque (douze combinaisons, boutons Forts et Époque). Une sentinelle fait sa ronde sur le rempart, le drapeau du royaume flotte au mât.</li>
+        <li>Niveau 1, Redoute : redoute de terre carrée (pentagonale sous l'Empire et à l'ère industrielle), fossé, petite porte, mât au drapeau, deux tentes ; pieux sur la crête en 1700, talus gazonné et palissade de pieux clairs aux Lumières, gabions et un canon sous l'Empire, poteaux goudronnés et lisses à l'ère industrielle.</li>
+        <li>Niveau 2, Fort : petit fort bastionné à quatre bastions, fossé sec, pont, caserne au milieu, canons sur les bastions ; pierre ocre et échauguettes en 1700, pierre claire et toits d'ardoise aux Lumières, pierre grise gazonnée sous l'Empire, brique et parapets de terre à l'ère industrielle.</li>
+        <li>Niveau 3, Fort à batteries : plus grand, trois demi-lunes, fossé en eau, batteries sur les bastions et les demi-lunes, poudrière, et une tour qui signale la vision étendue : tour de guet au brasier en 1700, sémaphore à bras ensuite. À l'ère industrielle, fort bas polygonal de brique couvert de terre, casemates, canons rayés, poudrière enterrée.</li>
+        <li>Monter d'un niveau lance quelques secondes de travaux : échafaudages, blocs, poussière, ouvriers qui frappent et portent les pierres, le nouveau fort qui s'élève, puis l'ancien disparaît.</li>
+        <li>Case de droite : une redoute rivale vide ; une de nos armées y entre, le drapeau rouge descend, le nôtre monte.</li>
+      </ul>
+      <h3>Événements à choix</h3>
+      <ul>
+        <li>La fenêtre du jeu (mêmes couleurs, polices et boutons que ses fenêtres), avec une illustration dessinée, la date et l'époque, deux ou trois choix colorés et l'annonce de la conséquence : la disette de 1709, un philosophe en exil en 1762, un inventeur de machine à vapeur en 1824.</li>
+      </ul>
+    </section>
+  </div>
+  <div hidden id="svg-inventeur"><svg viewBox="0 0 400 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Un atelier de brique : une machine à vapeur, son volant et sa cheminée qui fume ; l'inventeur en haut-de-forme tient ses plans">
+<rect width="400" height="170" fill="#b7634a"/>
+<g stroke="#8a3f2c" stroke-width="2"><line x1="0" y1="14" x2="400" y2="14"/><line x1="0" y1="28" x2="400" y2="28"/><line x1="0" y1="42" x2="400" y2="42"/><line x1="0" y1="56" x2="400" y2="56"/><line x1="0" y1="70" x2="400" y2="70"/><line x1="0" y1="84" x2="400" y2="84"/><line x1="0" y1="98" x2="400" y2="98"/><line x1="0" y1="112" x2="400" y2="112"/><line x1="0" y1="126" x2="400" y2="126"/><line x1="10" y1="0" x2="10" y2="14"/><line x1="50" y1="0" x2="50" y2="14"/><line x1="90" y1="0" x2="90" y2="14"/><line x1="130" y1="0" x2="130" y2="14"/><line x1="170" y1="0" x2="170" y2="14"/><line x1="210" y1="0" x2="210" y2="14"/><line x1="250" y1="0" x2="250" y2="14"/><line x1="290" y1="0" x2="290" y2="14"/><line x1="330" y1="0" x2="330" y2="14"/><line x1="370" y1="0" x2="370" y2="14"/><line x1="30" y1="14" x2="30" y2="28"/><line x1="70" y1="14" x2="70" y2="28"/><line x1="110" y1="14" x2="110" y2="28"/><line x1="150" y1="14" x2="150" y2="28"/><line x1="190" y1="14" x2="190" y2="28"/><line x1="230" y1="14" x2="230" y2="28"/><line x1="270" y1="14" x2="270" y2="28"/><line x1="310" y1="14" x2="310" y2="28"/><line x1="350" y1="14" x2="350" y2="28"/><line x1="390" y1="14" x2="390" y2="28"/><line x1="10" y1="28" x2="10" y2="42"/><line x1="50" y1="28" x2="50" y2="42"/><line x1="90" y1="28" x2="90" y2="42"/><line x1="130" y1="28" x2="130" y2="42"/><line x1="170" y1="28" x2="170" y2="42"/><line x1="210" y1="28" x2="210" y2="42"/><line x1="250" y1="28" x2="250" y2="42"/><line x1="290" y1="28" x2="290" y2="42"/><line x1="330" y1="28" x2="330" y2="42"/><line x1="370" y1="28" x2="370" y2="42"/><line x1="30" y1="42" x2="30" y2="56"/><line x1="70" y1="42" x2="70" y2="56"/><line x1="110" y1="42" x2="110" y2="56"/><line x1="150" y1="42" x2="150" y2="56"/><line x1="190" y1="42" x2="190" y2="56"/><line x1="230" y1="42" x2="230" y2="56"/><line x1="270" y1="42" x2="270" y2="56"/><line x1="310" y1="42" x2="310" y2="56"/><line x1="350" y1="42" x2="350" y2="56"/><line x1="390" y1="42" x2="390" y2="56"/><line x1="10" y1="56" x2="10" y2="70"/><line x1="50" y1="56" x2="50" y2="70"/><line x1="90" y1="56" x2="90" y2="70"/><line x1="130" y1="56" x2="130" y2="70"/><line x1="170" y1="56" x2="170" y2="70"/><line x1="210" y1="56" x2="210" y2="70"/><line x1="250" y1="56" x2="250" y2="70"/><line x1="290" y1="56" x2="290" y2="70"/><line x1="330" y1="56" x2="330" y2="70"/><line x1="370" y1="56" x2="370" y2="70"/><line x1="30" y1="70" x2="30" y2="84"/><line x1="70" y1="70" x2="70" y2="84"/><line x1="110" y1="70" x2="110" y2="84"/><line x1="150" y1="70" x2="150" y2="84"/><line x1="190" y1="70" x2="190" y2="84"/><line x1="230" y1="70" x2="230" y2="84"/><line x1="270" y1="70" x2="270" y2="84"/><line x1="310" y1="70" x2="310" y2="84"/><line x1="350" y1="70" x2="350" y2="84"/><line x1="390" y1="70" x2="390" y2="84"/><line x1="10" y1="84" x2="10" y2="98"/><line x1="50" y1="84" x2="50" y2="98"/><line x1="90" y1="84" x2="90" y2="98"/><line x1="130" y1="84" x2="130" y2="98"/><line x1="170" y1="84" x2="170" y2="98"/><line x1="210" y1="84" x2="210" y2="98"/><line x1="250" y1="84" x2="250" y2="98"/><line x1="290" y1="84" x2="290" y2="98"/><line x1="330" y1="84" x2="330" y2="98"/><line x1="370" y1="84" x2="370" y2="98"/><line x1="30" y1="98" x2="30" y2="112"/><line x1="70" y1="98" x2="70" y2="112"/><line x1="110" y1="98" x2="110" y2="112"/><line x1="150" y1="98" x2="150" y2="112"/><line x1="190" y1="98" x2="190" y2="112"/><line x1="230" y1="98" x2="230" y2="112"/><line x1="270" y1="98" x2="270" y2="112"/><line x1="310" y1="98" x2="310" y2="112"/><line x1="350" y1="98" x2="350" y2="112"/><line x1="390" y1="98" x2="390" y2="112"/><line x1="10" y1="112" x2="10" y2="126"/><line x1="50" y1="112" x2="50" y2="126"/><line x1="90" y1="112" x2="90" y2="126"/><line x1="130" y1="112" x2="130" y2="126"/><line x1="170" y1="112" x2="170" y2="126"/><line x1="210" y1="112" x2="210" y2="126"/><line x1="250" y1="112" x2="250" y2="126"/><line x1="290" y1="112" x2="290" y2="126"/><line x1="330" y1="112" x2="330" y2="126"/><line x1="370" y1="112" x2="370" y2="126"/><line x1="30" y1="126" x2="30" y2="140"/><line x1="70" y1="126" x2="70" y2="140"/><line x1="110" y1="126" x2="110" y2="140"/><line x1="150" y1="126" x2="150" y2="140"/><line x1="190" y1="126" x2="190" y2="140"/><line x1="230" y1="126" x2="230" y2="140"/><line x1="270" y1="126" x2="270" y2="140"/><line x1="310" y1="126" x2="310" y2="140"/><line x1="350" y1="126" x2="350" y2="140"/><line x1="390" y1="126" x2="390" y2="140"/></g>
+<path d="M28 30 h46 v52 h-46 z" fill="#f2d27a" stroke="#24180f" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><path d="M51 30 v52 M28 56 h46" stroke="#24180f" stroke-width="3"/>
+<rect x="0" y="138" width="400" height="32" fill="#8a6a44" stroke="#24180f" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<g stroke="#24180f" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"><circle cx="112" cy="98" r="36" fill="none" stroke="#24180f" stroke-width="13"/><circle cx="112" cy="98" r="36" fill="none" stroke="#6b7078" stroke-width="7"/>
+<path d="M112 62 V134 M76 98 H148 M87 73 L137 123 M137 73 L87 123" stroke="#6b7078" stroke-width="4"/><circle cx="112" cy="98" r="8" fill="#3a3d42"/></g>
+<path d="M112 98 L170 92" stroke="#24180f" stroke-width="8"/><path d="M112 98 L170 92" stroke="#c9a24a" stroke-width="4"/>
+<rect x="158" y="76" width="122" height="54" rx="27" fill="#3a3d42" stroke="#24180f" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><rect x="170" y="84" width="98" height="8" rx="4" fill="#5a5f66"/>
+<g fill="#c9a24a"><circle cx="178" cy="104" r="2.6"/><circle cx="178" cy="120" r="2.6"/><circle cx="192" cy="104" r="2.6"/><circle cx="192" cy="120" r="2.6"/><circle cx="206" cy="104" r="2.6"/><circle cx="206" cy="120" r="2.6"/><circle cx="220" cy="104" r="2.6"/><circle cx="220" cy="120" r="2.6"/><circle cx="234" cy="104" r="2.6"/><circle cx="234" cy="120" r="2.6"/><circle cx="248" cy="104" r="2.6"/><circle cx="248" cy="120" r="2.6"/><circle cx="262" cy="104" r="2.6"/><circle cx="262" cy="120" r="2.6"/></g>
+<rect x="190" y="130" width="62" height="10" fill="#2b2b30" stroke="#24180f" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><rect x="206" y="118" width="30" height="12" fill="#ff8a1c" stroke="#24180f" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<rect x="246" y="24" width="20" height="56" fill="#2b2b30" stroke="#24180f" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><rect x="242" y="20" width="28" height="8" fill="#2b2b30" stroke="#24180f" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<g fill="#f4f1ea" stroke="#24180f" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"><circle cx="262" cy="14" r="9"/><circle cx="280" cy="8" r="7"/><circle cx="244" cy="8" r="6"/></g>
+<circle cx="170" cy="62" r="11" fill="#c9a24a" stroke="#24180f" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><path d="M170 51 v-12 M164 39 h12" stroke="#24180f" stroke-width="3"/>
+<g stroke="#24180f" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"><path d="M318 140 v-30 M334 140 v-30" stroke-width="7"/><path d="M306 116 L312 70 Q326 62 340 70 L346 116 Z" fill="#7a4a24"/><path d="M326 70 v46" stroke="#24180f" stroke-width="2"/>
+<circle cx="326" cy="56" r="12" fill="#f0c9a0"/><rect x="314" y="40" width="24" height="6" fill="#1f1f1f"/><rect x="318" y="20" width="16" height="22" fill="#1f1f1f"/><rect x="318" y="34" width="16" height="4" fill="#b8322a" stroke="none"/>
+<path d="M300 88 L352 76" stroke-width="3"/><rect x="290" y="78" width="66" height="13" rx="6" fill="#f2e6c4" transform="rotate(-13 323 84)"/></g>
+</svg></div>
+  <div hidden id="svg-philosophe"><svg viewBox="0 0 400 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Au soleil couchant, devant la barrière rouge et blanche d'un poste-frontière, un philosophe en perruque et tricorne porte une pile de livres et une plume">
+<rect width="400" height="170" fill="#f4c98a"/><circle cx="300" cy="62" r="26" fill="#ffe7a8"/>
+<path d="M0 104 Q60 78 130 96 T260 92 T400 98 V170 H0 Z" fill="#7fae54" stroke="#24180f" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><path d="M0 124 Q120 110 240 122 T400 118 V170 H0 Z" fill="#9fc46a" stroke="#24180f" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M150 170 Q200 128 236 120 L262 120 Q240 136 230 170 Z" fill="#dcc79a" stroke="#24180f" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<g stroke="#24180f" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"><rect x="24" y="92" width="10" height="34" fill="#7a5233"/><circle cx="29" cy="80" r="22" fill="#5fae3e"/><rect x="64" y="100" width="8" height="26" fill="#7a5233"/><circle cx="68" cy="90" r="16" fill="#74b83f"/></g>
+<g stroke="#24180f" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"><rect x="300" y="72" width="34" height="56" fill="#f6f2ea"/><rect x="300" y="80" width="34" height="8" fill="#b8322a" stroke="none"/><rect x="300" y="96" width="34" height="8" fill="#b8322a" stroke="none"/><rect x="300" y="112" width="34" height="8" fill="#b8322a" stroke="none"/><rect x="300" y="72" width="34" height="56" fill="none"/><path d="M294 74 L317 58 L340 74 Z" fill="#b8322a"/>
+<rect x="250" y="104" width="10" height="26" fill="#6b4a2a"/><rect x="254" y="104" width="46" height="8" fill="#f6f2ea"/><rect x="258" y="104" width="7" height="8" fill="#b8322a" stroke="none"/><rect x="272" y="104" width="7" height="8" fill="#b8322a" stroke="none"/><rect x="286" y="104" width="7" height="8" fill="#b8322a" stroke="none"/><rect x="254" y="104" width="46" height="8" fill="none"/>
+<rect x="352" y="84" width="6" height="44" fill="#6b4a2a"/><rect x="330" y="76" width="56" height="16" fill="#e9dcc0"/></g>
+<text x="358" y="88" font-family="Nunito, sans-serif" font-size="8" font-weight="900" fill="#24180f" text-anchor="middle">FRONTIÈRE</text>
+<g stroke="#24180f" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"><path d="M146 140 v-24 M162 140 v-24" stroke-width="7"/><path d="M134 120 L140 72 Q154 64 168 72 L174 120 Z" fill="#5a6a86"/><path d="M154 72 v48" stroke-width="2"/>
+<circle cx="141" cy="62" r="7" fill="#f6f2ea"/><circle cx="167" cy="62" r="7" fill="#f6f2ea"/><circle cx="154" cy="56" r="12" fill="#f0c9a0"/><path d="M134 50 L154 38 L174 50 L154 46 Z" fill="#1f1f1f"/>
+<rect x="164" y="86" width="30" height="9" fill="#b8322a"/><rect x="166" y="77" width="28" height="9" fill="#2f5fa8"/><rect x="163" y="95" width="32" height="9" fill="#3f8f4a"/>
+<path d="M126 92 L116 60" stroke-width="3"/><path d="M116 60 Q104 66 112 76 Q118 70 116 60 Z" fill="#f6f2ea"/></g>
+</svg></div>
+  <div hidden id="svg-disette"><svg viewBox="0 0 400 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Hiver gris : un grenier de bois aux portes ouvertes sur le vide, un sac de grain presque vide, des corbeaux sur un arbre nu, une paysanne au panier vide">
+<rect width="400" height="170" fill="#c3ccd4"/>
+<path d="M0 112 Q100 100 200 108 T400 104 V170 H0 Z" fill="#eef2f6" stroke="#24180f" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<g stroke="#b9c3cc" stroke-width="3"><path d="M150 170 L210 116"/><path d="M184 170 L244 116"/><path d="M218 170 L278 116"/><path d="M252 170 L312 116"/><path d="M286 170 L346 116"/><path d="M320 170 L380 116"/><path d="M354 170 L414 116"/><path d="M388 170 L448 116"/></g>
+<g stroke="#24180f" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"><rect x="40" y="64" width="110" height="70" fill="#8a5a32"/><path d="M30 66 L95 26 L160 66 Z" fill="#6b3a2e"/><path d="M44 58 L95 28 L146 58 L95 40 Z" fill="#f6f8fb"/>
+<rect x="74" y="84" width="42" height="50" fill="#2a1d14"/><path d="M74 84 L60 92 V140 L74 134 Z M116 84 L130 92 V140 L116 134 Z" fill="#a8723f"/>
+<path d="M150 134 Q148 112 162 110 Q178 112 176 134 Z" fill="#d9c49a"/><path d="M156 110 Q163 104 170 110" fill="none"/></g>
+<g fill="#e3c75b"><circle cx="182" cy="136" r="2"/><circle cx="188" cy="138" r="2"/><circle cx="194" cy="135" r="2"/></g>
+<g stroke="#24180f" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"><path d="M262 140 V84 M262 104 L240 82 M262 96 L286 72 M286 72 L296 64 M240 82 L232 70" fill="none" stroke-width="5"/></g>
+<g fill="#1f1f24"><path d="M236 68 q6 -7 12 0 q-6 -2 -12 0 z M239 66 l-5 -3" stroke="#1f1f24" stroke-width="2"/><path d="M284 66 q6 -7 12 0 q-6 -2 -12 0 z M287 64 l-5 -3" stroke="#1f1f24" stroke-width="2"/><path d="M300 60 q6 -7 12 0 q-6 -2 -12 0 z M303 58 l-5 -3" stroke="#1f1f24" stroke-width="2"/></g>
+<g stroke="#24180f" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"><path d="M336 142 L330 98 Q342 88 354 98 L360 142 Z" fill="#4a6a9a"/><path d="M332 104 Q345 112 358 104 L354 96 Q345 90 336 96 Z" fill="#a8553a"/>
+<circle cx="345" cy="82" r="11" fill="#f0c9a0"/><path d="M333 80 Q345 64 357 80 Q345 74 333 80 Z" fill="#f6f2ea"/>
+<path d="M352 118 Q370 118 372 108" fill="none"/><path d="M360 112 h26 l-4 18 h-18 z" fill="#c9a26a"/></g>
+<g fill="#ffffff"><circle cx="20" cy="20" r="2.2"/><circle cx="64" cy="14" r="2.2"/><circle cx="180" cy="30" r="2.2"/><circle cx="214" cy="12" r="2.2"/><circle cx="250" cy="40" r="2.2"/><circle cx="312" cy="22" r="2.2"/><circle cx="370" cy="34" r="2.2"/><circle cx="390" cy="10" r="2.2"/><circle cx="120" cy="10" r="2.2"/></g>
+</svg></div>
+</main>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }</script>
+<script type="module">
+/*SCRIPT*/
+</script>

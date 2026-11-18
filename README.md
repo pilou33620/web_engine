@@ -19,8 +19,9 @@ Les commits copiés sont dans `sources/SOURCES.json`. L'inventaire de chaque fic
 index.html                 accueil : une source, puis Bâtiments / Monde vivant / Maquettes
 lib/                       LA BIBLIOTHÈQUE GRAPHIQUE (version dans lib/package.json, journal dans lib/CHANGELOG.md)
   three/                   three.js r186 (+ BufferGeometryUtils)
-  royaumes/                moteur et rendu de web_royaumes (modules ES) + rendu.css
+  royaumes/                moteur et rendu de web_royaumes (modules ES) + rendu.css, img/ (illustrations), icons/ (icônes)
   power/                   graphismes de web_power (scripts classiques) + pont.js (ses modèles dans le moteur royaumes)
+maquettes/                 L'ATELIER : toutes les maquettes (permanentes, jamais supprimées par la synchronisation)
 sources/                   copies intégrales, jamais modifiées à la main (outils/synchroniser.sh les remplace)
   web_royaumes/            tout le dépôt (main) : web/ (rendu, ui, css, images), maquettes/, moteur Rust, tests…
   web_power/               tout le dépôt (main) : index.html, js/, css/, maquettes/, banc/, serveur…
@@ -71,7 +72,7 @@ Un serveur est nécessaire (modules JS et `fetch`). web_power et certaines maque
 - **Monde vivant** : la carte du jeu avec sa nature (mer, rivières, forêts, champs, collines, montagnes) et ses animations, rendue par le moteur du jeu lui-même.
   - *web_royaumes* : le pipeline de `appliquer()` de `main.js` sur la carte et l'état du moteur. La page ne fait que retoucher l'état : époque (style, uniformes, éclairage public), saison, temps, neige au sol, heure, jour de marché, remparts, et tous les bâtiments posés autour de la capitale.
   - *web_power* : le jeu complet dans un cadre, piloté avec ses propres fonctions. Croissance des villes année par année jusqu'à l'époque, une installation de chaque type de l'époque raccordée à la capitale, puis le mois, un jour dont la météo correspond, et l'heure. Le temps continue de s'écouler.
-- **Maquettes** : les maquettes graphiques des deux dépôts (armées, guerre, quartiers, rendu façon web_power, déchets) et Héliosphère (conquête spatiale, branche non fusionnée de web_power).
+- **Maquettes** : le dossier permanent `maquettes/` : armées, guerre, quartiers, rendu façon web_power, déchets, et Héliosphère (conquête spatiale, branche non fusionnée de web_power). Voir [`maquettes/LISEZMOI.md`](maquettes/LISEZMOI.md).
 
 ## Carte test
 

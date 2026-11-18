@@ -1,0 +1,872 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Maquette Déchets</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Maquette du mode « Gestion des déchets » de GridMaster : tokens repris de css/style.css, page autonome. */
+:root {
+  color-scheme: dark;
+  --fond: #1b211a; --fond2: #253021; --fond3: #2a3327; --bord: #0f130e; --trait: #2b1d14; --sol: #141813;
+  --txt: #f6f4ea; --doux: #b3bca5; --gris: #a9b39a; --or: #ffc94d; --vert: #7be08a; --rouge: #ff8a7a; --orange: #ff9a4a; --creme: #fff7e6;
+  --titre: Fredoka, "Trebuchet MS", system-ui, sans-serif; --corps: Nunito, "Segoe UI", system-ui, sans-serif;
+  --ombre: 0 4px 0 rgba(0,0,0,.35);
+  /* flux : palette catégorielle validée sur le fond sombre (ordre fixe) */
+  --f-res: #3987e5; --f-emb: #c98500; --f-verre: #199e70; --f-bio: #d95926; --f-enc: #9085e9;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--sol); color: var(--txt); font-family: var(--corps); }
+button { font-family: inherit; color: inherit; }
+button:focus-visible { outline: 3px solid var(--vert); outline-offset: 2px; }
+[hidden] { display: none !important; }
+#app { display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr) 400px; height: 100%; }
+.barre { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 0 12px; background: var(--fond); border-bottom: 3px solid var(--bord); min-width: 0; }
+.titre-date { font-family: var(--titre); font-weight: 600; font-size: 19px; line-height: 1.15; min-width: 0; white-space: nowrap; }
+.titre-date small { display: block; font: 800 11px var(--corps); color: var(--gris); white-space: nowrap; }
+.badge { padding: 2px 8px; border-radius: 8px; background: var(--creme); color: var(--trait); font-weight: 800; font-size: 11px; border: 2px solid var(--bord); }
+.vues { display: flex; gap: 3px; padding: 3px; border-radius: 13px; background: var(--fond2); border: 2px solid var(--bord); }
+.vues button { display: flex; align-items: center; gap: 5px; min-height: 34px; padding: 0 9px; border: 0; border-radius: 10px; background: transparent; font-weight: 800; font-size: 13px; cursor: pointer; }
+.vues button svg { width: 17px; height: 17px; }
+.vues button:disabled { opacity: .4; cursor: not-allowed; }
+.vues button.actif { background: var(--or); color: var(--trait); }
+.pills { display: flex; gap: 6px; margin-left: auto; min-width: 0; overflow: hidden; }
+.pill { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 12px; background: var(--fond2); border: 2px solid var(--bord); font-weight: 800; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pill .pt { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--bord); background: var(--vert); }
+.pill.alerte .pt { background: var(--or); } .pill.critique .pt { background: var(--rouge); animation: clignote .6s steps(2) infinite; }
+.pill.evt { background: var(--rouge); color: var(--trait); }
+@keyframes clignote { 50% { opacity: .2; } }
+.tresorerie { text-align: right; flex: none; }
+.etiquette { font-size: 10px; font-weight: 800; letter-spacing: 2px; color: var(--gris); }
+.argent { font-family: var(--titre); font-weight: 700; font-size: 21px; line-height: 1; color: var(--or); font-variant-numeric: tabular-nums; }
+.argent.neg { color: var(--rouge); }
+
+main { position: relative; overflow: hidden; background: #2d6aa0; min-width: 0; }
+#carte { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#carte .hex { stroke: rgba(15,19,14,.35); stroke-width: 1.2; }
+#carte .cible { fill: transparent; stroke: none; cursor: pointer; }
+#carte .cible:hover { fill: rgba(255,255,255,.12); }
+#carte .ok { fill: rgba(123,224,138,.45); stroke: var(--vert); stroke-width: 3; }
+#carte .ko { fill: rgba(255,138,122,.4); stroke: var(--rouge); stroke-width: 3; }
+#carte text { font-family: var(--titre); pointer-events: none; }
+#carte .site { cursor: pointer; }
+.flottant { position: absolute; z-index: 3; background: var(--fond); border: 2.5px solid var(--bord); border-radius: 16px; box-shadow: var(--ombre); }
+.temps { left: 12px; top: 12px; display: flex; gap: 3px; padding: 4px; }
+.temps button { min-width: 42px; min-height: 36px; border: 0; border-radius: 11px; background: transparent; font: 800 13px var(--corps); cursor: pointer; }
+.temps button.actif { background: var(--vert); color: var(--bord); }
+.temps button:first-child.actif { background: var(--or); }
+.lentilles { right: 12px; top: 12px; display: flex; flex-direction: column; gap: 4px; padding: 6px; }
+.lentilles button { min-height: 30px; padding: 0 10px; border-radius: 10px; border: 2px solid var(--bord); background: var(--fond2); font-weight: 800; font-size: 12px; text-align: left; cursor: pointer; }
+.lentilles button.actif { background: var(--or); color: var(--trait); }
+.chantier { left: 50%; transform: translateX(-50%); bottom: 12px; max-width: calc(100% - 24px); display: flex; gap: 6px; padding: 6px; overflow-x: auto; }
+.carte-c { flex: none; width: 96px; padding: 6px 5px 5px; border-radius: 12px; border: 2px solid var(--bord); background: var(--fond2); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+.carte-c svg { width: 30px; height: 30px; }
+.carte-c b { font-size: 11.5px; font-weight: 800; line-height: 1.15; }
+.carte-c span { font-size: 10.5px; font-weight: 700; color: var(--doux); }
+.carte-c.actif { background: var(--or); color: var(--trait); } .carte-c.actif span { color: var(--trait); }
+.carte-c:disabled { opacity: .42; cursor: not-allowed; }
+.aide { position: absolute; z-index: 4; left: 50%; transform: translateX(-50%); bottom: 104px; padding: 7px 12px; border-radius: 14px; background: var(--creme); color: var(--trait); border: 2.5px solid var(--bord); box-shadow: var(--ombre); font-weight: 800; font-size: 13px; width: max-content; max-width: min(560px, calc(100% - 24px)); text-align: center; display: flex; gap: 8px; align-items: center; }
+.aide button { min-height: 30px; padding: 0 10px; border-radius: 9px; border: 2px solid var(--bord); background: #efe3c8; color: var(--trait); font-weight: 800; cursor: pointer; }
+.bulle { position: fixed; z-index: 9; pointer-events: none; padding: 6px 10px; border-radius: 11px; background: var(--creme); color: var(--trait); border: 2px solid var(--bord); font-size: 12px; font-weight: 800; max-width: 260px; }
+.bulle b { font-family: var(--titre); font-weight: 600; font-size: 14px; }
+.bulle .non { color: #b3261e; } .bulle .oui { color: #23752f; }
+
+aside { display: flex; flex-direction: column; min-height: 0; background: var(--fond); border-left: 3px solid var(--bord); }
+.onglets { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 10px 6px; border-bottom: 2px solid var(--fond2); }
+.onglets button { min-height: 32px; padding: 0 10px; border-radius: 10px; border: 2px solid var(--bord); background: var(--fond2); font-weight: 800; font-size: 12.5px; cursor: pointer; }
+.onglets button.actif { background: var(--or); color: var(--trait); }
+#contenu { flex: 1; overflow-y: auto; padding: 4px 16px 24px; }
+h2 { margin: 10px 0 2px; font-family: var(--titre); font-weight: 700; font-size: 21px; }
+.section { margin-top: 16px; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: var(--gris); text-transform: uppercase; }
+.note { font-size: 12.5px; font-weight: 700; color: var(--doux); margin: 4px 0; }
+.tuiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.tuile { padding: 8px 10px; border-radius: 12px; background: var(--fond2); border: 2px solid var(--bord); }
+.tuile .v { font-family: var(--titre); font-weight: 700; font-size: 20px; font-variant-numeric: tabular-nums; }
+.tuile .l { font-size: 11px; font-weight: 800; color: var(--gris); }
+.tuile.alerte { border-color: var(--or); } .tuile.critique { border-color: var(--rouge); }
+.ligne { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--fond2); font-size: 13.5px; font-weight: 700; }
+.ligne .grand { flex: 1; min-width: 0; }
+.ligne small { display: block; color: var(--doux); font-size: 11.5px; }
+.ligne .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pastille { width: 12px; height: 12px; border-radius: 4px; border: 2px solid var(--bord); flex: none; }
+.btn { min-height: 34px; padding: 0 12px; border-radius: 10px; border: 2px solid var(--bord); background: var(--vert); color: var(--bord); font-weight: 800; font-size: 12.5px; cursor: pointer; white-space: nowrap; }
+.btn.secondaire { background: var(--fond3); color: var(--txt); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.seg { display: flex; gap: 2px; padding: 2px; border-radius: 10px; background: var(--sol); border: 2px solid var(--bord); }
+.seg button { min-width: 30px; min-height: 28px; border: 0; border-radius: 8px; background: transparent; font-weight: 800; font-size: 12px; cursor: pointer; }
+.seg button.actif { background: var(--or); color: var(--trait); }
+.jauge { height: 9px; border-radius: 5px; background: var(--sol); border: 1.5px solid var(--bord); overflow: hidden; }
+.jauge i { display: block; height: 100%; background: var(--vert); border-radius: 4px; }
+.jauge.alerte i { background: var(--or); } .jauge.critique i { background: var(--rouge); }
+.objectif { display: flex; gap: 8px; align-items: flex-start; padding: 5px 0; font-size: 13px; font-weight: 700; }
+.objectif .c { width: 18px; height: 18px; flex: none; border-radius: 6px; border: 2px solid var(--bord); background: var(--fond3); display: grid; place-items: center; font-size: 12px; }
+.objectif.fait { color: var(--doux); } .objectif.fait .c { background: var(--vert); color: var(--bord); }
+input[type=range] { width: 100%; accent-color: var(--or); }
+#sankey text { font-family: var(--corps); font-weight: 800; font-size: 11px; fill: var(--txt); }
+#sankey .lien { fill: none; stroke-opacity: .42; }
+#sankey .lien:hover { stroke-opacity: .8; }
+.toast { position: fixed; z-index: 10; left: calc(50% - 200px); top: 72px; transform: translateX(-50%); padding: 8px 14px; border-radius: 13px; background: var(--creme); color: var(--trait); border: 2.5px solid var(--bord); box-shadow: var(--ombre); font-weight: 800; font-size: 13.5px; max-width: calc(100% - 24px); }
+.toast.critique { background: var(--rouge); }
+.modale { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.55); display: grid; place-items: center; padding: 16px; }
+.boite { width: min(440px, 100%); padding: 18px; border-radius: 20px; background: var(--fond); border: 3px solid var(--bord); box-shadow: var(--ombre); display: flex; flex-direction: column; gap: 10px; }
+.boite h2 { margin: 0; }
+.boite p { margin: 0; font-weight: 700; color: var(--doux); }
+
+@media (max-width: 900px) {
+  #app { grid-template-columns: minmax(0, 1fr); grid-template-rows: 60px minmax(0, 52fr) minmax(0, 48fr); }
+  aside { border-left: 0; border-top: 3px solid var(--bord); }
+  .vues button span, .pill.opt, .titre-date small, .badge, .pills { display: none; }
+  .titre-date { font-size: 14px; }
+  .toast { left: 50%; }
+  .aide { font-size: 12px; padding: 5px 9px; }
+  .lentilles { display: none; }
+  .aide { bottom: 96px; }
+  .carte-c { width: 84px; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="barre">
+    <div id="date" class="titre-date">GridMaster</div>
+    <span class="badge">MAQUETTE</span>
+    <nav class="vues" aria-label="Vue de la carte">
+      <button type="button" disabled title="Vue du jeu principal, absente de la maquette"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2 17 6v8l-7 4-7-4V6z" fill="#86c552" stroke="#0f130e" stroke-width="2" stroke-linejoin="round"/></svg><span>Carte</span></button>
+      <button type="button" disabled title="Vue du jeu principal, absente de la maquette"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M11 1 4 11h5l-1 8 7-10h-5z" fill="#ffc94d" stroke="#0f130e" stroke-width="2" stroke-linejoin="round"/></svg><span>Électricité</span></button>
+      <button type="button" disabled title="Vue du jeu principal, absente de la maquette"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1c4 6 6 8.5 6 11.5a6 6 0 0 1-12 0C4 9.5 6 7 10 1z" fill="#38b6ff" stroke="#0f130e" stroke-width="2" stroke-linejoin="round"/></svg><span>Eau</span></button>
+      <button type="button" class="actif" title="Vue déchets (touche 4)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 6h10l-1 12H6zM3 6h14M8 6V3h4v3" fill="#7be08a" stroke="#0f130e" stroke-width="2" stroke-linejoin="round"/></svg><span>Déchets</span></button>
+    </nav>
+    <div class="pills">
+      <div id="p-evt" class="pill evt" hidden></div>
+      <div id="p-prop" class="pill" title="Dépôts sauvages dans la région"><span class="pt"></span><span></span></div>
+      <div id="p-rec" class="pill" title="Recyclage et valorisation sur 30 jours"><span class="pt"></span><span></span></div>
+      <div id="p-dech" class="pill opt" title="Remplissage des décharges"><span class="pt"></span><span></span></div>
+      <div id="p-sat" class="pill opt" title="Satisfaction des habitants"><span class="pt"></span><span></span></div>
+    </div>
+    <div class="tresorerie"><div class="etiquette">TRÉSORERIE</div><div id="argent" class="argent">—</div></div>
+  </header>
+
+  <main>
+    <svg id="carte" aria-label="Carte de la région : quartiers, bacs et installations de traitement"></svg>
+    <div class="flottant temps" id="temps" role="group" aria-label="Vitesse du temps"></div>
+    <nav class="flottant lentilles" id="lentilles" aria-label="Lentilles de la carte"></nav>
+    <div class="aide" id="aide" hidden></div>
+    <div class="flottant chantier" id="chantier" role="toolbar" aria-label="Construire"></div>
+  </main>
+
+  <aside aria-label="Panneau de gestion des déchets">
+    <nav class="onglets" id="onglets"></nav>
+    <div id="contenu"></div>
+  </aside>
+</div>
+<div class="bulle" id="bulle" hidden></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<div class="modale" id="modale" hidden><div class="boite" role="dialog" aria-modal="true" id="boite"></div></div>
+
+<script>
+'use strict';
+// ---------- Outils ----------
+const $ = id => document.getElementById(id);
+const NS = 'http://www.w3.org/2000/svg';
+const somme = a => a.reduce((s, x) => s + x, 0);
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const fmt = (x, d = 0) => x.toLocaleString('fr-FR', { maximumFractionDigits: d, minimumFractionDigits: d });
+const euros = x => Math.abs(x) >= 1e6 ? fmt(x / 1e6, 2) + ' M€' : Math.abs(x) >= 1e4 ? fmt(x / 1e3) + ' k€' : fmt(x) + ' €';
+const pct = x => fmt(100 * x) + ' %';
+function alea(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+let rnd = alea(1985);
+const gauss = () => Math.sqrt(-2 * Math.log(rnd() + 1e-9)) * Math.cos(2 * Math.PI * rnd());
+
+// ---------- Grille hexagonale (pointe en haut, lignes impaires décalées) ----------
+const S = 30, COLS = 15, ROWS = 10, R3 = Math.sqrt(3);
+const centre = (c, r) => [S * R3 * (c + 0.5 * (r & 1)) + S, S * 1.5 * r + S + 4];
+const coins = (x, y, s = S) => Array.from({ length: 6 }, (_, i) => { const a = Math.PI / 180 * (60 * i - 30); return (x + s * Math.cos(a)).toFixed(1) + ',' + (y + s * Math.sin(a)).toFixed(1); }).join(' ');
+const cube = (c, r) => { const x = c - (r - (r & 1)) / 2; return [x, r, -x - r]; };
+const dist = (a, b) => { const A = cube(a.c, a.r), B = cube(b.c, b.r); return Math.max(Math.abs(A[0] - B[0]), Math.abs(A[1] - B[1]), Math.abs(A[2] - B[2])); };
+
+// ---------- Données (à sortir en fichiers de données dans le jeu) ----------
+const FLUX = ['res', 'emb', 'verre', 'bio', 'enc'];
+const NOM_FLUX = { res: 'Ordures résiduelles', emb: 'Emballages', verre: 'Verre', bio: 'Biodéchets', enc: 'Encombrants' };
+const COUL = { res: '#3987e5', emb: '#c98500', verre: '#199e70', bio: '#d95926', enc: '#9085e9' };
+const COMPO = { res: { res: .38, emb: .24, verre: .08, bio: .20, enc: .10 }, com: { res: .30, emb: .48, verre: .04, bio: .14, enc: .04 }, ind: { res: .50, emb: .22, verre: 0, bio: 0, enc: .28 } };
+const CAPJ = { res: 5, emb: 10, verre: 16, bio: 5 };        // autonomie des bacs, en jours de production
+const MATIERES = { papier: ['Papier et carton', 95], plastique: ['Plastiques', 230], metal: ['Métaux', 280], verre: ['Verre', 25], materiaux: ['Ferraille et bois', 45] };
+const TYPES = {
+  decheterie: { nom: 'Déchèterie', cout: 350e3, jours: 45, fixe: 1100, nuis: -3, rayon: 3, coul: '#ffc94d', aide: 'Capte 85 % des encombrants ; 45 % repartent en matières' },
+  tri: { nom: 'Centre de tri', cout: 2.2e6, jours: 90, cap: 30, opex: 135, nuis: 4, rayon: 2, coul: '#5fb3ff', aide: 'Sépare papier, plastiques et métaux ; les refus partent en élimination' },
+  compost: { nom: 'Compostage', cout: 600e3, jours: 40, cap: 22, opex: 40, nuis: 6, rayon: 2, coul: '#7be08a', aide: 'Transforme les biodéchets en compost ; odeurs' },
+  incin: { nom: 'Incinérateur', cout: 9e6, jours: 240, cap: 60, opex: 95, nuis: 10, rayon: 3, coul: '#c9c9c9', rd: 'incin', loin: 3, aide: 'Brûle les résiduels et vend la chaleur ; fumées, mal accepté' },
+  decharge: { nom: 'Décharge', cout: 4.5e6, jours: 150, volume: 150000, opex: 32, nuis: 14, rayon: 3, coul: '#b07a4a', loin: 3, aide: 'Enfouissement : se remplit, lixiviats, opposition locale' },
+};
+const EMPRUNT = { montant: 5e6, annuite: 5e6 * 0.04 / (1 - 1.04 ** -15), jours: 15 * 365 };
+const TECHS = [
+  { id: 'selective', niv: 1, nom: 'Collecte sélective', effet: 'Débloque le bac jaune des emballages', cout: 250e3, jours: 25 },
+  { id: 'bio', niv: 1, nom: 'Collecte des biodéchets', effet: 'Débloque le bac des biodéchets', cout: 200e3, jours: 25 },
+  { id: 'prevention', niv: 1, nom: 'Prévention de base', effet: 'Compostage domestique, anti-gaspillage : −7 % de déchets', cout: 150e3, jours: 20 },
+  { id: 'trisemi', niv: 2, nom: 'Tri semi-automatique', effet: 'Centres de tri : capacité ×1,7, refus −5 points', cout: 600e3, jours: 45 },
+  { id: 'incin', niv: 2, nom: 'Incinération avec récupération de chaleur', effet: "Débloque l'incinérateur", cout: 700e3, jours: 50 },
+  { id: 'incitative', niv: 2, nom: 'Redevance incitative', effet: 'Tri des habitants nettement meilleur, mais 3 % des résiduels finissent en dépôts sauvages', cout: 250e3, jours: 30 },
+  { id: 'tournees', niv: 2, nom: 'Optimisation des tournées', effet: 'Camions +20 % de capacité, transport −15 %', cout: 300e3, jours: 30 },
+];
+const QUARTIERS = [
+  { id: 'centre', nom: 'Centre-ville', type: 'res', pop: 21000, cases: [[4, 4], [5, 3], [4, 3], [3, 4], [5, 4], [4, 5], [5, 5]] },
+  { id: 'tilleuls', nom: 'Les Tilleuls', type: 'res', pop: 9000, cases: [[2, 7], [3, 7], [2, 6]] },
+  { id: 'brecy', nom: 'Brécy', type: 'res', pop: 4000, cases: [[13, 2], [13, 1]] },
+  { id: 'gare', nom: 'La Gare', type: 'com', tj: 5, cases: [[7, 2], [6, 2]] },
+  { id: 'zi', nom: 'Zone industrielle', type: 'ind', tj: 6, cases: [[12, 7], [13, 7], [12, 6]] },
+];
+
+// ---------- Carte ----------
+const HEX = new Map();
+const cle = (c, r) => c + ',' + r;
+function genererCarte() {
+  for (let r = 0; r < ROWS; r++) {
+    const riv = 10 + Math.round(Math.sin(r * 0.7) * 1.2);
+    for (let c = 0; c < COLS; c++) {
+      const v = rnd();
+      HEX.set(cle(c, r), { c, r, ter: c === riv ? 'riviere' : v < 0.16 ? 'foret' : v < 0.26 ? 'colline' : 'plaine', var: rnd() });
+    }
+  }
+  for (const q of QUARTIERS) for (const [c, r] of q.cases) HEX.get(cle(c, r)).quartier = q.id;
+}
+
+// ---------- État ----------
+let G;
+function nouvellePartie() {
+  rnd = alea(1985);
+  HEX.clear(); genererCarte();
+  G = {
+    date: new Date(1985, 0, 7), jour: 0, argent: 8e6, redevance: 85, camions: 6, brigade: false, campagne: -1,
+    modes: { res: { actif: true, f: 2 }, emb: { actif: false, f: 1 }, verre: { actif: false, f: 1 }, bio: { actif: false, f: 2 } },
+    rd: {}, rdEnCours: null, emprunts: [],
+    quartiers: QUARTIERS.map(q => { const m = (q.type === 'res' ? q.pop * 1.37e-3 : q.tj) * 0.95; return { ...q, bac: { res: m * 3, emb: 0, verre: 0, bio: 0 }, moy: { res: m, emb: 0, verre: 0, bio: 0 }, sauvage: q.type === 'res' ? 8 : 2, sat: 62, nuis: 0, deborde: false }; }),
+    sites: [{ type: 'decharge', nom: 'Décharge des Combes', c: 1, r: 1, chantier: 0, rempli: 111000, volume: 150000, util: [] }],
+    prix: Object.fromEntries(Object.entries(MATIERES).map(([k, v]) => [k, v[1]])),
+    histPrix: Object.fromEntries(Object.keys(MATIERES).map(k => [k, []])),
+    vendre: Object.fromEntries(Object.keys(MATIERES).map(k => [k, true])),
+    stock: Object.fromEntries(Object.keys(MATIERES).map(k => [k, 0])),
+    L: { prod: 0, vendu: 0, compost: 0, energie: 0, enfoui: 0, export: 0 }, // grand livre de la matière, cumulé
+    jours: [], liens: [], journal: [], evt: null, nonCollecte: 0, fini: false, victoire: false,
+  };
+  G.L.prod = bacsTotal() + sauvageTotal(); // l'existant au départ compte comme produit
+  log('Bienvenue à la tête du service des déchets de la vallée. La décharge des Combes est déjà remplie aux trois quarts.');
+}
+const bacsTotal = () => somme(G.quartiers.map(q => somme(Object.values(q.bac))));
+const sauvageTotal = () => somme(G.quartiers.map(q => q.sauvage));
+const stockTotal = () => somme(Object.values(G.stock));
+const actifs = t => G.sites.filter(s => s.type === t && !s.chantier && !s.panne);
+const centreQ = q => ({ c: q.cases[0][0], r: q.cases[0][1] });
+const annee = () => G.date.getFullYear();
+const tgap = () => 10 + 2.5 * (annee() - 1985) + (G.date.getMonth() / 12) * 2.5; // taxe sur l'enfouissement, qui monte chaque année
+function log(t, niveau = 'info') { G.journal.unshift({ d: dateCourte(), t, niveau }); G.journal.length = Math.min(G.journal.length, 80); }
+function dateCourte() { return G.date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }); }
+
+// ---------- Simulation : un pas = une journée ----------
+function pas() {
+  if (G.fini) return;
+  const J = { prod: 0, collecte: 0, vendu: 0, compost: 0, energie: 0, enfoui: 0, export: 0, sauvageIn: 0, recettes: 0, depenses: 0, triIn: 0, refus: 0, manque: 0, cat: {} };
+  const liens = {};
+  const lien = (a, b, t) => { if (t > 1e-9) liens[a + '>' + b] = (liens[a + '>' + b] || 0) + t; };
+  const payer = (cat, x) => { J.cat[cat] = (J.cat[cat] || 0) - x; J.depenses += x; G.argent -= x; };
+  const encaisser = (cat, x) => { J.cat[cat] = (J.cat[cat] || 0) + x; J.recettes += x; G.argent += x; };
+  const mois = G.date.getMonth() + G.date.getDate() / 31, dow = (G.date.getDay() + 6) % 7;
+  const evt = G.evt;
+  // capacités du jour
+  const cap = { tri: somme(actifs('tri').map(() => TYPES.tri.cap * (G.rd.trisemi ? 1.7 : 1))), compost: somme(actifs('compost').map(() => TYPES.compost.cap)), incin: somme(actifs('incin').map(() => TYPES.incin.cap)) };
+  const capDepart = { ...cap };
+  const decheterie = actifs('decheterie').length > 0;
+  const camp = G.campagne > G.jour ? 0.08 : 0;
+  const qualite = 0.76 + camp;                               // part des objets bien triés dans le bac jaune
+  const inc = G.rd.incitative ? 1 : 0;
+  const tri = { emb: G.modes.emb.actif ? 0.55 + camp + inc * 0.15 : 0, verre: G.modes.verre.actif ? 0.72 + inc * 0.1 : 0, bio: G.modes.bio.actif ? 0.48 + camp / 2 + inc * 0.12 : 0 };
+  const saison = { bio: 1 + 0.35 * (Math.exp(-(((mois - 4.5) / 1.2) ** 2)) + Math.exp(-(((mois - 10) / 1) ** 2))) * (evt?.id === 'tempete' ? 2 : 1), emb: mois >= 12 ? 1.2 : 1, enc: evt?.id === 'tempete' ? 4 : 1 };
+  const canicule = evt?.id === 'canicule';
+
+  // 1. production et dépôt dans les bacs
+  for (const q of G.quartiers) {
+    if (q.type === 'res') q.pop *= 1 + 0.015 / 365;
+    const base = (q.type === 'res' ? q.pop * 1.37e-3 : q.tj) * (G.rd.prevention ? 0.93 : 1);
+    const p = {}; for (const f of FLUX) p[f] = base * COMPO[q.type][f] * (saison[f] || 1);
+    const tot = somme(Object.values(p)); J.prod += tot; G.L.prod += tot;
+    const dans = { res: p.res, emb: p.emb * tri.emb, verre: p.verre * tri.verre, bio: p.bio * tri.bio };
+    dans.res += p.emb * (1 - tri.emb) + p.verre * (1 - tri.verre) + p.bio * (1 - tri.bio);
+    const erreurs = Math.min(dans.res * 0.5, dans.emb * (1 - qualite) / qualite); // erreurs de tri : des résiduels dans le bac jaune
+    dans.res -= erreurs; dans.emb += erreurs;
+    if (inc) { const x = dans.res * 0.03; dans.res -= x; q.sauvage += x; J.sauvageIn += x; lien('res', 'sauvage', x); } // la redevance au poids pousse certains à jeter dehors
+    // encombrants : déchèterie, sinon bacs et dépôts sauvages
+    if (decheterie) { q.versDech = p.enc * 0.85; dans.res += p.enc * 0.15; }
+    else { q.versDech = 0; dans.res += p.enc * 0.7; q.sauvage += p.enc * 0.3; J.sauvageIn += p.enc * 0.3; lien('enc', 'sauvage', p.enc * 0.3); }
+    q.deborde = false;
+    for (const f of ['res', 'emb', 'verre', 'bio']) {
+      q.moy[f] = q.moy[f] * 0.9 + dans[f] * 0.1;
+      q.bac[f] += dans[f];
+      const capBac = CAPJ[f] * Math.max(q.moy[f], 0.05) * (canicule && (f === 'bio' || f === 'res') ? 0.75 : 1);
+      if (q.bac[f] > capBac) { const x = q.bac[f] - capBac; q.bac[f] = capBac; q.sauvage += x; J.sauvageIn += x; lien(f, 'sauvage', x); q.deborde = true; }
+    }
+  }
+
+  // 2. collecte, du lundi au samedi : avec f passages par semaine, chaque jour les camions vident f/6 des bacs du quartier
+  const parFlux = { res: [], emb: [], verre: [], bio: [] };
+  let capCamions = G.camions * 14 * (G.rd.tournees ? 1.2 : 1);
+  if (evt?.id === 'greve') capCamions = 0;
+  const destDe = f => f === 'res' ? (actifs('incin')[0] ? 'incin' : 'decharge') : f === 'emb' ? (actifs('tri')[0] ? 'tri' : 'decharge') : f === 'bio' ? (actifs('compost')[0] ? 'compost' : 'decharge') : 'tri';
+  if (dow < 6) for (const f of ['res', 'bio', 'emb', 'verre']) {
+    if (!G.modes[f].actif) continue;
+    const fr = G.modes[f].f, poids = 1 + 0.06 * (fr - 2); // des passages fréquents remplissent moins les camions
+    for (const q of [...G.quartiers].sort((a, b) => b.bac[f] - a.bac[f])) {
+      const voulu = q.bac[f] * Math.min(1, fr / 6), x = Math.min(voulu, capCamions / poids);
+      if (x < voulu - 1e-9) J.manque += voulu - x;
+      if (x <= 0) continue;
+      q.bac[f] -= x; capCamions -= x * poids; J.collecte += x; parFlux[f].push({ q, x });
+      const sites = G.sites.filter(s => s.type === destDe(f) && !s.chantier);
+      const d = sites.length ? Math.min(...sites.map(s => dist(centreQ(q), s))) : 4;
+      payer('Transport', x * Math.max(1, d) * 1.5 * (G.rd.tournees ? 0.85 : 1));
+      if (rnd() < fr / 6) animer(q, sites[0] || G.sites[0], f, x);
+    }
+  }
+  payer('Camions', G.camions * 420);
+  for (const e of G.emprunts) if (e.reste > 0) { e.reste--; payer('Emprunts', e.annuite / 365); }
+
+  // 3. traitement
+  function eliminer(src, t, residuel = true) { // incinérateur, puis décharge, puis export d'urgence
+    const col0 = FLUX.includes(src);
+    const vers = (inst, dest, x) => { if (col0) { lien(src, inst, x); lien(inst, dest, x); } else lien(src, dest, x); };
+    if (residuel && cap.incin > 0) { const x = Math.min(t, cap.incin); cap.incin -= x; t -= x; J.energie += x; G.L.energie += x; vers('incin', 'energie', x); payer('Traitement', x * TYPES.incin.opex); encaisser('Chaleur', x * 25); }
+    for (const s of actifs('decharge')) { if (t <= 0) break; const x = Math.min(t, s.volume - s.rempli); if (x <= 0) continue; s.rempli += x; t -= x; J.enfoui += x; G.L.enfoui += x; vers('decharge', 'enfoui', x); payer('Enfouissement', x * TYPES.decharge.opex); payer('Taxe enfouissement', x * tgap()); }
+    if (t > 0) { J.export += t; G.L.export += t; vers('export', 'enfoui', t); payer('Export', t * 165); if (!G.alerteExport) { G.alerteExport = true; alerte('Décharges pleines : les déchets partent en export d’urgence à 165 €/t.', 'critique'); } }
+  }
+  function matiere(m, t) {
+    if (G.vendre[m]) { encaisser('Ventes', t * G.prix[m]); G.L.vendu += t; }
+    else { G.stock[m] += t; const exc = stockTotal() - 2500; if (exc > 0) { G.stock[m] -= exc; encaisser('Ventes', exc * G.prix[m]); G.L.vendu += exc; } }
+    J.vendu += t;
+  }
+  const tot = f => somme(parFlux[f].map(o => o.x));
+  // emballages
+  let E = tot('emb');
+  if (E > 0) {
+    const x = Math.min(E, cap.tri); cap.tri -= x; J.triIn += x;
+    if (x > 0) {
+      const tauxRefus = clamp(1 - qualite + 0.04 - (G.rd.trisemi ? 0.05 : 0), 0.03, 0.6), refus = x * tauxRefus, bon = x - refus;
+      J.refus += refus; lien('emb', 'tri', x); lien('tri', 'recycle', bon); payer('Traitement', x * TYPES.tri.opex);
+      matiere('papier', bon * .55); matiere('plastique', bon * .27); matiere('metal', bon * .18);
+      eliminer('tri', refus);
+    }
+    if (E - x > 0) eliminer('emb', E - x);
+  }
+  // verre
+  const V = tot('verre'); if (V > 0) { lien('verre', 'verrier', V); lien('verrier', 'recycle', V); matiere('verre', V); }
+  // biodéchets
+  const B = tot('bio');
+  if (B > 0) {
+    const x = Math.min(B, cap.compost); cap.compost -= x;
+    if (x > 0) { J.compost += x; G.L.compost += x; lien('bio', 'compost', x); lien('compost', 'composte', x); payer('Traitement', x * TYPES.compost.opex); encaisser('Ventes', x * 4); }
+    if (B - x > 0) eliminer('bio', B - x);
+  }
+  // encombrants en déchèterie
+  const D = somme(G.quartiers.map(q => q.versDech || 0));
+  if (D > 0) { lien('enc', 'decheterie', D); lien('decheterie', 'recycle', D * .45); matiere('materiaux', D * .45); eliminer('decheterie', D * .55, false); payer('Déchèteries', actifs('decheterie').length * TYPES.decheterie.fixe); }
+  // résiduels
+  const Rr = tot('res'); if (Rr > 0) eliminer('res', Rr);
+  // propreté : les services municipaux ramassent 2 t/j de dépôts, la brigade 6 t/j de plus
+  {
+    payer('Propreté', 200 + (G.brigade ? 650 : 0)); let reste = G.brigade ? 8 : 2;
+    for (const q of [...G.quartiers].sort((a, b) => b.sauvage - a.sauvage)) { const x = Math.min(q.sauvage, reste); q.sauvage -= x; reste -= x; if (x > 0) eliminer('sauvage', x); }
+  }
+  for (const s of G.sites) if (TYPES[s.type].cap) { s.util.push(capDepart[s.type] ? 1 - cap[s.type] / capDepart[s.type] : 0); if (s.util.length > 30) s.util.shift(); }
+
+  // 4. recettes : redevance des ménages, redevance spéciale des professionnels
+  const popRes = somme(G.quartiers.filter(q => q.type === 'res').map(q => q.pop));
+  encaisser('Redevance', popRes * G.redevance / 365 + somme(G.quartiers.filter(q => q.type !== 'res').map(q => q.tj)) * 110);
+
+  // 5. satisfaction et nuisances
+  for (const q of G.quartiers) {
+    let n = 0;
+    for (const s of G.sites) { const T = TYPES[s.type], d = dist(centreQ(q), s); if (d <= T.rayon) n += T.nuis * (1 - (d - 1) / T.rayon) * (canicule && T.nuis > 5 ? 1.5 : 1); }
+    q.nuis = n;
+    const cible = 72 - n - Math.min(30, q.sauvage * 0.25) - (q.deborde ? 10 : 0) - Math.max(0, G.redevance - 90) * 0.5 + Math.max(0, 90 - G.redevance) * 0.15
+      + (G.modes.emb.actif ? 3 : 0) + (decheterie ? 3 : 0) - (G.modes.res.f < 2 ? 6 : 0) - (evt?.id === 'greve' ? 8 : 0);
+    q.sat += (clamp(cible, 0, 100) - q.sat) * 0.04;
+  }
+
+  // 6. recherche, chantiers, marché, événements
+  if (G.rdEnCours && --G.rdEnCours.reste <= 0) { G.rd[G.rdEnCours.id] = true; alerte('Recherche terminée : ' + TECHS.find(t => t.id === G.rdEnCours.id).nom); G.rdEnCours = null; }
+  for (const s of G.sites) {
+    if (s.chantier && --s.chantier === 0) { alerte(s.nom + ' est en service.'); dessinerSites(); }
+    if (s.panne && --s.panne === 0) { alerte(s.nom + ' redémarre.'); dessinerSites(); }
+  }
+  for (const m in MATIERES) {
+    const base = MATIERES[m][1];
+    G.prix[m] = Math.max(base * 0.1, G.prix[m] + (base - G.prix[m]) * 0.01 + G.prix[m] * 0.022 * gauss());
+    G.histPrix[m].push(G.prix[m]); if (G.histPrix[m].length > 180) G.histPrix[m].shift();
+  }
+  evenements(mois);
+
+  // 7. historiques et bilan matière
+  G.liens.push(liens); if (G.liens.length > 30) G.liens.shift();
+  G.jours.push(J); if (G.jours.length > 365) G.jours.shift();
+  verifierBilan();
+  G.jour++; G.date = new Date(G.date.getTime() + 864e5);
+  if (G.date.getDate() === 1 && G.date.getMonth() === 0) log(`Nouvelle année ${annee()} : la taxe sur l'enfouissement passe à ${fmt(tgap())} €/t.`);
+  finDePartie();
+}
+
+// Conservation de la matière : chaque tonne produite se retrouve quelque part
+function bilan() {
+  const L = G.L, ou = L.vendu + stockTotal() + L.compost + L.energie + L.enfoui + L.export + bacsTotal() + sauvageTotal();
+  return { prod: L.prod, ou, ecart: Math.abs(L.prod - ou) };
+}
+function verifierBilan() {
+  const b = bilan();
+  if (b.ecart > 1e-6 * b.prod + 1e-6) { console.error('Bilan matière faux', b); G.bilanFaux = true; }
+}
+
+// ---------- Événements ----------
+const EVTS = [
+  { id: 'greve', nom: 'Grève de la collecte', p: m => 0.001, duree: [4, 7], critique: true, txt: 'Grève des équipages : plus aucune collecte, les bacs vont déborder.' },
+  { id: 'canicule', nom: 'Canicule', p: m => m >= 6 && m < 9 ? 0.012 : 0, duree: [5, 9], txt: 'Canicule : odeurs, fermentation rapide, risque d’incendie.' },
+  { id: 'tempete', nom: 'Tempête', p: m => m >= 10 || m < 3 ? 0.005 : 0, duree: [3, 4], txt: 'Tempête : encombrants et déchets verts en masse.' },
+];
+function evenements(mois) {
+  if (G.evt && --G.evt.reste <= 0) { log('Fin : ' + G.evt.nom); G.evt = null; }
+  if (!G.evt) for (const e of EVTS) if (rnd() < e.p(mois)) { G.evt = { ...e, reste: e.duree[0] + Math.floor(rnd() * (e.duree[1] - e.duree[0] + 1)) }; alerte(e.txt, e.critique ? 'critique' : 'alerte'); break; }
+  const tri = actifs('tri');
+  if (tri.length && rnd() < 0.0006 * (G.evt?.id === 'canicule' ? 6 : 1)) { const s = tri[0]; s.panne = 30; G.argent -= 150e3; alerte(`Incendie au ${s.nom} : arrêt 30 jours, 150 k€ de dégâts.`, 'critique'); dessinerSites(); }
+  if (rnd() < 0.0008) { const m = rnd() < 0.5 ? 'plastique' : 'papier'; G.prix[m] *= 0.35; alerte(`Effondrement du cours : ${MATIERES[m][0].toLowerCase()} à ${fmt(G.prix[m])} €/t. Stocker en attendant ?`, 'alerte'); }
+  if (rnd() < 0.001) { const q = G.quartiers[Math.floor(rnd() * G.quartiers.length)]; q.sauvage += 40; G.L.prod += 40; alerte(`Décharge sauvage massive découverte près de ${q.nom} (40 t).`, 'alerte'); }
+}
+
+// ---------- Indicateurs ----------
+function sur(n, k) { return somme(G.jours.slice(-n).map(j => j[k])); }
+function taux(n = 30) {
+  const sortie = sur(n, 'vendu') + sur(n, 'compost') + sur(n, 'energie') + sur(n, 'enfoui') + sur(n, 'export');
+  return { recyclage: sortie ? (sur(n, 'vendu') + sur(n, 'compost')) / sortie : 0, valorisation: sortie ? (sur(n, 'vendu') + sur(n, 'compost') + sur(n, 'energie')) / sortie : 0, sortie };
+}
+function decharge() {
+  const ds = G.sites.filter(s => s.type === 'decharge' && !s.chantier), vol = somme(ds.map(s => s.volume)), rem = somme(ds.map(s => s.rempli));
+  const parJour = sur(30, 'enfoui') / Math.max(1, Math.min(30, G.jours.length));
+  return { taux: vol ? rem / vol : 1, reste: vol - rem, jours: parJour > 0 ? (vol - rem) / parJour : Infinity };
+}
+function satisfaction() { const p = q => q.type === 'res' ? q.pop : 3000; return somme(G.quartiers.map(q => q.sat * p(q))) / somme(G.quartiers.map(p)); }
+const OBJECTIFS = [
+  { t: 'Ouvrir une déchèterie pour capter les encombrants', ok: () => actifs('decheterie').length > 0, aide: 'Construisez une déchèterie (barre du bas) : les encombrants finissent aujourd’hui en dépôts sauvages.' },
+  { t: 'Déployer la collecte sélective (recherche, puis bac jaune)', ok: () => G.modes.emb.actif, aide: 'Onglet R&D : lancez « Collecte sélective », puis déployez le bac jaune dans l’onglet Collecte.' },
+  { t: 'Trier les emballages dans un centre de tri', ok: () => actifs('tri').length > 0, aide: 'Construisez un centre de tri : sans lui, le bac jaune finit à la décharge.' },
+  { t: 'Valoriser les biodéchets', ok: () => G.modes.bio.actif && actifs('compost').length > 0, aide: 'Recherche « Collecte des biodéchets » et plateforme de compostage.' },
+  { t: 'Ne pas laisser la décharge saturer', ok: () => decharge().jours > 720 || actifs('incin').length > 0, aide: 'Moins de deux ans de décharge : recyclez plus, ouvrez un site ou un incinérateur.' },
+  { t: 'Atteindre 65 % de recyclage et valorisation, dont 30 % de recyclage (90 jours)', ok: () => G.jours.length >= 90 && taux(90).valorisation >= 0.65 && taux(90).recyclage >= 0.30, aide: 'Objectif final : 65 % valorisés dont 30 % recyclés sur 90 jours. Brûler ne suffit pas : il faut aussi trier.' },
+];
+function finDePartie() {
+  const sauv = sauvageTotal();
+  let raison = null;
+  if (sauv > 600) raison = ['Débordement', `${fmt(sauv)} t de déchets s’entassent dans les rues : crise sanitaire, la préfecture reprend la main.`];
+  else if (G.argent < -3e6) raison = ['Faillite', 'Le service des déchets ne peut plus payer ses camions ni ses sites.'];
+  else if (G.jours.length > 60 && satisfaction() < 15) raison = ['Révolte locale', 'Les habitants bloquent les sites et exigent votre départ.'];
+  if (raison) { G.fini = true; if (muet) return; vitesse(0); modale(raison[0], raison[1] + ` (${dateCourte()})`, [['Recommencer', () => { nouvellePartie(); toutDessiner(); fermerModale(); }]]); return; }
+  if (!G.victoire && OBJECTIFS[5].ok()) { G.victoire = true; if (muet) return; vitesse(0); modale('Objectif atteint', `La vallée recycle et valorise ${pct(taux(90).valorisation)} de ses déchets. Vous pouvez continuer à jouer.`, [['Continuer', fermerModale]]); }
+}
+
+// ---------- Rendu de la carte ----------
+const svg = $('carte');
+const W = S * R3 * (COLS + 0.5) + S * 2, H = S * 1.5 * (ROWS - 1) + S * 2 + 8;
+svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+const calques = {};
+for (const n of ['terrain', 'lentille', 'sites', 'cibles', 'apercu', 'camions', 'bannieres']) { const g = document.createElementNS(NS, 'g'); svg.appendChild(g); calques[n] = g; }
+calques.cibles.style.pointerEvents = 'all';
+const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+const TER = { plaine: ['#86c552', '#7dbb4b'], foret: ['#4f9a3c', '#478f35'], colline: ['#a8b86a', '#9fae63'], riviere: ['#38b6ff', '#38b6ff'] };
+const QCOUL = { res: '#efdcb4', com: '#f2c27e', ind: '#c3b2d4' };
+function dessinerTerrain() {
+  calques.terrain.innerHTML = ''; calques.cibles.innerHTML = '';
+  for (const h of HEX.values()) {
+    const [x, y] = centre(h.c, h.r);
+    const fill = h.quartier ? QCOUL[QUARTIERS.find(q => q.id === h.quartier).type] : TER[h.ter][h.var < 0.5 ? 0 : 1];
+    el('polygon', { points: coins(x, y, S + 0.4), fill, class: 'hex' }, calques.terrain);
+    if (h.ter === 'foret' && !h.quartier) for (const [dx, dy] of [[-8, 2], [6, -5], [5, 9]]) { el('circle', { cx: x + dx, cy: y + dy, r: 6.5, fill: '#2f7a2a', stroke: '#0f130e', 'stroke-width': 1.5 }, calques.terrain); }
+    if (h.ter === 'colline' && !h.quartier) el('path', { d: `M${x - 14} ${y + 8} Q${x} ${y - 12} ${x + 14} ${y + 8}`, fill: '#8f9f55', stroke: '#0f130e', 'stroke-width': 1.5 }, calques.terrain);
+    if (h.quartier) {
+      const q = QUARTIERS.find(q => q.id === h.quartier);
+      for (const [dx, dy, w] of [[-11, -4, 9], [3, -9, 8], [1, 6, 10]]) {
+        const hh = q.type === 'ind' ? 9 : 8;
+        el('rect', { x: x + dx, y: y + dy, width: w, height: hh, fill: q.type === 'ind' ? '#9a8bb0' : '#fff7e6', stroke: '#2b1d14', 'stroke-width': 1.5, rx: 1.5 }, calques.terrain);
+        if (q.type !== 'ind') el('path', { d: `M${x + dx - 1} ${y + dy} L${x + dx + w / 2} ${y + dy - 5} L${x + dx + w + 1} ${y + dy}Z`, fill: q.type === 'com' ? '#e0703a' : '#d9534a', stroke: '#2b1d14', 'stroke-width': 1.5, 'stroke-linejoin': 'round' }, calques.terrain);
+        else el('rect', { x: x + dx + w - 3, y: y + dy - 6, width: 3, height: 6, fill: '#6b6f68', stroke: '#2b1d14', 'stroke-width': 1 }, calques.terrain);
+      }
+    }
+    const cible = el('polygon', { points: coins(x, y), class: 'cible' }, calques.cibles);
+    cible.addEventListener('pointerenter', e => survol(h, e));
+    cible.addEventListener('pointermove', e => placerBulle(e));
+    cible.addEventListener('pointerleave', () => { $('bulle').hidden = true; calques.apercu.innerHTML = ''; });
+    cible.addEventListener('click', () => clicHex(h));
+  }
+}
+function icone(type, x, y, g, s = 1) {
+  const T = TYPES[type], k = v => v * s;
+  const r = el('rect', { x: x - k(15), y: y - k(13), width: k(30), height: k(26), rx: k(7), fill: T.coul, stroke: '#0f130e', 'stroke-width': 2.5 }, g);
+  const p = d => el('path', { d, fill: 'none', stroke: '#0f130e', 'stroke-width': 2.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', transform: `translate(${x},${y}) scale(${s})` }, g);
+  if (type === 'decharge') p('M-10 7 Q-3 -9 10 7M-4 2l3-3');
+  if (type === 'tri') p('M-8 -3h12l-3-3M8 4H-4l3 3');
+  if (type === 'compost') p('M-7 7C-7 -4 1 -8 8 -8C8 1 3 7 -7 7M-7 7l7-7');
+  if (type === 'incin') p('M-9 8V-1l5-3v3l5-3v3l5-3V8zM6 -4V-9');
+  if (type === 'decheterie') p('M-9 -3h18l-2 10H-7zM-5 -3v-4h10v4');
+  return r;
+}
+function dessinerSites() {
+  calques.sites.innerHTML = '';
+  for (const s of G.sites) {
+    const [x, y] = centre(s.c, s.r), g = el('g', { class: 'site' }, calques.sites);
+    if (s.type === 'decharge') el('polygon', { points: coins(x, y, S - 2), fill: '#8b6a45', stroke: '#0f130e', 'stroke-width': 2 }, g);
+    icone(s.type, x, y, g);
+    if (s.chantier || s.panne) { g.setAttribute('opacity', '.55'); el('rect', { x: x - 17, y: y + 12, width: 34, height: 13, rx: 5, fill: s.panne ? '#ff8a7a' : '#fff7e6', stroke: '#0f130e', 'stroke-width': 1.5 }, g); const t = el('text', { x, y: y + 22, 'text-anchor': 'middle', 'font-size': 9.5, fill: '#2b1d14' }, g); t.textContent = (s.chantier || s.panne) + ' j'; }
+    if (s.type === 'decharge' && !s.chantier) { el('rect', { x: x - 15, y: y + 15, width: 30, height: 5, rx: 2, fill: '#141813' }, g); el('rect', { x: x - 15, y: y + 15, width: 30 * s.rempli / s.volume, height: 5, rx: 2, fill: s.rempli / s.volume > 0.9 ? '#ff8a7a' : '#ffc94d' }, g); s.jaugeEl = g.lastChild; }
+    g.addEventListener('click', e => { e.stopPropagation(); if (!G.construire) { G.fiche = s; onglet('fiche'); } });
+  }
+}
+let lentille = 'aucune';
+function dessinerDynamique() {
+  // lentilles
+  calques.lentille.innerHTML = '';
+  if (lentille === 'nuisances') for (const s of G.sites) { const T = TYPES[s.type]; if (T.nuis <= 0) continue; const [x, y] = centre(s.c, s.r); el('circle', { cx: x, cy: y, r: T.rayon * S * R3 * 0.95, fill: '#ff8a7a', 'fill-opacity': .12 + T.nuis / 80, stroke: '#ff8a7a', 'stroke-width': 2, 'stroke-dasharray': '6 5' }, calques.lentille); }
+  if (lentille === 'bacs' || lentille === 'satisfaction') for (const q of G.quartiers) {
+    const v = lentille === 'bacs' ? remplissage(q) : 1 - q.sat / 100;
+    const c = v > 0.85 ? '#ff5a4a' : v > 0.6 ? '#ff9a4a' : v > 0.35 ? '#ffc94d' : '#7be08a';
+    for (const [cc, rr] of q.cases) { const [x, y] = centre(cc, rr); el('polygon', { points: coins(x, y), fill: c, 'fill-opacity': .55 }, calques.lentille); }
+  }
+  // dépôts sauvages et bannières
+  calques.bannieres.innerHTML = '';
+  for (const q of G.quartiers) {
+    const n = Math.min(q.cases.length * 2, Math.floor(q.sauvage / 12));
+    for (let i = 0; i < n; i++) { const [cc, rr] = q.cases[i % q.cases.length]; const [x, y] = centre(cc, rr); const a = i * 2.4; el('path', { d: `M${x + 13 * Math.cos(a) - 6} ${y + 13 * Math.sin(a) + 4} q6 -10 12 0z`, fill: '#6d4c2f', stroke: '#0f130e', 'stroke-width': 1.5 }, calques.bannieres); }
+    const pts = q.cases.map(([c, r]) => centre(c, r)), bx = somme(pts.map(p => p[0])) / pts.length, by = Math.min(...pts.map(p => p[1])) - 6;
+    const g = el('g', {}, calques.bannieres), w = Math.max(70, q.nom.length * 7.2 + 18), f = remplissage(q);
+    el('rect', { x: bx - w / 2, y: by - 13, width: w, height: 25, rx: 8, fill: q.deborde ? '#ff8a7a' : '#fff7e6', stroke: '#0f130e', 'stroke-width': 2.5 }, g);
+    const t = el('text', { x: bx, y: by - 1, 'text-anchor': 'middle', 'font-size': 12, 'font-weight': 700, fill: '#2b1d14' }, g); t.textContent = q.nom;
+    el('rect', { x: bx - w / 2 + 8, y: by + 4, width: w - 16, height: 4, rx: 2, fill: '#d8ccb0' }, g);
+    el('rect', { x: bx - w / 2 + 8, y: by + 4, width: (w - 16) * Math.min(1, f), height: 4, rx: 2, fill: f > 0.85 ? '#d9342b' : f > 0.6 ? '#e07b1a' : '#3b9a4a' }, g);
+  }
+  for (const s of G.sites) if (s.jaugeEl) s.jaugeEl.setAttribute('width', 30 * s.rempli / s.volume);
+}
+function remplissage(q) { let m = 0; for (const f of ['res', 'emb', 'verre', 'bio']) if (G.modes[f].actif && q.moy[f] > 0.05) m = Math.max(m, q.bac[f] / (CAPJ[f] * q.moy[f])); return m; }
+
+// camions : purement visuels, un trajet quartier → site par collecte
+const CAMIONS = [];
+let muet = false; // vrai pendant l'auto-vérification
+function animer(q, site, f, x) {
+  if (muet || CAMIONS.length > 40 || !site) return;
+  const n = Math.min(3, Math.ceil(x / 8));
+  for (let i = 0; i < n; i++) {
+    const [ax, ay] = centre(...q.cases[i % q.cases.length]), [bx, by] = centre(site.c, site.r);
+    const g = el('g', {}, calques.camions);
+    el('rect', { x: -7, y: -4.5, width: 14, height: 9, rx: 2.5, fill: COUL[f], stroke: '#0f130e', 'stroke-width': 1.8 }, g);
+    el('rect', { x: 3, y: -4.5, width: 4, height: 9, rx: 1.5, fill: '#fff7e6', stroke: '#0f130e', 'stroke-width': 1.5 }, g);
+    CAMIONS.push({ g, ax, ay, bx, by, t: -i * 0.15, ang: Math.atan2(by - ay, bx - ax) * 180 / Math.PI });
+  }
+}
+function bougerCamions(dt) {
+  const v = Math.max(0.6, Math.min(3, VITESSES[G.v] / 3));
+  for (let i = CAMIONS.length - 1; i >= 0; i--) {
+    const c = CAMIONS[i]; c.t += dt * v * 0.6;
+    if (c.t >= 1) { c.g.remove(); CAMIONS.splice(i, 1); continue; }
+    const t = Math.max(0, c.t), x = c.ax + (c.bx - c.ax) * t, y = c.ay + (c.by - c.ay) * t;
+    c.g.setAttribute('transform', `translate(${x},${y}) rotate(${c.ang > 90 || c.ang < -90 ? c.ang + 180 : c.ang}) ${c.ang > 90 || c.ang < -90 ? 'scale(-1,1)' : ''}`);
+    c.g.style.opacity = c.t < 0 ? 0 : 1;
+  }
+}
+
+// ---------- Construction ----------
+function verifierPose(type, h) {
+  const T = TYPES[type];
+  if (h.ter === 'riviere') return 'Impossible sur la rivière';
+  if (h.quartier) return 'Impossible dans un quartier habité';
+  if (G.sites.some(s => s.c === h.c && s.r === h.r)) return 'Case déjà occupée';
+  const dq = Math.min(...G.quartiers.flatMap(q => q.cases.map(([c, r]) => dist({ c, r }, h))));
+  if (T.loin && dq < T.loin) return `Trop près des habitations (${dq} case${dq > 1 ? 's' : ''}, ${T.loin} au minimum) : enquête publique défavorable`;
+  if (type === 'decharge') { const dr = Math.min(...[...HEX.values()].filter(x => x.ter === 'riviere').map(x => dist(x, h))); if (dr < 2) return 'Trop près de la rivière : risque de lixiviats'; }
+  if (G.argent < T.cout) return 'Trésorerie insuffisante';
+  return null;
+}
+function survol(h, e) {
+  calques.apercu.innerHTML = '';
+  const b = $('bulle');
+  if (G.construire) {
+    const err = verifierPose(G.construire, h), T = TYPES[G.construire], [x, y] = centre(h.c, h.r);
+    el('polygon', { points: coins(x, y), class: err ? 'ko' : 'ok' }, calques.apercu);
+    if (!err && T.rayon && T.nuis > 0) el('circle', { cx: x, cy: y, r: T.rayon * S * R3 * 0.95, fill: 'none', stroke: '#ff8a7a', 'stroke-width': 2, 'stroke-dasharray': '6 5' }, calques.apercu);
+    const gene = !err && T.nuis > 0 ? G.quartiers.filter(q => dist(centreQ(q), h) <= T.rayon).map(q => q.nom) : [];
+    b.innerHTML = `<b>${T.nom}</b><br>${err ? `<span class="non">${err}</span>` : `<span class="oui">${euros(T.cout)} · ${T.jours} jours de chantier</span>${gene.length ? `<br>Gêne : ${gene.join(', ')}` : ''}`}`;
+  } else if (h.quartier) {
+    const q = G.quartiers.find(q => q.id === h.quartier);
+    b.innerHTML = `<b>${q.nom}</b><br>${q.type === 'res' ? fmt(q.pop) + ' habitants' : q.type === 'com' ? 'Commerces et services' : 'Industrie'}<br>Bacs : ${pct(Math.min(1, remplissage(q)))} · Dépôts : ${fmt(q.sauvage)} t<br>Satisfaction : ${fmt(q.sat)} / 100`;
+  } else { b.hidden = true; return; }
+  b.hidden = false; placerBulle(e);
+}
+function placerBulle(e) { const b = $('bulle'); b.style.left = Math.min(innerWidth - 270, e.clientX + 14) + 'px'; b.style.top = (e.clientY + 14) + 'px'; }
+function clicHex(h) {
+  if (!G.construire) { const s = G.sites.find(s => s.c === h.c && s.r === h.r); if (s) { G.fiche = s; onglet('fiche'); } return; }
+  const type = G.construire, err = verifierPose(type, h);
+  if (err) { alerte(err, 'alerte'); return; }
+  const T = TYPES[type], n = G.sites.filter(s => s.type === type).length + 1;
+  G.argent -= T.cout;
+  G.sites.push({ type, nom: T.nom + (n > 1 ? ' n° ' + n : ''), c: h.c, r: h.r, chantier: T.jours, util: [], ...(type === 'decharge' ? { rempli: 0, volume: T.volume } : {}) });
+  log(`Chantier lancé : ${T.nom} (${euros(T.cout)}, ${T.jours} jours).`);
+  G.construire = null; $('bulle').hidden = true; calques.apercu.innerHTML = '';
+  dessinerSites(); dessinerChantier(); aide(); ui();
+}
+function dessinerChantier() {
+  const c = $('chantier'); c.innerHTML = '';
+  for (const [id, T] of Object.entries(TYPES)) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'carte-c' + (G.construire === id ? ' actif' : '');
+    const verrou = T.rd && !G.rd[T.rd];
+    b.disabled = verrou; b.title = verrou ? 'Recherche requise : ' + TECHS.find(t => t.id === T.rd).nom : T.aide;
+    const ic = document.createElementNS(NS, 'svg'); ic.setAttribute('viewBox', '-17 -15 34 30'); icone(id, 0, 0, ic, 0.95);
+    b.appendChild(ic); b.insertAdjacentHTML('beforeend', `<b>${T.nom}</b><span>${verrou ? 'Recherche' : euros(T.cout)}</span>`);
+    b.onclick = () => { G.construire = G.construire === id ? null : id; dessinerChantier(); aide(); };
+    c.appendChild(b);
+  }
+}
+
+// ---------- Panneau ----------
+const ONGLETS = [['bord', 'Tableau de bord'], ['flux', 'Flux'], ['collecte', 'Collecte'], ['marche', 'Marché'], ['rd', 'R&D'], ['journal', 'Journal']];
+let ongletActif = 'bord';
+function onglet(id) { ongletActif = id; dessinerOnglets(); ui(true); }
+function dessinerOnglets() {
+  $('onglets').innerHTML = [...ONGLETS, ...(G.fiche ? [['fiche', 'Fiche']] : [])].map(([id, n]) => `<button type="button" class="${id === ongletActif ? 'actif' : ''}" data-o="${id}">${n}</button>`).join('');
+  $('onglets').querySelectorAll('button').forEach(b => b.onclick = () => onglet(b.dataset.o));
+}
+const tuile = (v, l, cl = '') => `<div class="tuile ${cl}"><div class="v">${v}</div><div class="l">${l}</div></div>`;
+const jauge = (x, cl = '') => `<div class="jauge ${cl || (x > 0.9 ? 'critique' : x > 0.7 ? 'alerte' : '')}"><i style="width:${clamp(x * 100, 0, 100)}%"></i></div>`;
+
+const PANNEAUX = {
+  bord() {
+    const t = taux(30), d = decharge(), n = Math.max(1, Math.min(30, G.jours.length)), sauv = sauvageTotal();
+    const refus = sur(30, 'triIn') ? sur(30, 'refus') / sur(30, 'triIn') : 0;
+    const res = sur(30, 'recettes') - sur(30, 'depenses'), b = bilan();
+    const cats = {}; for (const j of G.jours.slice(-30)) for (const k in j.cat) cats[k] = (cats[k] || 0) + j.cat[k];
+    const obj = OBJECTIFS.map((o, i) => `<div class="objectif ${o.ok() ? 'fait' : ''}"><span class="c">${o.ok() ? '✓' : i + 1}</span>${o.t}</div>`).join('');
+    return `<h2>Tableau de bord</h2><p class="note">Scénario « Ville en transition » · 30 derniers jours</p>
+    <div class="tuiles">
+      ${tuile(fmt(sur(30, 'prod') / n, 1) + ' t/j', 'Produit')}
+      ${tuile(fmt(sur(30, 'collecte') / n, 1) + ' t/j', 'Collecté')}
+      ${tuile(pct(t.recyclage), 'Recyclage matière et organique (cible 30 %)', t.recyclage >= .3 ? '' : 'alerte')}
+      ${tuile(pct(t.valorisation), 'Recyclage + valorisation (cible 65 %)', t.valorisation >= .65 ? '' : 'alerte')}
+      ${tuile(d.jours === Infinity ? '—' : fmt(d.jours / 365, 1) + ' ans', `Décharge : ${fmt(d.reste / 1000)} kt restantes`, d.jours < 365 ? 'critique' : d.jours < 730 ? 'alerte' : '')}
+      ${tuile(fmt(sauv) + ' t', 'Dépôts sauvages (défaite à 600 t)', sauv > 350 ? 'critique' : sauv > 150 ? 'alerte' : '')}
+      ${tuile(sur(30, 'triIn') ? pct(refus) : '—', 'Refus de tri (erreurs des habitants)')}
+      ${tuile(t.sortie ? fmt(sur(30, 'depenses') / t.sortie) + ' €/t' : '—', 'Coût complet par tonne')}
+    </div>
+    <div class="section">Objectifs</div>${obj}
+    <div class="section">Redevance des ménages</div>
+    <div class="ligne"><div class="grand"><input type="range" min="50" max="160" step="5" value="${G.redevance}" id="redev" aria-label="Redevance par habitant et par an"></div><span class="num"><b id="redev-v">${G.redevance}</b> €/hab/an</span></div>
+    <p class="note">Au-delà de 90 €, la satisfaction baisse. Les professionnels paient 110 €/t.</p>
+    <div class="section">Emprunts</div>
+    <div class="ligne"><div class="grand">${G.emprunts.filter(e => e.reste > 0).length} emprunt(s) en cours<small>5 M€ sur 15 ans à 4 % : ${euros(EMPRUNT.annuite)} par an. Trois au plus.</small></div><button type="button" class="btn secondaire" data-emprunt ${G.emprunts.filter(e => e.reste > 0).length >= 3 ? 'disabled' : ''}>Emprunter 5 M€</button></div>
+    <div class="section">Finances sur 30 jours</div>
+    ${Object.entries(cats).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div class="ligne"><span class="grand">${k}</span><span class="num" style="color:${v < 0 ? 'var(--rouge)' : 'var(--vert)'}">${v > 0 ? '+' : ''}${euros(v)}</span></div>`).join('')}
+    <div class="ligne"><b class="grand">Résultat</b><b class="num" style="color:${res < 0 ? 'var(--rouge)' : 'var(--vert)'}">${res > 0 ? '+' : ''}${euros(res)}</b></div>
+    <div class="section">Bilan matière</div>
+    <p class="note">${G.bilanFaux ? '✗ Écart détecté' : '✓ Chaque tonne est retrouvée'} : ${fmt(b.prod)} t produites = ${fmt(G.L.vendu + stockTotal())} recyclées + ${fmt(G.L.compost)} compostées + ${fmt(G.L.energie)} brûlées + ${fmt(G.L.enfoui + G.L.export)} enfouies + ${fmt(bacsTotal() + sauvageTotal())} dans les bacs et les rues.</p>`;
+  },
+  flux() {
+    return `<h2>Flux de matière</h2><p class="note">D'où viennent les tonnes et où elles vont, sur 30 jours. Une installation saturée est cerclée de rouge : c'est le goulot.</p>${sankey()}
+    <p class="note">Survolez un flux pour lire son tonnage.</p>`;
+  },
+  collecte() {
+    const capC = G.camions * 14 * (G.rd.tournees ? 1.2 : 1), besoin = sur(30, 'collecte') / Math.max(1, Math.min(30, G.jours.length)) * 7 / 6, manque = sur(7, 'manque');
+    const lignes = [
+      ['res', 'Porte-à-porte, bac gris', null, 0],
+      ['emb', 'Bac jaune en porte-à-porte', 'selective', 400e3],
+      ['verre', 'Colonnes d’apport volontaire', null, 120e3],
+      ['bio', 'Bac marron en porte-à-porte', 'bio', 250e3],
+    ].map(([f, mode, rd, cout]) => {
+      const m = G.modes[f];
+      let droite;
+      if (m.actif) droite = `<div class="seg" role="group" aria-label="Passages par semaine">${[1, 2, 3, 6].map(k => `<button type="button" class="${m.f === k ? 'actif' : ''}" data-freq="${f}:${k}">${k}</button>`).join('')}</div>`;
+      else if (rd && !G.rd[rd]) droite = `<button type="button" class="btn secondaire" data-o="rd">Recherche requise</button>`;
+      else droite = `<button type="button" class="btn" data-deployer="${f}:${cout}" ${G.argent < cout ? 'disabled' : ''}>Déployer · ${euros(cout)}</button>`;
+      return `<div class="ligne"><span class="pastille" style="background:${COUL[f]}"></span><div class="grand">${NOM_FLUX[f]}<small>${mode}${m.actif ? ' · passages par semaine' : ''}</small></div>${droite}</div>`;
+    }).join('');
+    const quartiers = G.quartiers.map(q => `<div class="ligne" style="display:block"><div style="display:flex;justify-content:space-between"><b>${q.nom}</b><span class="num" style="color:var(--doux)">${q.sauvage > 1 ? fmt(q.sauvage) + ' t de dépôts' : 'propre'}</span></div>
+      ${['res', 'emb', 'verre', 'bio'].filter(f => G.modes[f].actif).map(f => `<div style="display:flex;gap:8px;align-items:center;margin-top:4px"><span class="pastille" style="background:${COUL[f]};width:10px;height:10px"></span><div style="flex:1">${jauge(q.moy[f] > 0.05 ? q.bac[f] / (CAPJ[f] * q.moy[f]) : 0)}</div></div>`).join('')}</div>`).join('');
+    return `<h2>Collecte</h2>
+    <div class="section">Flotte</div>
+    <div class="ligne"><div class="grand">${G.camions} camions-bennes<small>${fmt(capC)} t/j de capacité · besoin moyen ${fmt(besoin)} t/j (lundi au samedi)</small></div>
+      <button type="button" class="btn secondaire" data-camion="-1" ${G.camions <= 1 ? 'disabled' : ''} aria-label="Vendre un camion">−</button><button type="button" class="btn" data-camion="1" ${G.argent < 180e3 ? 'disabled' : ''}>+ 180 k€</button></div>
+    ${manque > 1 ? `<p class="note" style="color:var(--or)">⚠ ${fmt(manque)} t laissées dans les bacs cette semaine faute de camions.</p>` : ''}
+    <div class="section">Modes de collecte</div>${lignes}
+    <p class="note">Plus de passages = bacs moins pleins, mais plus de camions. Un seul passage d'ordures par semaine mécontente.</p>
+    <div class="section">Propreté et prévention</div>
+    <div class="ligne"><div class="grand">Brigade de propreté<small>650 €/j, ramasse 6 t/j de dépôts sauvages en plus des 2 t/j des services municipaux</small></div><button type="button" class="btn ${G.brigade ? '' : 'secondaire'}" data-brigade>${G.brigade ? 'Active' : 'Activer'}</button></div>
+    <div class="ligne"><div class="grand">Campagne d'information<small>Un an : meilleur tri, moins de refus</small></div>${G.campagne > G.jour ? `<span class="num">${G.campagne - G.jour} j</span>` : `<button type="button" class="btn" data-campagne ${G.argent < 90e3 ? 'disabled' : ''}>90 k€</button>`}</div>
+    <div class="section">Remplissage des bacs par quartier</div>${quartiers}`;
+  },
+  marche() {
+    const rows = Object.entries(MATIERES).map(([m, [nom]]) => {
+      const h = G.histPrix[m], p = G.prix[m], mx = Math.max(...h, MATIERES[m][1] * 1.5), mn = 0;
+      const pts = h.map((v, i) => `${(i / 179 * 140).toFixed(1)},${(30 - (v - mn) / (mx - mn) * 28).toFixed(1)}`).join(' ');
+      const var30 = h.length > 30 ? (p / h[h.length - 31] - 1) : 0;
+      return `<div class="ligne" style="flex-wrap:wrap"><div class="grand">${nom}<small>${fmt(p)} €/t · <span style="color:${var30 < 0 ? 'var(--rouge)' : 'var(--vert)'}">${var30 >= 0 ? '▲' : '▼'} ${pct(Math.abs(var30))}</span> sur 30 j${G.stock[m] > 0.5 ? ` · stock ${fmt(G.stock[m])} t` : ''}</small></div>
+        <svg width="140" height="32" viewBox="0 0 140 32" role="img" aria-label="Cours de ${nom} sur 180 jours"><line x1="0" x2="140" y1="${30 - MATIERES[m][1] / mx * 28}" y2="${30 - MATIERES[m][1] / mx * 28}" stroke="#4a5444" stroke-dasharray="3 3"/><polyline points="${pts}" fill="none" stroke="#f6f4ea" stroke-width="2" stroke-linejoin="round"/></svg>
+        <div class="seg"><button type="button" class="${G.vendre[m] ? 'actif' : ''}" data-vendre="${m}:1">Vendre</button><button type="button" class="${G.vendre[m] ? '' : 'actif'}" data-vendre="${m}:0">Stocker</button></div>
+        ${G.stock[m] > 0.5 ? `<button type="button" class="btn secondaire" data-solder="${m}">Vendre le stock · ${euros(G.stock[m] * p)}</button>` : ''}</div>`;
+    }).join('');
+    return `<h2>Marché des matières</h2><p class="note">Cours en €/t sur 180 jours (pointillé : cours moyen). Quand un cours s'effondre, stockez et revendez plus tard. Stock limité à 2 500 t (${fmt(stockTotal())} t).</p>${rows}`;
+  },
+  rd() {
+    const n1 = TECHS.filter(t => t.niv === 1 && G.rd[t.id]).length;
+    return `<h2>Recherche</h2><p class="note">Une recherche à la fois. Le niveau 2 demande deux technologies de niveau 1.</p>` + [1, 2].map(niv => `<div class="section">Niveau ${niv}</div>` + TECHS.filter(t => t.niv === niv).map(t => {
+      const enCours = G.rdEnCours?.id === t.id, verrou = niv === 2 && n1 < 2;
+      const droite = G.rd[t.id] ? '<b style="color:var(--vert)">✓ Acquise</b>' : enCours ? `<div style="width:90px">${jauge(1 - G.rdEnCours.reste / t.jours, 'ok')}<small>${G.rdEnCours.reste} j</small></div>`
+        : `<button type="button" class="btn" data-rd="${t.id}" ${verrou || G.rdEnCours || G.argent < t.cout ? 'disabled' : ''}>${verrou ? 'Verrouillée' : euros(t.cout) + ' · ' + t.jours + ' j'}</button>`;
+      return `<div class="ligne"><div class="grand">${t.nom}<small>${t.effet}</small></div>${droite}</div>`;
+    }).join('')).join('') + `<p class="note" style="margin-top:14px">Dans le jeu : quatre branches de cinq niveaux (Prévention et collecte, Tri et recyclage, Valorisation et élimination, Gestion et données).</p>`;
+  },
+  journal() { return `<h2>Journal</h2>` + G.journal.map(j => `<div class="ligne"><span class="pastille" style="background:${j.niveau === 'critique' ? 'var(--rouge)' : j.niveau === 'alerte' ? 'var(--or)' : 'var(--vert)'}"></span><div class="grand">${j.t}<small>${j.d}</small></div></div>`).join(''); },
+  fiche() {
+    const s = G.fiche; if (!s) return '';
+    const T = TYPES[s.type], u = s.util?.length ? somme(s.util) / s.util.length : 0;
+    const proches = G.quartiers.filter(q => dist(centreQ(q), s) <= T.rayon).map(q => q.nom);
+    let corps = `<div class="ligne"><span class="grand">État</span><b>${s.chantier ? `Chantier, ${s.chantier} j` : s.panne ? `À l'arrêt, ${s.panne} j` : 'En service'}</b></div>`;
+    if (T.cap) corps += `<div class="ligne"><span class="grand">Capacité</span><span class="num">${fmt(T.cap * (s.type === 'tri' && G.rd.trisemi ? 1.7 : 1))} t/j</span></div><div class="ligne" style="display:block"><div style="display:flex;justify-content:space-between"><span>Utilisation sur 30 j</span><b>${pct(u)}</b></div>${jauge(u)}</div>`;
+    if (s.type === 'decharge') { const d = decharge(); corps += `<div class="ligne" style="display:block"><div style="display:flex;justify-content:space-between"><span>Remplissage</span><b>${fmt(s.rempli / 1000, 1)} / ${fmt(s.volume / 1000)} kt</b></div>${jauge(s.rempli / s.volume)}</div><div class="ligne"><span class="grand">Coût d'enfouissement</span><span class="num">${fmt(T.opex)} + taxe ${fmt(tgap())} €/t</span></div><p class="note">Saturation de l'ensemble des décharges dans ${d.jours === Infinity ? '—' : fmt(d.jours) + ' jours'} au rythme actuel.</p>`; }
+    if (T.opex && s.type !== 'decharge') corps += `<div class="ligne"><span class="grand">Coût d'exploitation</span><span class="num">${fmt(T.opex)} €/t</span></div>`;
+    if (T.fixe) corps += `<div class="ligne"><span class="grand">Coût d'exploitation</span><span class="num">${fmt(T.fixe)} €/j</span></div>`;
+    corps += `<div class="ligne"><span class="grand">${T.nuis > 0 ? 'Nuisances' : 'Service rendu'} (rayon ${T.rayon})</span><span class="num">${proches.length ? proches.join(', ') : 'aucun quartier'}</span></div>`;
+    return `<h2>${s.nom}</h2><p class="note">${T.aide}</p>${corps}`;
+  },
+};
+
+// diagramme de Sankey à trois colonnes : flux à la source → installations → devenir
+const NOEUDS = [
+  ...FLUX.map(f => ({ id: f, nom: NOM_FLUX[f], col: 0, coul: COUL[f] })),
+  ...[['tri', 'Centre de tri'], ['verrier', 'Verrier'], ['compost', 'Compostage'], ['decheterie', 'Déchèterie'], ['incin', 'Incinérateur'], ['decharge', 'Décharge'], ['export', 'Export d’urgence'], ['sauvage', 'Dépôts sauvages']].map(([id, nom]) => ({ id, nom, col: 1, coul: '#a9b39a' })),
+  ...[['recycle', 'Recyclé'], ['composte', 'Composté'], ['energie', 'Énergie'], ['enfoui', 'Enfoui'], ['noncollecte', 'Dans les rues']].map(([id, nom]) => ({ id, nom, col: 2, coul: '#a9b39a' })),
+];
+function sankey() {
+  const L = {}; for (const j of G.liens) for (const k in j) L[k] = (L[k] || 0) + j[k];
+  const sIn = Object.entries(L).filter(([k]) => k.startsWith('sauvage>')).reduce((s, [, v]) => s - v, somme(Object.entries(L).filter(([k]) => k.endsWith('>sauvage')).map(([, v]) => v)));
+  if (sIn > 0.5) L['sauvage>noncollecte'] = sIn;
+  const liens = Object.entries(L).map(([k, v]) => { const [a, b] = k.split('>'); return { a, b, v }; }).filter(l => l.v > 0.05);
+  const val = id => Math.max(somme(liens.filter(l => l.a === id).map(l => l.v)), somme(liens.filter(l => l.b === id).map(l => l.v)));
+  const noeuds = NOEUDS.map(n => ({ ...n, v: val(n.id) })).filter(n => n.v > 0.05);
+  if (!noeuds.length) return '<p class="note">Pas encore de données.</p>';
+  const Wd = 360, Hd = 420, nw = 12, gap = 10, colX = [0, 160, Wd - nw];
+  const k = Math.min(...[0, 1, 2].map(c => { const ns = noeuds.filter(n => n.col === c); return (Hd - gap * (ns.length - 1)) / Math.max(1e-9, somme(ns.map(n => n.v))); }));
+  for (const c of [0, 1, 2]) { let y = 0; for (const n of noeuds.filter(n => n.col === c)) { n.y = y; n.h = Math.max(2, n.v * k); n.x = colX[c]; n.oOut = 0; n.oIn = 0; y += n.h + gap; } }
+  const N = Object.fromEntries(noeuds.map(n => [n.id, n]));
+  const sat = { tri: actifs('tri').some(s => somme(s.util.slice(-7)) / Math.max(1, s.util.slice(-7).length) > 0.97), compost: actifs('compost').some(s => somme(s.util.slice(-7)) / Math.max(1, s.util.slice(-7).length) > 0.97), incin: actifs('incin').some(s => somme(s.util.slice(-7)) / Math.max(1, s.util.slice(-7).length) > 0.97), export: true, sauvage: true };
+  let html = `<svg id="sankey" viewBox="-2 -2 ${Wd + 4} ${Hd + 4}" width="100%" role="img" aria-label="Diagramme des flux de déchets sur 30 jours">`;
+  for (const l of liens) {
+    const a = N[l.a], b = N[l.b]; if (!a || !b) continue;
+    const t = l.v * k, y0 = a.y + a.oOut + t / 2, y1 = b.y + b.oIn + t / 2; a.oOut += t; b.oIn += t;
+    const x0 = a.x + nw, x1 = b.x, xm = (x0 + x1) / 2;
+    const coul = a.col === 0 ? a.coul : l.b === 'enfoui' || l.b === 'noncollecte' ? '#7a6a5a' : '#6f8f6a';
+    html += `<path class="lien" d="M${x0} ${y0}C${xm} ${y0} ${xm} ${y1} ${x1} ${y1}" stroke="${coul}" stroke-width="${Math.max(1, t)}"><title>${a.nom} → ${b.nom} : ${fmt(l.v)} t</title></path>`;
+  }
+  for (const n of noeuds) {
+    const goulot = sat[n.id] && n.col === 1;
+    html += `<rect x="${n.x}" y="${n.y}" width="${nw}" height="${n.h}" rx="3" fill="${n.coul}" stroke="${goulot ? '#ff8a7a' : '#0f130e'}" stroke-width="${goulot ? 3 : 1.5}"><title>${n.nom} : ${fmt(n.v)} t</title></rect>`;
+    const tx = n.col === 2 ? n.x - 5 : n.x + nw + 5, anc = n.col === 2 ? 'end' : 'start';
+    html += `<text x="${tx}" y="${n.y + n.h / 2 - (n.h > 24 ? 5 : 0)}" text-anchor="${anc}" dominant-baseline="middle">${n.nom}</text>`;
+    if (n.h > 24) html += `<text x="${tx}" y="${n.y + n.h / 2 + 8}" text-anchor="${anc}" dominant-baseline="middle" style="fill:var(--doux);font-weight:700">${fmt(n.v)} t</text>`;
+  }
+  return html + '</svg>';
+}
+
+function brancherPanneau() {
+  const c = $('contenu');
+  c.querySelectorAll('[data-o]').forEach(b => b.onclick = () => onglet(b.dataset.o));
+  c.querySelectorAll('[data-freq]').forEach(b => b.onclick = () => { const [f, k] = b.dataset.freq.split(':'); G.modes[f].f = +k; ui(true); });
+  c.querySelectorAll('[data-deployer]').forEach(b => b.onclick = () => { const [f, cout] = b.dataset.deployer.split(':'); G.argent -= +cout; G.modes[f].actif = true; log(`${NOM_FLUX[f]} : collecte déployée (${euros(+cout)}).`); aide(); ui(true); });
+  c.querySelectorAll('[data-camion]').forEach(b => b.onclick = () => { const d = +b.dataset.camion; G.camions += d; G.argent -= d > 0 ? 180e3 : -60e3; ui(true); });
+  c.querySelectorAll('[data-emprunt]').forEach(b => b.onclick = () => { G.argent += EMPRUNT.montant; G.emprunts.push({ annuite: EMPRUNT.annuite, reste: EMPRUNT.jours }); log('Emprunt de 5 M€ sur 15 ans.'); ui(true); });
+  c.querySelectorAll('[data-brigade]').forEach(b => b.onclick = () => { G.brigade = !G.brigade; ui(true); });
+  c.querySelectorAll('[data-campagne]').forEach(b => b.onclick = () => { G.argent -= 90e3; G.campagne = G.jour + 365; log('Campagne d’information lancée pour un an.'); ui(true); });
+  c.querySelectorAll('[data-vendre]').forEach(b => b.onclick = () => { const [m, v] = b.dataset.vendre.split(':'); G.vendre[m] = v === '1'; ui(true); });
+  c.querySelectorAll('[data-solder]').forEach(b => b.onclick = () => { const m = b.dataset.solder; G.argent += G.stock[m] * G.prix[m]; G.L.vendu += G.stock[m]; G.stock[m] = 0; ui(true); });
+  c.querySelectorAll('[data-rd]').forEach(b => b.onclick = () => { const t = TECHS.find(t => t.id === b.dataset.rd); G.argent -= t.cout; G.rdEnCours = { id: t.id, reste: t.jours }; log('Recherche lancée : ' + t.nom); ui(true); });
+  const r = $('redev'); if (r) r.oninput = () => { G.redevance = +r.value; $('redev-v').textContent = r.value; };
+}
+
+// ---------- Barre du haut, aide, toasts ----------
+function pill(id, txt, niveau) { const p = $(id); p.className = 'pill ' + (p.classList.contains('opt') ? 'opt ' : '') + niveau; p.lastElementChild.textContent = txt; }
+function barre() {
+  $('date').innerHTML = `${G.date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}<small>Vallée de Valmont · ${fmt(somme(G.quartiers.filter(q => q.type === 'res').map(q => q.pop)))} habitants</small>`;
+  const s = sauvageTotal(), t = taux(30), d = decharge(), sat = satisfaction();
+  pill('p-prop', `Dépôts ${fmt(s)} t`, s > 350 ? 'critique' : s > 150 ? 'alerte' : '');
+  pill('p-rec', `Valorisé ${pct(t.valorisation)}`, t.valorisation >= .65 ? '' : t.valorisation >= .35 ? 'alerte' : 'critique');
+  pill('p-dech', `Décharge ${pct(d.taux)}`, d.jours < 365 ? 'critique' : d.jours < 730 ? 'alerte' : '');
+  pill('p-sat', `★ ${fmt(sat)}`, sat < 30 ? 'critique' : sat < 50 ? 'alerte' : '');
+  const e = $('p-evt'); e.hidden = !G.evt; if (G.evt) e.textContent = G.evt.nom + ' · ' + G.evt.reste + ' j';
+  $('argent').textContent = euros(G.argent); $('argent').classList.toggle('neg', G.argent < 0);
+}
+let aideMasquee = false;
+function aide() {
+  const a = $('aide');
+  if (G.construire) { a.hidden = false; a.innerHTML = `Choisissez une case pour : ${TYPES[G.construire].nom}. <button type="button" id="aide-x">Annuler</button>`; $('aide-x').onclick = () => { G.construire = null; dessinerChantier(); aide(); }; return; }
+  const o = OBJECTIFS.find(o => !o.ok());
+  a.hidden = aideMasquee || !o;
+  if (o) { a.innerHTML = `${o.aide} <button type="button" id="aide-x">OK</button>`; $('aide-x').onclick = () => { aideMasquee = true; aide(); }; }
+}
+let toastT;
+function alerte(t, niveau = 'info') {
+  log(t, niveau);
+  if (muet) return;
+  const el = $('toast'); el.textContent = t; el.className = 'toast ' + niveau; el.hidden = false;
+  clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 4200);
+  if (niveau === 'critique' && G.v > 1) vitesse(1); // ralentissement automatique sur incident critique
+}
+function modale(titre, texte, boutons) {
+  $('boite').innerHTML = `<h2>${titre}</h2><p>${texte}</p><div style="display:flex;gap:8px;justify-content:flex-end">${boutons.map((b, i) => `<button type="button" class="btn" data-i="${i}">${b[0]}</button>`).join('')}</div>`;
+  $('boite').querySelectorAll('button').forEach(b => b.onclick = boutons[+b.dataset.i][1]);
+  $('modale').hidden = false;
+}
+function fermerModale() { $('modale').hidden = true; }
+
+// ---------- Temps, lentilles, boucle ----------
+const VITESSES = [0, 1, 4, 16, 64];
+function vitesse(i) { G.v = i; $('temps').querySelectorAll('button').forEach((b, k) => b.classList.toggle('actif', k === i)); }
+$('temps').innerHTML = VITESSES.map((v, i) => `<button type="button" aria-label="${v ? 'Vitesse ×' + v : 'Pause'}">${v ? '×' + v : '❚❚'}</button>`).join('');
+$('temps').querySelectorAll('button').forEach((b, i) => b.onclick = () => vitesse(i));
+const LENTILLES = [['aucune', 'Sans lentille'], ['bacs', 'Remplissage des bacs'], ['nuisances', 'Nuisances'], ['satisfaction', 'Mécontentement']];
+function dessinerLentilles() {
+  $('lentilles').innerHTML = LENTILLES.map(([id, n]) => `<button type="button" class="${lentille === id ? 'actif' : ''}" data-l="${id}">${n}</button>`).join('');
+  $('lentilles').querySelectorAll('button').forEach(b => b.onclick = () => { lentille = b.dataset.l; dessinerLentilles(); dessinerDynamique(); });
+}
+let dernierUI = 0;
+function ui(force) {
+  const t = performance.now();
+  if (!force && t - dernierUI < 250) return;
+  dernierUI = t;
+  barre(); dessinerDynamique();
+  const c = $('contenu'), haut = c.scrollTop;
+  if (!force && c.contains(document.activeElement) && document.activeElement.type === 'range') return; // ne pas casser un curseur en cours
+  c.innerHTML = PANNEAUX[ongletActif](); c.scrollTop = haut; brancherPanneau();
+  if (OBJECTIFS.some((o, i) => o.ok() !== G.objOk?.[i])) { G.objOk = OBJECTIFS.map(o => o.ok()); aide(); }
+}
+function toutDessiner() { dessinerTerrain(); dessinerSites(); dessinerChantier(); dessinerLentilles(); dessinerOnglets(); vitesse(1); aide(); ui(true); }
+let acc = 0, avant = performance.now();
+function boucle(t) {
+  const dt = Math.min(0.1, (t - avant) / 1000); avant = t;
+  acc += dt * VITESSES[G.v];
+  let n = 0; while (acc >= 1 && n < 8) { pas(); acc -= 1; n++; }
+  if (n) ui();
+  bougerCamions(dt);
+  requestAnimationFrame(boucle);
+}
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === ' ') { e.preventDefault(); vitesse(G.v ? 0 : 1); }
+  if (e.key === 'Escape' && G.construire) { G.construire = null; dessinerChantier(); aide(); calques.apercu.innerHTML = ''; }
+});
+
+nouvellePartie(); toutDessiner(); requestAnimationFrame(boucle);
+// auto-vérification de la conservation de la matière : 400 jours simulés en silence sur une copie, sans toucher l'interface
+window.testBilan = function (jours = 400, strategie = () => {}) {
+  const sauve = [G, rnd]; muet = true;
+  try { nouvellePartie(); for (let i = 0; i < jours && !G.fini; i++) { strategie(G); pas(); } return { ok: !G.bilanFaux, fini: G.fini, date: dateCourte(), argent: Math.round(G.argent), sauvage: Math.round(sauvageTotal()), valo: taux(90).valorisation, sat: Math.round(satisfaction()), dech: decharge(), ...bilan() }; }
+  finally { [G, rnd] = sauve; muet = false; }
+};
+</script>
+</body>
+</html>

@@ -12,6 +12,7 @@ La bibliothèque graphique commune des jeux. Elle vit dans `web_engine/lib/`, et
 |---|---|---|
 | `three/` | three.js r186 (`three.module.js`, `three.core.js`) et `addons/utils/BufferGeometryUtils.js` | modules ES |
 | `royaumes/` | moteur et rendu de web_royaumes : scène, toon, plateau (terrain, nature), modèles, vie, quartiers, météo, routes, remparts, forts, marine, sièges, espions, brouillard, étiquettes ; `rendu.css` | modules ES |
+| `royaumes/img/`, `royaumes/icons/` | illustrations des événements (SVG) et icônes de l'application (PNG) de web_royaumes | fichiers |
 | `power/` | outils, moteur 3D, modèles, ambiance et ciel de web_power | scripts classiques |
 | `power/pont.js` | les modèles de web_power utilisables dans la scène du moteur royaumes | module ES |
 
@@ -70,7 +71,7 @@ scene.add(groupe);                               // à l'échelle du plateau roy
 
 | Jeu | Dossier | Parties utilisées |
 |---|---|---|
-| web_royaumes | `web/graphismes/` | `three/`, `royaumes/` (servi par le serveur Rust) |
+| web_royaumes | `web/graphismes/` | `three/`, `royaumes/` avec ses images et icônes (servi par le serveur Rust) |
 | web_power | `graphismes/` | `power/` (servi par `serveur.py` ; three.js r186 depuis le CDN, pour l'ouverture en `file://`) |
 
 ## Utiliser la bibliothèque dans un jeu
