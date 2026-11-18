@@ -3,7 +3,7 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
-## 2.5.0 — 2026-11-18
+## 2.6.0 — 2026-11-18
 
 Plus de vie partout, dans `rendu/modernes.js` : `oiseaux()` (vols qui tournent : mouettes sur la décharge, le compost, le barrage et l'éolien en mer,
 pigeons du centre-ville, corbeaux des fermes…), `pietons()` (centre-ville, affaires, centrale nucléaire), `engin()` (chargeurs des centrales
@@ -11,14 +11,14 @@ pigeons du centre-ville, corbeaux des fermes…), `pietons()` (centre-ville, aff
 ventilations des centrales au gaz, TAC, SMR et du centre de tri ; camions de la centrale au fioul et de l'incinérateur ; ambulance de l'hôpital ;
 bateau de l'éolien en mer, véhicule d'entretien de la ferme solaire, canards du lagunage, second agitateur de la potabilisation, plus de vaches.
 
-## 2.4.0 — 2026-11-18
+## 2.5.0 — 2026-11-18
 
 Les villes s'animent aussi, dans `rendu/modernes.js` :
 - voitures qui font le tour du centre-ville, du quartier résidentiel et du village (`ronde()`), arbres qui ploient dans le vent (`arbreVent()`) ;
 - centre-ville et quartier d'affaires : feu de balisage au sommet de la plus haute tour ; affaires : nacelle de laveur de vitres et enseigne qui tourne ;
 - zone industrielle : un camion de livraison ; village : girouette sur le clocher.
 
-## 2.3.0 — 2026-11-18
+## 2.4.0 — 2026-11-18
 
 Chaque bâtiment moderne a maintenant son animation, dans `rendu/modernes.js` :
 - `piece(L, ex, dessin, x, y, z, a, axe, amp, v, ph)` déclare une partie mobile (tourne, oscille, glisse, pulse, clignote), animée par `animer()` ;
@@ -28,6 +28,17 @@ Chaque bâtiment moderne a maintenant son animation, dans `rendu/modernes.js` :
   jet de la source, ponts racleurs de l'épuration, roseaux du lagunage, bulldozer, voiture, retourneur et fumée du compost, camions, conteneur
   du quai, dômes et torchère du méthaniseur, vaches et tracteur des fermes, hélicoptère de l'hôpital ;
 - `bFerme(L, elevage, ex)` : troisième argument facultatif pour ses animations.
+
+## 2.3.0 — 2026-11-18
+
+Ce qu'il faut à web_power pour passer au moteur unique :
+- `scene.js` : le canevas peut ne couvrir qu'une partie de la page (la carte de web_power est à côté de son panneau) :
+  la taille de rendu et les clics suivent le canevas, plus la fenêtre ; rien ne change pour un canevas plein écran ;
+- `plateau.js` : le sol et son décor ont leur matériau, `MAT_SOL` (exporté avec `MAT_RIV`, celui des rivières),
+  qu'un jeu peut teinter sans toucher aux bâtiments (les vues réseau de web_power assombrissent la carte) ;
+- `modernes.js` : `semer` est exporté, pour un jeu qui appelle lui-même les dessins de `BAT` et `QBAT`.
+
+web_power passe au moteur unique (partie `rendu`) : plateau, caméra, ciel et modèles viennent de la bibliothèque.
 
 ## 2.2.0 — 2026-11-18
 
