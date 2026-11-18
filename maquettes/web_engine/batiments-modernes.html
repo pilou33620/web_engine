@@ -66,14 +66,14 @@ apresCamera(() => {
   const v = new THREE.Vector3(), noms = f.noms.checked;
   for (const { el, p, titre } of poses) {
     v.copy(p).project(camera);
-    el.hidden = v.z > 1 || (!titre && (!noms || cam.d > 16));  // les noms des bâtiments seulement de près, pour rester lisible
+    el.hidden = v.z > 1 || (!titre && (!noms || cam.d > 18));  // les noms des bâtiments seulement de près, pour rester lisible
     el.style.transform = `translate(${(v.x + 1) / 2 * innerWidth}px, ${(1 - v.y) / 2 * innerHeight}px) translate(-50%, -50%)`;
   }
 });
 appliquerMeteo({ genre: 'soleil', temperature: 20, pluie: 0, vent: 0.5, neige_sol: 0 }, 2);
 const heure = () => forcerHeure(f.heure.value || null);
 f.addEventListener('change', heure); heure();
-Object.assign(cam, { l: COLS * PAS + 2, h: ligne * PAS + 2, x: (COLS - 1) * PAS / 2, z: (ligne - 1) * PAS / 2, cible: 12, d: 12, lacet: 0, auto: false });
+Object.assign(cam, { l: COLS * PAS + 2, h: ligne * PAS + 2, x: (COLS - 1) * PAS / 2, z: (ligne - 1) * PAS / 2, cible: 26, d: 26, lacet: 0, auto: false });
 </script>
 </body>
 </html>
