@@ -38,6 +38,7 @@ import { ANT, ANTIQUES } from '../../lib/rendu/antiques.js';
 import { maillageBatiment, maillageArmee, PALIERS } from '../../lib/rendu/modeles.js';
 import { animerPose, oublierPose } from '../../lib/rendu/monde.js';
 import { viderFumees, climat } from '../../lib/rendu/vie.js';
+import { animationsAncien } from '../../lib/rendu/animations.js';
 
 const R = await (await fetch('../../sources/web_royaumes/rust/royaumes/data/regles.json')).json();
 
@@ -48,7 +49,7 @@ const liste = [
   ...ANTIQUES.map(b => ({ ...b, ere: ERE[b.groupe], dessin: ANT[b.cle] })),
   // les époques de web_royaumes : tous ses bâtiments à chaque époque (l'hôtel de ville au niveau 5), et ses armées, palier par palier
   ...R.epoques.flatMap(e => [
-    ...R.batiments.map(b => ({ ere: e.cle, groupe: `${e.debut} · ${e.nom}`, nom: b.cle === 'hotel' ? `${b.nom} niv. 5` : b.nom, royaumes: { cle: b.cle, epoque: e.cle, niveau: 5 } })),
+    ...R.batiments.map(b => ({ ere: e.cle, groupe: `${e.debut} · ${e.nom}`, nom: b.cle === 'hotel' ? `${b.nom} niv. 5` : b.nom, royaumes: { cle: b.cle, epoque: e.cle, niveau: 5 }, ancre: `${e.cle}-${b.cle}` })),
     ...PALIERS_DE[e.cle].map(p => ({ ere: e.cle, groupe: `Armées · ${e.nom}`, nom: `${PALIERS[p].date} : ${PALIERS[p].nom}`, palier: p })),
   ]),
   ...QUARTIERS.map(q => ({ nom: q.nom, groupe: 'Villes', dessin: QBAT[q.cle] })),
@@ -80,9 +81,11 @@ function construire() {
       if (RIVIERE.includes(b.cle)) put(T, boite(0.35, 0.02, 1.75), EAU, 0, 0.005, 0, 0, 0);
       fige(T, carte).position.set(x, 0, z);
       if (b.royaumes) {  // bâtiment de web_royaumes : son maillage en cache, ses ailes, drapeaux et fumées animés par monde.js
-        const { mesh, anim } = maillageBatiment({ ...b.royaumes, couleur: COULEUR });
+        const { mesh, anim, boites } = maillageBatiment({ ...b.royaumes, couleur: COULEUR });
         mesh.position.set(x, 0, z); mesh.userData.cache = true; carte.add(mesh);
         const id = `vitrine-${b.royaumes.epoque}-${b.royaumes.cle}`; animerPose(id, mesh, anim, COULEUR); poses_anim.push(id);
+        const vie = modele(animationsAncien(b.royaumes.cle, b.royaumes.epoque, boites, COULEUR), k + 1);  // ses habitants, artisans, bêtes, charrettes…
+        vie.groupe.position.set(x, 0, z); carte.add(vie.groupe); animer(vie);
       } else if (b.palier !== undefined) {  // armée de web_royaumes : l'icône du palier, qui marche sur sa case
         const mesh = maillageArmee(COULEUR, b.palier); mesh.position.set(x, 0, z); mesh.userData.cache = true; carte.add(mesh); armees.push({ mesh, z, ph: k });
       } else {
@@ -115,8 +118,8 @@ f.heure.addEventListener('change', heure); heure();
 f.epoque.addEventListener('change', construire);
 chaqueImage((dt, t) => { for (const a of armees) { a.mesh.position.z = a.z + Math.sin(t * .35 + a.ph) * .12; a.mesh.position.y = Math.abs(Math.sin(t * 6)) * .02; } });
 construire();
-// #cle (ex. #legion, #nucleaire) : gros plan sur ce modèle
-const vu = liste.find(b => b.cle && '#' + b.cle === location.hash);
+// #cle (ex. #legion, #nucleaire, #industrie-brasserie) : gros plan sur ce modèle
+const vu = liste.find(b => '#' + (b.ancre || b.cle) === location.hash);  // ou #industrie-brasserie pour un bâtiment ancien
 if (vu) Object.assign(cam, { x: vu.x, z: vu.z, cible: 5, d: 5 });
 </script>
 </body>

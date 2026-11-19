@@ -3,6 +3,17 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.11.0 — 2026-11-19
+
+Tous les bâtiments de toutes les époques sont animés :
+- `rendu/animations.js` (nouveau) : `animationsAncien(cle, epoque, boites, couleur)` donne la vie de chacun des 56 bâtiments de `modeles.js`,
+  à chaque époque : artisans au travail, porteurs (sacs, tonneaux, caisses, seaux, poissons, minerai…), passants, charrettes et carrosses,
+  bêtes (moutons, vaches, chevaux, âne, poules, chiens), soldats à l'uniforme de l'époque, enfants, wagonnets de mine, train de la gare,
+  oiseaux ; chacun se place dans les espaces libres du bâtiment (ses emprises au sol), à l'échelle de ses portes ;
+- `modeles.js` : chaque emprise de `boites` porte aussi sa hauteur (cinquième valeur), pour qu'une clôture basse n'empêche pas d'entrer dans l'enclos ;
+- `antiques.js` exporte aussi `trajet`, `poule`, `mouton`, `chariot`, `ane`, `poisson` ;
+- carte complète : chaque bâtiment ancien reçoit sa vie ; `#industrie-brasserie` (époque-clé) pour un gros plan.
+
 ## 2.10.0 — 2026-11-19
 
 Les armées de web_royaumes (`modeles.js`, `maillageArmee`) deviennent un grand bataillon, validé sur la maquette `armees-propositions.html` :
