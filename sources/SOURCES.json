@@ -1,9 +1,9 @@
 {
  "depots": {
   "web_royaumes": {
-   "commit": "5db64d34d4b80f1060b178688f7722fa8cd5a80e",
+   "commit": "024507aa88f0c6391dc6b7db21d777d15102de95",
    "date": "2026-11-19",
-   "message": "Graphismes : bibliothèque web_engine 2.17.0 (saisons, vent, nuit, eau, journée, commerce, ponton du pêcheur)"
+   "message": "Graphismes : bibliothèque web_engine 2.18.0, nouvelle cabane de pêcheur"
   },
   "web_power": {
    "commit": "e7689be345481841bdbb53f37d33433772a2a938",
@@ -36,6 +36,11 @@
    "source": "web_engine",
    "chemin": "maquettes/web_engine/carte-complete.html",
    "titre": "Carte complète"
+  },
+  {
+   "source": "web_engine",
+   "chemin": "maquettes/web_engine/pecheur-propositions.html",
+   "titre": "Cabane de pêcheur : propositions"
   },
   {
    "source": "web_power",

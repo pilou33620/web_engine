@@ -2,7 +2,7 @@
 
 Généré par `outils/synchroniser.sh` : ne pas modifier à la main.
 
-## web_royaumes — `5db64d3` (2026-11-19)
+## web_royaumes — `024507a` (2026-11-19)
 
 | Fichier | Taille | Rôle (en-tête du fichier) |
 |---|---:|---|
@@ -29,7 +29,7 @@ Généré par `outils/synchroniser.sh` : ne pas modifier à la main.
 | `maquettes/source/scene.js` | 46 ko | Maquette : le plateau de Royaumes des Rives rendu comme web_power (toon 3 tons, contours bruns, hexagones étagés). |
 | `maquettes/source/vie2.js` | 32 ko | Même façon de faire que l'ambiance : petits modèles en boîtes (unités de web_power), contours, va-et-vient simples. |
 | `web/css/style.css` | 13 ko | Royaumes des Rives — interface (thème de la vidéo : bleu nuit, or, rubans colorés) |
-| `web/graphismes/CHANGELOG.md` | 18 ko | Journal des versions de la bibliothèque graphique |
+| `web/graphismes/CHANGELOG.md` | 19 ko | Journal des versions de la bibliothèque graphique |
 | `web/graphismes/README.md` | 8 ko | Bibliothèque graphique web_engine |
 | `web/graphismes/VERSION.json` | 0 ko |  |
 | `web/graphismes/package.json` | 0 ko |  |
@@ -54,7 +54,7 @@ Généré par `outils/synchroniser.sh` : ne pas modifier à la main.
 | `web/graphismes/rendu/img/evenement-philosophe.svg` | 2 ko |  |
 | `web/graphismes/rendu/marine.js` | 32 ko | La marine (maquettes/guerre.html) : navires aux couleurs du royaume (pavillon, flamme, liston) qui tanguent et laissent |
 | `web/graphismes/rendu/meteo.js` | 18 ko | Le temps qu'il fait et l'heure du jour, rendus : pluie, neige, brouillard, orage (éclairs), nuages et leur ombre, |
-| `web/graphismes/rendu/modeles.js` | 79 ko | Les modèles des bâtiments et des armées, dans le vocabulaire de web_power (maquette maquettes/rendu-power.html) : |
+| `web/graphismes/rendu/modeles.js` | 81 ko | Les modèles des bâtiments et des armées, dans le vocabulaire de web_power (maquette maquettes/rendu-power.html) : |
 | `web/graphismes/rendu/modernes.js` | 47 ko | Les bâtiments modernes (1900 → 2035), modèles du moteur : installations électriques, lignes, eau, déchets, quartiers, fermes. |
 | `web/graphismes/rendu/monde.js` | 23 ko | Ce qui vit sur le plateau et suit l'état de la partie : bâtiments (et chantiers), armées, bannières ; |
 | `web/graphismes/rendu/nuit.js` | 10 ko | La nuit et l'eau qui brille, toutes automatiques (elles suivent climat, posé par meteo.js) : |
