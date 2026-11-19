@@ -7,7 +7,7 @@
 #   three    three.js r186 et BufferGeometryUtils
 #   socle    scène, caméra, plateau (terrain, nature, rivières), météo et heure, vie commune (fumées, climat), routes, boue,
 #            brume, feuilles et givre, nuit (étoiles, lune, lucioles, reflets, lueurs, halos), faune (migrateurs, poissons, envols), eau (vagues, cascades, sillages), brouillard, étiquettes, rendu.css
-#   moderne  bâtiments modernes (modernes.js : installations, lignes, quartiers, fermes), chantiers vivants et piquets de grève (chantiers.js), voies ferrées et trains (rail.js)
+#   moderne  bâtiments modernes (modernes.js : installations, lignes, quartiers, fermes), chantiers vivants et piquets de grève (chantiers.js), voies ferrées et trains (rail.js), crises (crises.js : panaches, chutes des barrages, reflets, blackout)
 #   antique  Gaulois et Romains (antiques.js)
 #   ancien   bâtiments et armées de 1700 à 1816, le monde de web_royaumes (monde, quartiers, animations, chroniques), images et icônes
 #   guerre   remparts, forts, sièges, flottes, espions
@@ -21,7 +21,7 @@ R=rendu
 declare -A FICHIERS=(
   [three]="three"
   [socle]="$R/scene.js $R/toon.js $R/plateau.js $R/meteo.js $R/vie.js $R/boue.js $R/ambiance.js $R/nuit.js $R/faune.js $R/eau.js $R/routes.js $R/brouillard.js $R/etiquettes.js $R/rendu.css"
-  [moderne]="$R/modernes.js $R/chantiers.js $R/rail.js"
+  [moderne]="$R/modernes.js $R/chantiers.js $R/rail.js $R/crises.js"
   [antique]="$R/antiques.js"
   [ancien]="$R/modeles.js $R/monde.js $R/quartiers.js $R/animations.js $R/chroniques.js $R/img $R/icons"
   [guerre]="$R/guerre_commun.js $R/remparts.js $R/forts.js $R/sieges.js $R/marine.js $R/espions.js"
