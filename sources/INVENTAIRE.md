@@ -2,7 +2,7 @@
 
 Généré par `outils/synchroniser.sh` : ne pas modifier à la main.
 
-## web_royaumes — `024507a` (2026-11-19)
+## web_royaumes — `3772ac2` (2026-11-19)
 
 | Fichier | Taille | Rôle (en-tête du fichier) |
 |---|---:|---|
@@ -58,7 +58,7 @@ Généré par `outils/synchroniser.sh` : ne pas modifier à la main.
 | `web/graphismes/rendu/modernes.js` | 47 ko | Les bâtiments modernes (1900 → 2035), modèles du moteur : installations électriques, lignes, eau, déchets, quartiers, fermes. |
 | `web/graphismes/rendu/monde.js` | 23 ko | Ce qui vit sur le plateau et suit l'état de la partie : bâtiments (et chantiers), armées, bannières ; |
 | `web/graphismes/rendu/nuit.js` | 10 ko | La nuit et l'eau qui brille, toutes automatiques (elles suivent climat, posé par meteo.js) : |
-| `web/graphismes/rendu/plateau.js` | 27 ko | Le plateau, rendu comme web_power (maquettes/rendu-power.html) : hexagones séparés et étagés, ombrage toon en trois tons |
+| `web/graphismes/rendu/plateau.js` | 28 ko | Le plateau, rendu comme web_power (maquettes/rendu-power.html) : hexagones séparés et étagés, ombrage toon en trois tons |
 | `web/graphismes/rendu/quartiers.js` | 94 ko | La vie des quartiers (maquette maquettes/quartiers.html), sur les seuls bâtiments proches du centre du regard : |
 | `web/graphismes/rendu/rail.js` | 4 ko | Voies ferrées et trains, pour un jeu qui trace ses lignes lui-même (web_power) : poserVoie(parent, pts, options) dessine |
 | `web/graphismes/rendu/remparts.js` | 28 ko | Les remparts des villes : une amélioration à quatre niveaux (Palissade, Murailles, Bastions à la Vauban, Citadelle), |
@@ -80,7 +80,7 @@ Généré par `outils/synchroniser.sh` : ne pas modifier à la main.
 | `web/js/ui.js` | 66 ko | L'interface : barre du haut, panneaux (construire, diplomatie, armées, royaume, menu), fiche d'une case |
 | `web/manifest.webmanifest` | 0 ko |  |
 
-## web_power — `e7689be` (2026-11-19)
+## web_power — `6278a86` (2026-11-19)
 
 | Fichier | Taille | Rôle (en-tête du fichier) |
 |---|---:|---|

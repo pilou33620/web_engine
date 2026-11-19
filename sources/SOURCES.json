@@ -1,14 +1,14 @@
 {
  "depots": {
   "web_royaumes": {
-   "commit": "024507aa88f0c6391dc6b7db21d777d15102de95",
+   "commit": "3772ac220eeaa081b1e15f0cbdc3e1ba6e5edba1",
    "date": "2026-11-19",
-   "message": "Graphismes : bibliothèque web_engine 2.18.0, nouvelle cabane de pêcheur"
+   "message": "Graphismes : bibliothèque web_engine 2.19.0, les cases du plateau se touchent avec un fin trait sombre entre elles"
   },
   "web_power": {
-   "commit": "e7689be345481841bdbb53f37d33433772a2a938",
+   "commit": "6278a8683995746773145dfa66826662359b2705",
    "date": "2026-11-19",
-   "message": "Graphismes : bibliothèque web_engine 2.17.0 ; train, phares, grèves, construction par étages"
+   "message": "Graphismes : bibliothèque web_engine 2.19.0, les cases du plateau se touchent avec un fin trait sombre entre elles"
   }
  },
  "maquettes": [

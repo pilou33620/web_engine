@@ -85,6 +85,7 @@ const matRiv = toon(0x46a9dd, { polygonOffset: true, polygonOffsetFactor: -2, po
 export const MAT_SOL = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: degrade });
 /** Les berges de sable des rivières : boue.js les recouvre d'eau trouble pendant une crue (couleur recopiée de MAT_SOL sinon). */
 export const MAT_BERGE = MAT_SOL.clone();
+const MAT_CONTOUR = new THREE.LineBasicMaterial({ color: 0x14130f, transparent: true, opacity: 0.55 });  // le trait entre les cases
 export { matRiv as MAT_RIV };
 
 // ------------------------------------------------------------------ construction
@@ -118,13 +119,13 @@ const hexagone = r => new THREE.CircleGeometry(r, 6).rotateX(-Math.PI / 2).rotat
 
 function rebatir() {
   for (const f of familles) jeter(f);
-  const N = C.l * C.h, TU = lot(), DE = lot(), RS = lot(), RE = lot();
+  const N = C.l * C.h, TU = lot(), DE = lot(), RS = lot(), RE = lot(), bords = [];
   for (let i = 0; i < N; i++) H[i] = TERR[genre(i)][1];
   rivieres(RS, RE);
   const teinte = (TEINTES[saison] || TEINTES[2]).clone().lerp(PAILLE, Math.min(sec, 2) * 0.22);  // l'herbe sèche avec la sécheresse
   for (let i = 0; i < N; i++) {
     const g0 = genre(i), [col, top] = TERR[g0], { x, z, c, r } = posCase(i), bas = -1, h = top - bas;
-    const g = cyl(R * 0.965, R, h, 6).clone();
+    const g = cyl(R, R, h, 6).clone();  // le dessus à pleine taille : les cases se touchent
     g.translate(x, bas + h / 2, z);
     const k = new THREE.Color(col).offsetHSL((hache(c, r, 1) - 0.5) * 0.015, 0, (hache(c, r, 2) - 0.5) * 0.05);
     if (!EAUX.has(g0)) { k.multiply(teinte); if (neige) k.lerp(BLANC, neige * 0.6); }
@@ -132,9 +133,15 @@ function rebatir() {
     for (let v = 0; v < n.count; v++) { const f = n.getY(v) > 0.5 ? 1 : 0.62; a.set([k.r * f, k.g * f, k.b * f], v * 3); } // flancs plus sombres
     g.setAttribute('color', new THREE.BufferAttribute(a, 3));
     TU.g.push(g);
+    if (!EAUX.has(g0)) for (let k = 0; k < 6; k++) {  // le contour de la case : un fin trait sombre entre deux cases de terre
+      const a = k * Math.PI / 3, b = a + Math.PI / 3;
+      bords.push(x + Math.sin(a) * R, top + 0.004, z + Math.cos(a) * R, x + Math.sin(b) * R, top + 0.004, z + Math.cos(b) * R);
+    }
     if (g0 !== 'bati') decor(DE, i, g0, top, x, z, c, r);
   }
-  familles = [fige(TU, groupe, MAT_SOL), fige(DE, groupe, MAT_SOL), fige(RS, groupe, MAT_BERGE), fige(RE, groupe, matRiv)];
+  const traits = new THREE.BufferGeometry(); traits.setAttribute('position', new THREE.Float32BufferAttribute(bords, 3));
+  const contours = new THREE.LineSegments(traits, MAT_CONTOUR); groupe.add(contours);
+  familles = [fige(TU, groupe, MAT_SOL), fige(DE, groupe, MAT_SOL), fige(RS, groupe, MAT_BERGE), fige(RE, groupe, matRiv), contours];
   teinterEaux();
 }
 
