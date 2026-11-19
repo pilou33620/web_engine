@@ -1556,7 +1556,8 @@ mod essais {
         assert_eq!(p.cout_pour(0, i), 1.5, "le désert ralentit");
         for v in p.carte.voisins(i) { p.carte.cases[v].route = 0; }
         assert!(p.danger_climat(i) > 0.0, "un désert sans route est contourné");
-        p.carte.cases[p.carte.voisins(i)[0]].route = 1;
+        let v0 = p.carte.voisins(i)[0];
+        p.carte.cases[v0].route = 1;
         assert_eq!(p.danger_climat(i), 0.0, "près d'une route, on y passe");
         p.carte.cases[i].biome = None;
         let couts: Vec<f64> = (1..=5).map(|n| { p.carte.cases[i].route = n; p.cout_pour(-1, i) }).collect();

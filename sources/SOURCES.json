@@ -1,9 +1,9 @@
 {
  "depots": {
   "web_royaumes": {
-   "commit": "abb82913fe65eb0411cc21f9a88798d719a2dd51",
+   "commit": "a3e1eefdc50417f695b372b5e8c06f9c22b695b9",
    "date": "2026-11-19",
-   "message": "IA : les chemins contournent le désert et la toundra l'hiver sans ravitaillement ; plus d'exception pour l'ordinateur"
+   "message": "Test des coûts de marche : corrige un double emprunt (le test ne compilait pas)"
   },
   "web_power": {
    "commit": "5f6edc3ea98242c2883ae762d21f9d8af88c9c07",
