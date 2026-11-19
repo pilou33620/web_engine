@@ -52,11 +52,13 @@ const coulTaux = b => (b.fin ? '#8d8f96' : b.hs > S.min ? '#6b6f68' : b.taux > 1
 function couleurCables() { for (const l of LIGNES) if (l.cables && !l.fin) (l.cables.userData.m0 || l.cables.material).color.set(S.lentille === 'charge' && !mode ? coulTaux(l) : l.hs > S.min ? '#8a3a30' : '#2d2621'); }
 
 // ============================================================ fumées
-const CHARBON = new Set(['usine', 'charbon', 'charbonG']);
+const CHARBON = new Set(['usine', 'charbon', 'charbonG']), NUCLEAIRE = new Set(['nucleaire', 'smr']);
 // les bouffées du moteur (vie.js), qui dérivent avec le vent ; seuls les ouvrages en marche fument
 function animFumees(dt) {
   for (const f of FUMEES) {
     const marche = f.u ? (estDecU(f.u) ? enService(f.u) && f.u.q > 1 : actifU(f.u) && f.u.p > 1) : true; if (!marche) continue;
+    // les tours de refroidissement : un panache de vapeur continu, à la mesure de la puissance du réacteur
+    if (f.vap && f.u && NUCLEAIRE.has(f.u.type)) { const p = versMoteur(f.p.x, f.p.y, f.p.z); MOTEUR.panache(f, p.x, p.y, p.z, { force: f.u.p / f.u.cap }); continue; }
     // le charbon fume plus noir et plus épais
     const charbon = f.u && CHARBON.has(f.u.type);
     f.tic -= dt; if (f.tic <= 0) { f.tic = f.vap ? .55 : charbon ? .4 : .7; const p = versMoteur(f.p.x, f.p.y, f.p.z); MOTEUR.bouffee(p.x, p.y, p.z, f.vap ? 'blanche' : 'noire', charbon && !f.vap ? 1.9 : undefined); }

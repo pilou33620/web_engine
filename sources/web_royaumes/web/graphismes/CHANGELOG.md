@@ -3,6 +3,27 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.20.0 — 2026-11-19
+
+Relief, biomes, vie des villes, guerre et crises :
+- relief (plateau.js) : les collines descendent en pente douce vers les cases plus basses (le replat central, où l'on bâtit, garde
+  sa hauteur), falaises de roche au bord des montagnes ; `hauteurEn()` suit la pente, `bordEntre(a, b)` ; le liseré des territoires
+  et les routes suivent le sol ;
+- biomes (plateau.js, ambiance.js) : marais (mares, roseaux), désert (dunes qui migrent sous le vent, sable soulevé), toundra
+  (lichens, sapins), déduits de la carte ou imposés par le jeu : `poserBiomes({ case: 'marais' | 'desert' | 'toundra' })`,
+  `biome(i)`, `casesBiome(nom)` ;
+- usure des routes (routes.js) : les tronçons les plus empruntés s'élargissent, un chemin de terre très passant devient pavé
+  (4e élément d'une route : son trafic, de 0 à 1, sinon estimé d'après le réseau) ;
+- villes (vie.js) : passants plus nombreux dans les grandes villes (`ville.pop` si le jeu la donne), linge qui sèche, fumées de
+  cheminée plus fortes quand il gèle ;
+- guerre (monde.js, modeles.js, sieges.js) : drapeaux des armées, des sièges et des forts qui flottent dans le sens du vent,
+  poussière derrière les armées en marche par temps sec ; les habitants d'une ville assiégée fuient vers la campagne ;
+- `traces.js` (ancien) : `traceBataille(case, tour)`, terre retournée, cratères et débris qui se referment en quatre mois ;
+- chroniques de web_royaumes : couronnement (confettis, cloches), peste (charrette des morts), révolte (foule aux torches, bonheur
+  sous `SEUIL_REVOLTE`), mariage royal (carrosse et pétales entre deux capitales alliées) ;
+- `crises.js` (moderne) : `panache()` (vapeur des tours nucléaires, fumée noire d'accident), `chute()` (débit des barrages),
+  `reflets()` (panneaux solaires), `blackout(x, z)` / `retablir()` (la carte s'éteint par vagues) ; `manifAntinucleaire()` (chantiers.js).
+
 ## 2.19.0 — 2026-11-19
 
 Le plateau (`plateau.js`, les deux jeux) : les cases se touchent (le dessus à pleine taille, sans biseau ni fossé entre elles),

@@ -7,7 +7,7 @@ use crate::commandes::{cout_recrue, prix};
 use crate::meteo::{self, Meteo};
 use crate::ia::diplomatie;
 use crate::partie::Partie;
-use crate::regles::regles;
+use crate::regles::{regles, HOMMES, REGLES_JSON};
 use crate::tour::QUETES;
 
 fn code(t: Terrain) -> u8 {
@@ -23,6 +23,24 @@ fn code(t: Terrain) -> u8 {
 }
 
 /// Le terrain : envoyé à l'ouverture et quand `version` change.
+/// Les règles servies à l'interface : celles du moteur, les habitants et les soldats comptés en hommes (`HOMMES`).
+pub fn regles_affichees() -> Value {
+    let mut r: Value = serde_json::from_str(REGLES_JSON).unwrap_or(json!({}));
+    let fois = |v: &mut Value, cles: &[&str]| {
+        for c in cles {
+            if let Some(n) = v.get(*c).and_then(Value::as_f64) {
+                v[*c] = json!(n * HOMMES as f64);
+            }
+        }
+    };
+    for (liste, cles) in [("batiments", &["logement", "ouvriers", "hygiene", "foi", "taverne", "colons"][..]), ("niveaux", &["pop"][..]), ("unites", &["transport"][..])] {
+        for v in r[liste].as_array_mut().into_iter().flatten() {
+            fois(v, cles);
+        }
+    }
+    r
+}
+
 pub fn carte(m: &Carte, version: u32) -> Value {
     json!({
         "l": m.l,
@@ -135,10 +153,11 @@ pub fn etat(p: &Partie) -> Value {
         "joueur": {
             "stock": j.stock,
             "capacite": caps,
-            "pop": j.pop,
-            "logement": s.logement,
-            "soldats": s.soldats,
-            "ouvriers_libres": j.ouvriers_libres,
+            "pop": j.pop * HOMMES,
+            "logement": s.logement * HOMMES,
+            "soldats": s.soldats * HOMMES,
+            "prix_terre": p.prix_terre(0),
+            "ouvriers_libres": j.ouvriers_libres as i64 * HOMMES,
             "bonheur": j.bonheur,
             "detail_bonheur": j.detail_bonheur,
             "impots": j.impots,
@@ -176,7 +195,7 @@ pub fn etat(p: &Partie) -> Value {
                 "relation": r.relation, "commerce": r.commerce, "puissance": p.puissance(r.id as i32),
                 // ce que l'on sait d'un rival : son trésor (pour commercer) et sa population à la dizaine près, pas ses réserves
                 "surplus": r.surplus, "demande": r.demande, "tresor": r.stock.get("or").copied().unwrap_or(0.0).floor(), "prix": prix_,
-                "population": if r.joueur { r.pop } else { (r.pop as f64 / 10.0).round() as i64 * 10 },
+                "population": if r.joueur { r.pop * HOMMES } else { (r.pop as f64 / 10.0).round() as i64 * 10 * HOMMES },
                 "techs": r.techs.len(), "techs_liste": r.techs,
                 // souverain, trêve, guerres et alliances avec les royaumes connus, coalition, mémoire
                 "diplo": diplomatie::vue_royaume(p, r.id),
@@ -185,13 +204,13 @@ pub fn etat(p: &Partie) -> Value {
         "villes": villes,
         "batiments": p.batiments.iter().filter(|b| b.proprio == 0 || connu(b.case)).map(|b| json!({
             "id": b.id, "cle": b.cle, "proprio": b.proprio, "case": b.case, "reste": b.reste,
-            "ouvriers": b.ouvriers, "etat": b.etat, "pause": b.pause, "file": b.file, "face": b.face,
+            "ouvriers": b.ouvriers as i64 * HOMMES, "etat": b.etat, "pause": b.pause, "file": b.file, "face": b.face,
             "ville": b.ville, "produit": b.produit, "arret": if b.arret > p.tour { json!(b.arret) } else { Value::Null },
         })).collect::<Vec<_>>(),
         "armees": p.armees.iter().filter(|a| a.proprio == 0 || vu(a.case)).map(|a| json!({
             "id": a.id, "proprio": a.proprio, "case": a.case, "unites": a.unites, // les autres : seulement la partie de leur marche qui est en vue (menaces en approche)
             "chemin": if a.proprio == 0 { json!(a.chemin) } else { json!(a.chemin.iter().take_while(|&&c| vu(c)).collect::<Vec<_>>()) },
-            "effectif": a.effectif(), "att": p.attaque(a, false, 1.0), "def": p.defense(a),
+            "effectif": a.effectif() as i64 * HOMMES, "att": p.attaque(a, false, 1.0), "def": p.defense(a),
             "mois": if a.chemin.is_empty() { 0 } else { p.mois_trajet(a, &a.chemin) },
             "assiege": p.assiege(a.proprio, a.case),
             // null, "en_cours" (un mois de travaux) ou "pret" (défense ×retranchement.defense)
@@ -226,12 +245,12 @@ pub fn etat(p: &Partie) -> Value {
                 "chemin": if a_moi { json!(f.chemin) } else { json!([]) },
                 "mois": if a_moi && !f.chemin.is_empty() { p.mois_navigation(f) } else { 0 },
                 "att": p.force_navale(f, true), "def": p.force_navale(f, false), "guerre": p.de_guerre(f),
-                "capacite": p.capacite_transport(f), "flutes": p.flutes(f), "commerce": f.commerce,
+                "capacite": p.capacite_transport(f) as i64 * HOMMES, "flutes": p.flutes(f), "commerce": f.commerce,
                 "a_quai": p.port_voisin(f).is_some(),
                 "armee": f.armee.as_ref().map(|a| if a_moi {
-                    json!({"id": a.id, "unites": a.unites, "effectif": a.effectif(), "att": p.attaque(a, false, 1.0), "def": p.defense(a)})
+                    json!({"id": a.id, "unites": a.unites, "effectif": a.effectif() as i64 * HOMMES, "att": p.attaque(a, false, 1.0), "def": p.defense(a)})
                 } else {
-                    json!({"effectif": a.effectif()})
+                    json!({"effectif": a.effectif() as i64 * HOMMES})
                 }),
             })
         }).collect::<Vec<_>>(),
@@ -268,7 +287,7 @@ pub fn etat(p: &Partie) -> Value {
                 "murs_pct": if s.murs_max > 0.0 { (s.murs / s.murs_max * 100.0).round() } else { 0.0 },
                 "vivres": s.vivres, "faim": s.faim, "assaut": s.assaut,
                 "armees": p.armees.iter().filter(|a| a.proprio == s.assiegeant && a.case == s.case).map(|a| a.id).collect::<Vec<_>>(),
-                "garnison": p.armees.iter().filter(|a| Some(a.proprio) == proprio && a.case == s.case).map(|a| a.effectif()).sum::<u32>(),
+                "garnison": p.armees.iter().filter(|a| Some(a.proprio) == proprio && a.case == s.case).map(|a| a.effectif() as i64 * HOMMES).sum::<i64>(),
                 "force_assaut": at.round(), "defense_assaut": de.round(),
                 "chance_assaut": (at / (at + de) * 100.0).round(),
                 "faubourgs": faubourgs, "pillage": pillage,

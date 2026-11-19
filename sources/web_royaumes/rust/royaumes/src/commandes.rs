@@ -90,9 +90,12 @@ pub fn executer(p: &mut Partie, c: &Value) -> Result<Value, String> {
         "recruter" => {
             let id = num(c, "batiment")? as u32;
             let u = txt(c, "unite")?;
+            // « nombre » : plusieurs d'un coup, autant que l'or et les habitants le permettent
+            let voulu = c.get("nombre").and_then(Value::as_u64).unwrap_or(1).clamp(1, 20);
             p.recruter(0, id, u)?;
+            let n = 1 + (1..voulu).take_while(|_| p.recruter(0, id, u).is_ok()).count();
             let du = rg.unite(u).unwrap();
-            ok(format!("{} {} : en formation", du.icone, du.nom))
+            ok(if n > 1 { format!("{} {} ×{n} : en formation", du.icone, du.nom) } else { format!("{} {} : en formation", du.icone, du.nom) })
         }
         "ameliorer" => {
             let vid = num(c, "ville")? as u32;
@@ -105,6 +108,13 @@ pub fn executer(p: &mut Partie, c: &Value) -> Result<Value, String> {
             let vi = p.villes.iter().position(|v| v.id == vid).ok_or("ville inconnue")?;
             let f = p.fortifier(0, vi)?;
             Ok(json!({"ok": true, "msg": format!("{} {} : {} en travaux ({} mois)", f.icone, p.villes[vi].nom, f.nom, f.duree.max(1)), "mois": f.duree.max(1)}))
+        }
+        // {"action": "acheter_terre", "case": i} : achète une case libre au bord du royaume
+        "acheter_terre" => {
+            let case = num(c, "case")? as usize;
+            let prix = p.acheter_terre(0, case)?;
+            p.recalculer_routes();
+            ok(format!("🗺️ Terres achetées pour {prix} 🪙"))
         }
         // {"action": "eclairer", "ville": id, "actif": true|false} : allume ou éteint l'éclairage public (payé chaque mois)
         "eclairer" => {
@@ -188,18 +198,31 @@ pub fn executer(p: &mut Partie, c: &Value) -> Result<Value, String> {
                     part.insert(u.clone(), n.min(dispo));
                 }
             }
+            // « fois » : autant d'armées de cette composition (il doit rester quelqu'un dans l'armée d'origine)
+            let fois = c.get("fois").and_then(Value::as_u64).unwrap_or(1).max(1) as u32;
             let total: u32 = part.values().sum();
-            if total == 0 || total >= p.armees[ai].effectif() {
+            if total == 0 || total * fois >= p.armees[ai].effectif() || part.iter().any(|(u, n)| n * fois > p.armees[ai].unites[u]) {
                 return Err("Choisissez une partie de l'armée".into());
             }
             for (u, n) in &part {
-                let x = p.armees[ai].unites.get_mut(u).unwrap();
-                *x -= n;
+                *p.armees[ai].unites.get_mut(u).unwrap() -= n * fois;
             }
             p.armees[ai].unites.retain(|_, n| *n > 0);
             let case = p.armees[ai].case;
-            let nid = p.creer_armee(0, case, part);
-            Ok(json!({"ok": true, "msg": "Nouvelle armée formée", "armee": nid}))
+            let ids: Vec<u32> = (0..fois).map(|_| p.creer_armee(0, case, part.clone())).collect();
+            Ok(json!({"ok": true, "msg": if fois > 1 { format!("{fois} nouvelles armées formées") } else { "Nouvelle armée formée".into() }, "armee": ids[0]}))
+        }
+        // {"action": "fusionner", "armee": id, "avec": id} : l'armée « avec » rejoint « armee » (même case, toutes deux à l'arrêt)
+        "fusionner" => {
+            let (id, autre) = (num(c, "armee")? as u32, num(c, "avec")? as u32);
+            let ai = p.armee(id).filter(|&i| p.armees[i].proprio == 0).ok_or("armée inconnue")?;
+            let bi = p.armee(autre).filter(|&i| p.armees[i].proprio == 0 && i != ai).ok_or("armée inconnue")?;
+            let (a, b) = (&p.armees[ai], &p.armees[bi]);
+            if a.case != b.case || !a.chemin.is_empty() || !b.chemin.is_empty() || !p.praticable(a.case) {
+                return Err("Les deux armées doivent être arrêtées sur la même case".into());
+            }
+            p.fusionner(ai, bi);
+            ok("Armées fusionnées")
         }
         "ameliorer_routes" => {
             let cible = p.ameliorer_routes(0)?;
@@ -260,7 +283,7 @@ pub fn executer(p: &mut Partie, c: &Value) -> Result<Value, String> {
             p.peut_embarquer(fi, ai)?;
             let n = p.armees[ai].effectif();
             p.embarquer(fi, ai);
-            ok(format!("⛵ {n} soldats embarquent"))
+            ok(format!("⛵ {n} soldats embarquent", n = n as i64 * crate::regles::HOMMES))
         }
         "debarquer" => {
             let fi = flotte(p, c)?;
@@ -413,7 +436,7 @@ impl Partie {
             return Err("Une ville ne peut dépasser le rang de la capitale".into());
         }
         if self.royaumes[id as usize].pop < def.pop {
-            return Err(format!("Il faut {} habitants", def.pop));
+            return Err(format!("Il faut {} habitants", def.pop as i64 * crate::regles::HOMMES));
         }
         if !self.peut_payer(id, &def.cout) {
             return Err("Ressources insuffisantes".into());
@@ -796,6 +819,63 @@ mod essais {
         assert!(executer(&mut p, &json!({"action": "rechercher", "tech": "assolement"})).is_ok());
         assert!(executer(&mut p, &json!({"action": "diplo", "royaume": 1, "acte": "cadeau"})).is_ok());
         assert!(executer(&mut p, &json!({"action": "impots", "niveau": "eleve"})).is_ok());
+    }
+
+    #[test]
+    fn recruter_par_cinq() {
+        let mut p = Partie::nouvelle(Options { graine: 11, ..Options::default() });
+        let cap = p.villes[0].case;
+        let c = p.carte.rayon(cap, 4).into_iter().find(|&c| p.carte.cases[c].bat.is_none() && p.peut_construire("cabane", c, 0).is_ok()).unwrap();
+        let b = p.poser("caserne", c, 0, true);
+        p.royaumes[0].pop = 200;
+        p.royaumes[0].stock.insert("or".into(), 40.0); // de quoi payer deux miliciens seulement
+        p.royaumes[0].stock.insert("bois".into(), 100.0);
+        let r = executer(&mut p, &json!({"action": "recruter", "batiment": b, "unite": "milice", "nombre": 5})).unwrap();
+        assert!(r["msg"].as_str().unwrap().contains("×2"), "{r}");
+        assert_eq!(p.bat(b).unwrap().file.len(), 2);
+    }
+
+    #[test]
+    fn diviser_puis_fusionner() {
+        let mut p = Partie::nouvelle(Options { graine: 11, ..Options::default() });
+        let ai = p.armees.iter().position(|a| a.proprio == 0).unwrap();
+        let id = p.armees[ai].id;
+        p.armees[ai].unites = [("milice".to_string(), 7)].into();
+        assert!(executer(&mut p, &json!({"action": "diviser", "armee": id, "unites": {"milice": 2}, "fois": 4})).is_err(), "il doit rester quelqu'un");
+        assert!(executer(&mut p, &json!({"action": "diviser", "armee": id, "unites": {"milice": 2}, "fois": 3})).is_ok());
+        let miennes = |p: &Partie| p.armees.iter().filter(|a| a.proprio == 0).map(|a| a.id).collect::<Vec<_>>();
+        assert_eq!(miennes(&p).len(), 4);
+        assert_eq!(p.armees[p.armee(id).unwrap()].effectif(), 1);
+        // à la fin du mois, les armées séparées du joueur le restent
+        p.fin_du_mois();
+        assert_eq!(miennes(&p).len(), 4);
+        for autre in miennes(&p).into_iter().filter(|&x| x != id) {
+            assert!(executer(&mut p, &json!({"action": "fusionner", "armee": id, "avec": autre})).is_ok());
+        }
+        assert_eq!(miennes(&p), vec![id]);
+        assert_eq!(p.armees[p.armee(id).unwrap()].effectif(), 7);
+    }
+
+    #[test]
+    fn achat_de_terres() {
+        let mut p = Partie::nouvelle(Options { graine: 11, ..Options::default() });
+        let n = p.carte.cases.len();
+        let bord = |p: &Partie| (0..n).find(|&c| p.carte.cases[c].terre() && p.carte.cases[c].proprio == -1 && p.carte.voisins(c).iter().any(|&v| p.carte.cases[v].proprio == 0)).unwrap();
+        let loin = (0..n).find(|&c| p.carte.cases[c].terre() && p.carte.cases[c].proprio == -1 && p.carte.voisins(c).iter().all(|&v| p.carte.cases[v].proprio != 0)).unwrap();
+        assert!(executer(&mut p, &json!({"action": "acheter_terre", "case": loin})).is_err(), "pas loin du royaume");
+        let cap = p.villes[0].case;
+        assert!(executer(&mut p, &json!({"action": "acheter_terre", "case": cap})).is_err(), "pas une case déjà prise");
+        p.royaumes[0].stock.insert("or".into(), 1000.0);
+        let (c1, prix1) = (bord(&p), p.prix_terre(0));
+        assert!(executer(&mut p, &json!({"action": "acheter_terre", "case": c1})).is_ok());
+        assert_eq!(p.carte.cases[c1].proprio, 0);
+        assert_eq!(p.joueur().stock["or"], 1000.0 - prix1);
+        assert!(p.prix_terre(0) > prix1, "chaque achat coûte plus cher");
+        p.recalculer_territoire();
+        assert_eq!(p.carte.cases[c1].proprio, 0, "la terre achetée reste au royaume");
+        p.royaumes[0].stock.insert("or".into(), 0.0);
+        let c2 = bord(&p);
+        assert!(executer(&mut p, &json!({"action": "acheter_terre", "case": c2})).is_err(), "sans or");
     }
 
     #[test]

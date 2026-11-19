@@ -25,6 +25,8 @@ qui s'ouvre dans le navigateur, comme web_conquete.
 - **Routes automatiques** : chaque bâtiment achevé est relié à l'hôtel de ville, les villes à leur capitale. Elles
   s'améliorent dans 📊 Royaume : chemins de terre → routes pavées → routes royales bordées d'arbres (production et
   marches plus rapides), et changent d'aspect.
+- **Achat de terres** : une case libre qui touche le royaume s'achète en or (🗺️ dans sa fiche) ; 60 🪙, puis 20 🪙 de
+  plus à chaque achat. Elle reste au royaume comme la case d'un fort.
 - **Bâtiments qui changent avec l'époque**, chacun sur sa dalle : colombages et chaume, puis crépi, volets et tuiles,
   puis pierre, ardoise et étages, puis brique et ardoise ; la mairie passe du beffroi à l'horloge, à la coupole dorée,
   puis au campanile ; les usines sortent de terre à l'ère industrielle.
@@ -70,7 +72,7 @@ qui s'ouvre dans le navigateur, comme web_conquete.
   économie que vous (réserves, ouvriers, population, bonheur, famine, froid, recherche) et jouent avec les mêmes ordres ;
   la difficulté règle la qualité de leurs décisions (erreurs, lenteur, prévoyance), sans leur donner de ressources
   (seul le niveau Difficile garde +10 % de production).
-- **Victoires** : conquête, prospérité (Cité + Palais royal + 400 habitants), diplomatie (alliance avec tous),
+- **Victoires** : conquête, prospérité (Cité + Palais royal + 4 000 habitants), diplomatie (alliance avec tous),
   ou meilleur royaume en décembre 1850.
 
 ## Lancer le jeu
@@ -102,8 +104,10 @@ tout seul. La partie est sauvegardée à chaque mois dans `saves/` ; on peut aus
 - **Fin du mois** : tout se joue, puis le bilan du mois s'affiche (événements, stocks, population, météo à venir).
 - **Armées** (⚔️) : recrutez à la caserne, au haras ou à l'arsenal ; touchez une armée puis « Donner une destination »,
   ou faites un clic droit sur la case visée. Les marches durent plusieurs mois ; neige et boue les ralentissent.
-  Depuis la fiche de l'armée : se retrancher, construire un fort, embarquer sur une flotte ; assaut depuis le panneau
-  de siège.
+  Depuis la fiche de l'armée : se retrancher, construire un fort, embarquer sur une flotte, diviser (en une ou
+  plusieurs armées) ou fusionner avec une autre armée arrêtée sur la même case ; assaut depuis le panneau de siège.
+  On recrute par régiments de 10 soldats (bouton ×5 pour cinq d'un coup) ; les habitants se comptent à la même
+  échelle (le moteur compte en régiments et en foyers : `HOMMES` dans regles.rs).
 - **Marine et espions** : recrutez au port et à la taverne, puis touchez la flotte ou l'espion pour naviguer,
   débarquer, commercer ou lancer une mission.
 - **Villes** : touchez la mairie pour monter de rang ou fortifier la ville.

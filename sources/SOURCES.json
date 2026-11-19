@@ -1,14 +1,14 @@
 {
  "depots": {
   "web_royaumes": {
-   "commit": "3772ac220eeaa081b1e15f0cbdc3e1ba6e5edba1",
+   "commit": "a2eee54e75f3fb9118588f392d9a9c6e6637465d",
    "date": "2026-11-19",
-   "message": "Graphismes : bibliothèque web_engine 2.19.0, les cases du plateau se touchent avec un fin trait sombre entre elles"
+   "message": "Merge remote-tracking branch 'origin/main'"
   },
   "web_power": {
-   "commit": "6278a8683995746773145dfa66826662359b2705",
+   "commit": "ee6bd4b5567d8cf654d331504e12f8ad49f8c604",
    "date": "2026-11-19",
-   "message": "Graphismes : bibliothèque web_engine 2.19.0, les cases du plateau se touchent avec un fin trait sombre entre elles"
+   "message": "Graphismes : bibliothèque web_engine 2.20.0, crises et relief"
   }
  },
  "maquettes": [

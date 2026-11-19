@@ -386,6 +386,9 @@ pub struct Partie {
     pub choix: Vec<Choix>,
     #[serde(default)]
     pub forts: Vec<Fort>,
+    /// cases achetées : [case, royaume] ; elles restent au royaume comme la case d'un fort
+    #[serde(default)]
+    pub terres: Vec<[i64; 2]>,
     /// relations et traités entre rivaux, souverains, mémoire, coalitions (ia/diplomatie.rs)
     #[serde(default)]
     pub diplomatie: Diplomatie,
@@ -569,6 +572,7 @@ impl Partie {
             blocus: Vec::new(),
             choix: Vec::new(),
             forts: Vec::new(),
+            terres: Vec::new(),
             diplomatie: Diplomatie::default(),
         };
         p.meteo = Meteo::tirer(&Meteo { temperature: 9.0, ..Meteo::default() }, TOUR_DEPART, &mut p.hasard);
@@ -839,9 +843,13 @@ impl Partie {
                     continue;
                 }
             }
-            // un fort achevé tient sa case
+            // un fort achevé tient sa case, une terre achetée aussi
             if let Some(f) = self.forts.iter().find(|f| f.case == i && f.niveau > 0) {
                 self.carte.cases[i].proprio = f.proprio;
+                continue;
+            }
+            if let Some(t) = self.terres.iter().find(|t| t[0] == i as i64) {
+                self.carte.cases[i].proprio = t[1] as i32;
                 continue;
             }
             let mut meilleur: Option<(i32, i32, u8)> = None;
@@ -859,6 +867,35 @@ impl Partie {
             }
             self.carte.cases[i].proprio = meilleur.map(|m| m.1).unwrap_or(-1);
         }
+    }
+
+    /// Le prix de la prochaine terre achetée par `id`.
+    pub fn prix_terre(&self, id: i32) -> f64 {
+        let n = self.terres.iter().filter(|t| t[1] == id as i64).count() as f64;
+        regles().achat_terre.or + regles().achat_terre.hausse * n
+    }
+
+    /// `id` achète la case libre `case`, sur la terre ferme et voisine de son territoire : elle est à lui tout de suite.
+    pub fn acheter_terre(&mut self, id: i32, case: usize) -> Result<f64, String> {
+        let k = self.carte.cases.get(case).ok_or("Hors de la carte")?;
+        if !k.terre() {
+            return Err("On n'achète pas la mer".into());
+        }
+        if k.proprio != -1 {
+            return Err("Ces terres ne sont pas libres".into());
+        }
+        if !self.carte.voisins(case).iter().any(|&v| self.carte.cases[v].proprio == id) {
+            return Err("La case doit toucher votre royaume".into());
+        }
+        let prix = self.prix_terre(id);
+        let cout: Panier = [("or".to_string(), prix)].into();
+        if !self.peut_payer(id, &cout) {
+            return Err(format!("Il faut {prix} 🪙"));
+        }
+        self.payer(id, &cout);
+        self.terres.push([case as i64, id as i64]);
+        self.recalculer_territoire();
+        Ok(prix)
     }
 
     // ------------------------------------------------------------------ construction
@@ -1058,6 +1095,20 @@ impl Partie {
         let id = self.id();
         self.armees.push(Armee { id, proprio, case, unites, ..Default::default() });
         id
+    }
+
+    /// L'armée d'indice `src` rejoint celle d'indice `dst` (même case) : ses unités passent, la position retranchée le reste.
+    pub fn fusionner(&mut self, dst: usize, src: usize) {
+        let a = self.armees[src].clone();
+        let d = &mut self.armees[dst];
+        for (u, n) in a.unites {
+            *d.unites.entry(u).or_insert(0) += n;
+        }
+        d.retranche = match (d.retranche, a.retranche) {
+            (Some(x), Some(y)) => Some(x.min(y)),
+            (x, y) => x.or(y),
+        };
+        self.armees.remove(src);
     }
 
     pub fn armee(&self, id: u32) -> Option<usize> {

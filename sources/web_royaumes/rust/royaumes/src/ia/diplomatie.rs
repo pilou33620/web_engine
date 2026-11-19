@@ -764,7 +764,9 @@ pub fn succession(p: &mut Partie, k: usize, coup_d_etat: bool, rapport: &mut Rap
         } else {
             format!("👑 {vieux} ({royaume}) est mort ; {neuf} lui succède — un souverain {nature}.")
         };
-        p.evt(rapport, texte, "info", None);
+        // la case de sa capitale : le rendu y fête le couronnement (chroniques.js)
+        let cap = p.villes.iter().find(|v| v.proprio == k as i32 && v.capitale).map(|v| v.case);
+        p.evt(rapport, texte, "info", cap);
     }
 }
 

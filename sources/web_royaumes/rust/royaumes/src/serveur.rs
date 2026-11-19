@@ -18,7 +18,6 @@ use web_tools_commun::serveur::{Reponse, Requete, Serveur};
 use crate::carte::{Carte, Options};
 use crate::commandes;
 use crate::partie::Partie;
-use crate::regles::REGLES_JSON;
 use crate::vue;
 
 pub const PORT: u16 = 8795;
@@ -70,7 +69,7 @@ impl App {
                 "version": VERSION, "partie": self.partie.is_some(), "reseau": self.reseau, "maj": self.maj,
                 "fin": self.partie.as_ref().and_then(|p| p.fin.as_ref()).is_some(),
             })),
-            ("GET", "/api/regles") => (200, serde_json::from_str(REGLES_JSON).unwrap_or(json!({}))),
+            ("GET", "/api/regles") => (200, vue::regles_affichees()),
             ("POST", "/api/apercu") => {
                 let mut o: Options = serde_json::from_value(entree).unwrap_or_default();
                 o.borner();

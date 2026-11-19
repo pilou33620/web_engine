@@ -7,6 +7,7 @@
 import { THREE, chaqueImage, pres } from './scene.js';
 import { lot, put, fige, boite, cyl, cone, sphere, degrade, CONT } from './toon.js';
 import { climat, bouffee } from './vie.js';
+import { reflets, eteint } from './crises.js';
 
 const R = 10, SQ3 = Math.sqrt(3);
 // le hasard reproductible de web_power (01-outils.js) : les variantes (couleurs des maisons, des champs…) suivent la graine
@@ -73,6 +74,7 @@ const BAT = {
     for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) {
       const x = i * 3.1 + (j & 1) * .2, z = j * 2.9; if (Math.hypot(x, z) > 7.3) continue;
       piece(L, ex, P => { const p = boite(2.7, .22, 1.9); p.rotateX(.5); put(P, p, 0x2d4f92, 0, 0, 0, 0, .16); }, x, 1.1, z, 'oscille', 'x', .25, .3); put(L, boite(.2, .9, .2), 0x8d96a0, x, .45, z, 0, 0);
+      ex?.reflets?.push([x, 1.3, z]);  // l'éclat du soleil sur le panneau (crises.js)
     }
     put(L, boite(1.5, 1.4, 1.2), 0xf1efe6, 6.2, .7, -1.5);
     piece(L, ex, P => { put(P, boite(1.6, .6, .8), 0xf6f6f1, 0, .5, 0); put(P, boite(.6, .45, .75), 0xd9e8f2, .4, .95, 0, 0, .08); }, 0, 0, 1.45, 'glisse', 'x', 4, .2);
@@ -467,7 +469,7 @@ const PART = new THREE.SphereGeometry(.55, 8, 6), MPART = new THREE.MeshBasicMat
  *  chantier : le modèle en transparence sous une grue, comme pendant les travaux dans web_power. */
 export function modele(dessin, graine = 1, { chantier = false } = {}) {
   semer({ q: graine, r: 7 });
-  const L = lot(), ex = { fum: [], rotors: [], courant: [], pieces: [] };
+  const L = lot(), ex = { fum: [], rotors: [], courant: [], pieces: [], reflets: [] };
   dessin(L, ex);
   const groupe = fige(L, null, chantier ? CHANT : undefined);
   const rotors = ex.rotors.map(r => {
@@ -493,6 +495,7 @@ export function modele(dessin, graine = 1, { chantier = false } = {}) {
     return ps;
   }).flat();
   groupe.scale.setScalar(1 / R);
+  if (!chantier && ex.reflets.length) reflets(groupe, ex.reflets);
   return { groupe, fumees: chantier ? [] : ex.fum, rotors: chantier ? [] : rotors, lumieres, courant, pieces };
 }
 
@@ -515,7 +518,7 @@ chaqueImage(dt => {
     if (!groupe.parent) { ANIMES.splice(i, 1); continue; }
     for (const f of a.fum) if ((f.t -= dt) < 0) { f.t = f.genre === 'blanche' ? .55 : .7; bouffee(f.p.x, f.p.y, f.p.z, f.genre); }
     for (const r of rotors) r.rotation.z -= dt * 2 * (.5 + climat.vent * 1.5);
-    if (lumieres) { lumieres.visible = nuit > .05; MLUM.opacity = nuit; }
+    if (lumieres) { lumieres.visible = nuit > .05 && !eteint(groupe.matrixWorld.elements[12], groupe.matrixWorld.elements[14]); MLUM.opacity = nuit; }  // blackout : la vague éteint les fenêtres
     const loin = pieces.length && !pres(groupe.matrixWorld.elements[12], groupe.matrixWorld.elements[14]);  // qualité : au loin, les pièces se figent
     if (!loin) for (const p of pieces) {
       const f = Math.sin(maintenant / 1000 * p.v + p.ph);

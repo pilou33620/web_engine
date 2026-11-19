@@ -170,7 +170,7 @@ impl Partie {
                 "pop" => {
                     let j = &mut self.royaumes[k];
                     j.pop = (j.pop + v as i64).max(1);
-                    recit.push(format!("{signe}{v} habitants"));
+                    recit.push(format!("{signe}{v} habitants", v = v as i64 * crate::regles::HOMMES));
                 }
                 "relation" if id != 0 => {}
                 "relation" => {

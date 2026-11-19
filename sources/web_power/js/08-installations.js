@@ -40,11 +40,12 @@ function rotPour(t, type) {
   return (hache(t.q, t.r, 4) * 6 | 0) * Math.PI / 3;
 }
 function modele(t, type, mat = MAT, u = null) {
-  semer(t); MODERNES.semer(t); const L = lot(), ex = { rotors: [], fum: [], pieces: [] };
+  semer(t); MODERNES.semer(t); const L = lot(), ex = { rotors: [], fum: [], pieces: [], reflets: [] };
   BAT[type](L, ex, t);
   const grp = fige(L, scene, mat);
   grp.position.set(t.x, type === 'barrage' ? t.top - 1 : TYPES[type].eau ? MER_Y : t.top, t.z); grp.rotation.y = rotPour(t, type);
-  pieces(grp, ex, mat, mat === MAT);  // en travaux (CHANT), elles restent immobiles et transparentes
+  pieces(grp, ex, mat, mat === MAT);
+  if (mat === MAT && ex.reflets.length) MOTEUR.reflets(grp, ex.reflets);  // l'éclat du soleil sur les panneaux solaires  // en travaux (CHANT), elles restent immobiles et transparentes
   for (const r of ex.rotors) {
     const rg = rotor(); rg.position.set(...r);
     if (mat !== MAT) rg.traverse(o => { if (o.isMesh) { if (o.material === CONT) o.visible = false; else o.material = mat; } });

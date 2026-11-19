@@ -24,12 +24,12 @@ pub const QUETES: [Quete; 15] = [
     Quete { texte: "Construisez un Pêcheur et une Ferme céréalière", prime: 40.0 },
     Quete { texte: "Construisez une Scierie", prime: 40.0 },
     Quete { texte: "Bâtissez un Grenier à grain avant l'hiver", prime: 60.0 },
-    Quete { texte: "Atteignez 40 habitants", prime: 80.0 },
+    Quete { texte: "Atteignez 400 habitants", prime: 80.0 }, // 40 au moteur (HOMMES)
     Quete { texte: "Faites de votre capitale un Village", prime: 120.0 },
     Quete { texte: "Produisez du pain (Moulin + Boulangerie)", prime: 100.0 },
     Quete { texte: "Construisez un Comptoir de commerce", prime: 120.0 },
     Quete { texte: "Ouvrez une route commerciale ou signez une alliance", prime: 150.0 },
-    Quete { texte: "Rassemblez 20 soldats", prime: 120.0 },
+    Quete { texte: "Rassemblez 20 régiments (200 soldats)", prime: 120.0 },
     Quete { texte: "Découvrez 3 technologies", prime: 150.0 },
     Quete { texte: "Atteignez le rang de Bourg", prime: 250.0 },
     Quete { texte: "Fondez une Colonie", prime: 300.0 },
@@ -237,17 +237,9 @@ impl Partie {
                 continue;
             }
             if a.chemin.is_empty() && !self.assiege(a.proprio, a.case) {
-                if let Some(j) = self.armees.iter().position(|o| o.id != a.id && o.proprio == a.proprio && o.case == a.case && o.chemin.is_empty() && o.id < a.id) {
-                    for (u, n) in &a.unites {
-                        *self.armees[j].unites.entry(u.clone()).or_insert(0) += n;
-                    }
-                    // des renforts rejoignent une position retranchée : elle le reste
-                    let r = &mut self.armees[j].retranche;
-                    *r = match (*r, a.retranche) {
-                        (Some(x), Some(y)) => Some(x.min(y)),
-                        (x, y) => x.or(y),
-                    };
-                    self.armees.remove(i);
+                // le joueur fusionne lui-même ses armées (ordre « fusionner ») : celles qu'il a séparées restent séparées
+                if let Some(j) = self.armees.iter().position(|o| o.id != a.id && o.proprio == a.proprio && o.case == a.case && o.chemin.is_empty() && o.id < a.id).filter(|_| a.proprio != 0) {
+                    self.fusionner(j, i);
                     continue;
                 }
                 if a.proprio == BRIGANDS {
@@ -669,7 +661,7 @@ impl Partie {
                     formes += 1.0;
                 }
                 let n = self.batiments[i].file.len();
-                self.batiments[i].etat = if formes > 0.0 { format!("{formes} recrue(s) formée(s), {n} en file") } else if n > 0 { format!("{n} en file") } else { "Prête à recruter".into() };
+                self.batiments[i].etat = if formes > 0.0 { format!("{formes} régiment(s) formé(s), {n} en file") } else if n > 0 { format!("{n} en file") } else { "Prête à recruter".into() };
                 // le port forme ses navires et pêche aussi
                 if d.prod.is_empty() {
                     continue;
@@ -938,7 +930,7 @@ impl Partie {
             self.evt(rapport, "🍽️ Famine ! Les greniers sont vides, la population diminue.".into(), "guerre", None);
         }
         if gele {
-            self.evt(rapport, format!("🥶 Pas assez de combustible pour se chauffer : le peuple grelotte, le froid et les maladies emportent {geles} habitant(s)."), "meteo", None);
+            self.evt(rapport, format!("🥶 Pas assez de combustible pour se chauffer : le peuple grelotte, le froid et les maladies emportent {geles} habitant(s).", geles = geles as i64 * crate::regles::HOMMES), "meteo", None);
         }
         if self.jour_marche() {
             for (vi, x) in &vies {
@@ -1052,7 +1044,7 @@ impl Partie {
             let l = (pop * 0.08).ceil() as i64;
             self.royaumes[k].pop = (self.royaumes[k].pop - l).max(1);
             if k == 0 {
-                self.evt(rapport, format!("🤒 Épidémie : −{l} habitants (puits, fontaines, Hôtel-Dieu)"), "guerre", None);
+                self.evt(rapport, format!("🤒 Épidémie : −{l} habitants (puits, fontaines, Hôtel-Dieu)", l = l as i64 * crate::regles::HOMMES), "guerre", None);
             }
         }
         if self.tour < 6 {

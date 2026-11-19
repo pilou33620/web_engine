@@ -20,11 +20,13 @@ LUM.frustumCulled = false; LUM.visible = false; scene.add(LUM);
 let foudreTic = 2, debordTic = 0, lumCle = '', lumTic = 0, neigeSol = 0, minPrec = null, cleMeteo = '', platTic = 0;
 // une ville coupée par le délestage reste noire la nuit (une part des villes servies, toujours les mêmes d'abord)
 const coupee = v => S.delestage > 1 && hache(v.centre.q, v.centre.r, 61) < clamp(S.delestage / Math.max(1, S.demServie), .15, 1);
+// le blackout de la bibliothèque : la vague qui éteint les quartiers, puis celle qui les rallume
+const noir = t => { const p = versMoteur(t.x, 0, t.z); return MOTEUR.eteint(p.x, p.z); };
 function majLumieres() {
-  const cle = VILLES.map(v => v.nom + v.tuiles.length + v.servie + coupee(v)).join();
+  const cle = VILLES.map(v => v.nom + v.tuiles.length + v.servie + coupee(v) + v.tuiles.filter(noir).length).join();
   if (cle === lumCle) return; lumCle = cle;
   const pos = [], col = [];
-  for (const v of VILLES) if (v.servie && !coupee(v)) for (const t of v.tuiles) for (let k = 0; k < 5; k++) {
+  for (const v of VILLES) if (v.servie && !coupee(v)) for (const t of v.tuiles) if (!noir(t)) for (let k = 0; k < 5; k++) {
     pos.push(t.x + (hache(t.q, t.r, 80 + k) - .5) * 14, t.top + 1.5 + hache(t.q, t.r, 90 + k) * 5, t.z + (hache(t.q, t.r, 100 + k) - .5) * 12);
     col.push(1, k % 3 ? .74 : .9, k % 3 ? .36 : .65);
   }
@@ -55,6 +57,48 @@ function majGreves() {
     g.userData.piquet = fige(L, g); pieces(g.userData.piquet, ex);
   }
 }
+// ------------------------------------------------------------ crises (bibliothèque, crises.js et chantiers.js)
+// les barrages déversent selon la production, le lac plein et la rivière ; une installation qui tombe en panne crache un panache noir deux jours
+const ACCIDENTS = new Set(['usine', 'charbon', 'charbonG', 'fioul', 'gaz', 'tac', 'biomasse', 'incin', 'dangereux', 'tri', 'metha']);
+const debutPanne = new WeakMap();  // unité → minute du début de sa panne (hors de l'unité, qui est sauvegardée)
+const local = (g, x, y, z) => g.localToWorld(new THREE.Vector3(x, y, z));
+function majCrises() {
+  const w = meteo(S.min);
+  for (const u of UNITES) {
+    const g = u.grp; if (u.fin || !g || u.t.brume) continue;
+    if (u.type === 'barrage') {
+      const prod = actifU(u) ? clamp(u.p / u.cap, 0, 1) : 0;
+      MOTEUR.chute(u, local(g, 1.3, 3, 0), local(g, 4.8, -.4, 0), { debit: clamp(.1 + prod * .6 + (u.soc > .95 ? .5 : 0) + (w.debit - 1) * .4, 0, 1), larg: .3 });
+    }
+    if (ACCIDENTS.has(u.type) && u.panne > S.min) {
+      if (!debutPanne.has(u)) debutPanne.set(u, S.min);
+      const jours = (S.min - debutPanne.get(u)) / 1440;
+      if (jours < 2) { const p = local(g, 0, 7, 0); MOTEUR.panache(u, p.x, p.y, p.z, { genre: 'noire', force: 1 - jours / 2 }); }
+    } else debutPanne.delete(u);
+  }
+}
+// la manifestation antinucléaire devant les réacteurs, quand l'opinion gronde (enquêtes passées en force, recours) ou que la satisfaction s'effondre
+function majManifs() {
+  const colere = S.nimby > 4 || S.sat < 30;
+  for (const u of UNITES) {
+    if (!NUCLEAIRE.has(u.type) || u.fin || !u.grp) continue;
+    const g = u.grp; if (!!g.userData.manif === colere) continue;
+    jeter(g.userData.manif); g.userData.manif = null;
+    if (!colere) continue;
+    const L = lot(), ex = { pieces: [] }; MODERNES.semer(u.t); MOTEUR.manifAntinucleaire()(L, ex);
+    g.userData.manif = fige(L, g); g.userData.manif.rotation.y = -g.rotation.y; pieces(g.userData.manif, ex);  // toujours du côté sud, face à la caméra
+  }
+}
+// le réseau s'effondre (plus de la moitié de la demande délestée) : blackout depuis la dernière installation tombée, ou la plus grosse
+let effondre = false;
+function majBlackout() {
+  const part = (S.delestage || 0) / Math.max(1, S.demTot || 0);
+  if (!effondre && part > .5) {
+    effondre = true;
+    const u = UNITES.filter(u => u.panne > S.min).at(-1) || [...UNITES].filter(u => TYPES[u.type].mw).sort((a, b) => b.cap - a.cap)[0], t = u?.t || VILLES[0]?.centre;
+    if (t) { const p = versMoteur(t.x, 0, t.z); MOTEUR.blackout(p.x, p.z); }
+  } else if (effondre && part < .25) { effondre = false; MOTEUR.retablir(); }
+}
 function animCiel(dt, kt) {
   const w = meteo(S.min), mo = date(S.min).getUTCMonth(), g = genreMeteo(w, S.min), pluieK = pluieDe(w, S.min);
   MOTEUR.forcerHeure(cycleMoteur(S.min));
@@ -74,14 +118,15 @@ function animCiel(dt, kt) {
   const mwCharbon = UNITES.reduce((a, u) => a + (CHARBON.has(u.type) && actifU(u) ? u.p || 0 : 0), 0);
   MOTEUR.climat.pollution += (clamp(mwCharbon / 400, 0, .85) - MOTEUR.climat.pollution) * Math.min(1, dt * .3);
   MOTEUR.climat.eauSale = clamp((1 - (S.eau?.conf ?? 1)) * 1.5, 0, 1);
-  if ((debordTic -= dt) < 0) { debordTic = 1; majDebords(); majGreves(); for (const u of UNITES) if (u.fin && u.grue && u.grue.userData.palier !== Math.round(avancement(u) * 5)) poserChantier(u); }
+  majCrises();
+  if ((debordTic -= dt) < 0) { debordTic = 1; majDebords(); majGreves(); majManifs(); majBlackout(); for (const u of UNITES) if (u.fin && u.grue && u.grue.userData.palier !== Math.round(avancement(u) * 5)) poserChantier(u); }
   // la foudre frappe les lignes pendant la tempête (un pylône au hasard)
   if (g === 'tempete' && LIGNES.length && (foudreTic -= dt) < 0) {
     foudreTic = 3 + Math.random() * 5;
     const l = LIGNES[Math.random() * LIGNES.length | 0], t = l.tuiles?.[Math.random() * (l.tuiles?.length || 0) | 0];
     if (t && !t.brume) { const p = versMoteur(t.x, t.top + (l.kv >= 225 ? 7 : 4.5), t.z); MOTEUR.foudreSur(p.x, p.y, p.z); }
   }
-  if ((lumTic -= dt) < 0) { lumTic = .5; majLumieres(); }
+  if ((lumTic -= dt) < 0) { lumTic = .2; majLumieres(); }
   const nuit = MOTEUR.climat.nuit + MOTEUR.climat.aube * .5;
   LUM.material.opacity = clamp(nuit * 1.4, 0, 1); LUM.visible = LUM.material.opacity > .01;
 }

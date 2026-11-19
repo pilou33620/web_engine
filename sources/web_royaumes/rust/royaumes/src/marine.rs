@@ -83,7 +83,7 @@ impl Partie {
             return Err("Il faut des navires de transport (flûte marchande, navire à vapeur)".into());
         }
         if a.effectif() > cap {
-            return Err(format!("La flotte ne peut porter que {cap} soldats : divisez l'armée"));
+            return Err(format!("La flotte ne peut porter que {cap} soldats : divisez l'armée", cap = cap as i64 * crate::regles::HOMMES));
         }
         let cote = self.carte.cases[a.case].terre() && self.carte.dist(a.case, f.case) <= 1;
         let au_port = self.ville_a(a.case).is_some_and(|vi| {
@@ -252,10 +252,10 @@ impl Partie {
             r.pop = (r.pop - n as i64).max(1);
         }
         if f.proprio == 0 {
-            let texte = if n > 0 { format!("🌊 Votre flotte est envoyée par le fond avec {n} soldats à bord !") } else { "🌊 Votre flotte est envoyée par le fond !".to_string() };
+            let texte = if n > 0 { format!("🌊 Votre flotte est envoyée par le fond avec {n} soldats à bord !", n = n as i64 * crate::regles::HOMMES) } else { "🌊 Votre flotte est envoyée par le fond !".to_string() };
             self.evt(rapport, texte, "guerre", Some(f.case));
         } else if n > 0 && self.est_ennemi(0, f.proprio) {
-            self.evt(rapport, format!("🌊 Un convoi de {} sombre avec {n} soldats à bord", self.nom_royaume(f.proprio)), "bon", Some(f.case));
+            self.evt(rapport, format!("🌊 Un convoi de {} sombre avec {n} soldats à bord", self.nom_royaume(f.proprio), n = n as i64 * crate::regles::HOMMES), "bon", Some(f.case));
         }
     }
 
@@ -397,7 +397,7 @@ mod essais {
         let r = p.fin_du_mois();
         assert!(r.combats.iter().any(|c| c.texte.contains("navale")), "{:?}", r.combats);
         assert!(p.flottes.iter().all(|f| f.proprio != 0), "la flûte sans escorte est coulée");
-        assert!(r.evenements.iter().any(|e| e.texte.contains("5 soldats à bord")), "les soldats à bord sont perdus");
+        assert!(r.evenements.iter().any(|e| e.texte.contains("50 soldats à bord")), "les soldats à bord sont perdus");
         // les frégates mouillent à côté du port : blocus
         assert!(p.bloquee(p.batiments.iter().find(|b| b.cle == "port").unwrap().ville), "{:?}", p.blocus);
         assert!(r.evenements.iter().any(|e| e.texte.contains("Blocus")));

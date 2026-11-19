@@ -47,11 +47,11 @@
     {"cle": "admin", "nom": "Expansion", "icone": "🚩"}
   ],
   "batiments": [
-    {"cle": "cabane", "nom": "Chaumière", "icone": "🛖", "cat": "habitat", "niveau": 1, "cout": {"bois": 15}, "duree": 1, "logement": 8, "desc": "Toit de chaume pour 8 habitants."},
-    {"cle": "maison", "nom": "Maison à colombages", "icone": "🏠", "cat": "habitat", "niveau": 2, "cout": {"bois": 15, "planches": 15, "pierre": 8}, "duree": 2, "logement": 16, "desc": "Loge 16 habitants."},
-    {"cle": "maison_pierre", "nom": "Maison de pierre", "icone": "🏡", "cat": "habitat", "niveau": 3, "cout": {"planches": 25, "pierre": 35, "outils": 4}, "duree": 3, "logement": 28, "decor": 1, "desc": "Loge 28 habitants, ne brûle pas."},
-    {"cle": "hotel_particulier", "nom": "Hôtel particulier", "icone": "🏘️", "cat": "habitat", "niveau": 4, "cout": {"planches": 40, "pierre": 70, "outils": 10, "or": 200}, "duree": 5, "logement": 45, "decor": 3, "desc": "Demeure de notables : 45 habitants."},
-    {"cle": "immeuble", "nom": "Immeuble ouvrier", "icone": "🏢", "cat": "habitat", "niveau": 4, "tech": "vapeur", "cout": {"planches": 40, "pierre": 80, "fer": 10, "outils": 10}, "duree": 4, "logement": 80, "desc": "Logements serrés de l'ère industrielle : 80 habitants."},
+    {"cle": "cabane", "nom": "Chaumière", "icone": "🛖", "cat": "habitat", "niveau": 1, "cout": {"bois": 15}, "duree": 1, "logement": 8, "desc": "Toit de chaume pour 80 habitants."},
+    {"cle": "maison", "nom": "Maison à colombages", "icone": "🏠", "cat": "habitat", "niveau": 2, "cout": {"bois": 15, "planches": 15, "pierre": 8}, "duree": 2, "logement": 16, "desc": "Loge 160 habitants."},
+    {"cle": "maison_pierre", "nom": "Maison de pierre", "icone": "🏡", "cat": "habitat", "niveau": 3, "cout": {"planches": 25, "pierre": 35, "outils": 4}, "duree": 3, "logement": 28, "decor": 1, "desc": "Loge 280 habitants, ne brûle pas."},
+    {"cle": "hotel_particulier", "nom": "Hôtel particulier", "icone": "🏘️", "cat": "habitat", "niveau": 4, "cout": {"planches": 40, "pierre": 70, "outils": 10, "or": 200}, "duree": 5, "logement": 45, "decor": 3, "desc": "Demeure de notables : 450 habitants."},
+    {"cle": "immeuble", "nom": "Immeuble ouvrier", "icone": "🏢", "cat": "habitat", "niveau": 4, "tech": "vapeur", "cout": {"planches": 40, "pierre": 80, "fer": 10, "outils": 10}, "duree": 4, "logement": 80, "desc": "Logements serrés de l'ère industrielle : 800 habitants."},
 
     {"cle": "bucheron", "nom": "Bûcheron", "icone": "🪓", "cat": "ressources", "niveau": 1, "cout": {"bois": 12}, "duree": 1, "ouvriers": 2, "prod": {"bois": 12}, "besoin": "foret", "desc": "Abat les arbres voisins. Les forêts s'épuisent !"},
     {"cle": "forestier", "nom": "Garde forestier", "icone": "🌱", "cat": "ressources", "niveau": 1, "cout": {"bois": 15}, "duree": 1, "ouvriers": 1, "desc": "Replante des arbres dans un rayon de 2 cases."},
@@ -87,9 +87,9 @@
     {"cle": "banque", "nom": "Banque", "icone": "🏦", "cat": "commerce", "niveau": 4, "tech": "lumieres", "cout": {"pierre": 80, "planches": 30, "or": 500}, "duree": 4, "ouvriers": 2, "taxe": 0.25, "desc": "+25 % d'impôts."},
     {"cle": "gare", "nom": "Gare", "icone": "🚂", "cat": "commerce", "niveau": 4, "tech": "chemin_fer", "cout": {"pierre": 80, "fer": 60, "planches": 40, "or": 600}, "duree": 6, "ouvriers": 3, "taxe": 0.1, "desc": "Le chemin de fer : armées plus rapides et commerce."},
 
-    {"cle": "puits", "nom": "Puits", "icone": "🪣", "cat": "services", "niveau": 1, "cout": {"pierre": 10, "bois": 5}, "duree": 1, "hygiene": 40, "desc": "Hygiène pour 40 habitants, aide contre les incendies."},
-    {"cle": "taverne", "nom": "Taverne", "icone": "🍻", "cat": "services", "niveau": 2, "cout": {"planches": 20, "pierre": 8}, "duree": 2, "ouvriers": 1, "taverne": 60, "unites": ["espion"], "desc": "Sert bière ou vin à 60 habitants ; on y recrute des espions."},
-    {"cle": "eglise", "nom": "Église", "icone": "⛪", "cat": "services", "niveau": 2, "cout": {"pierre": 40, "planches": 15}, "duree": 4, "ouvriers": 1, "foi": 80, "desc": "Foi pour 80 habitants."},
+    {"cle": "puits", "nom": "Puits", "icone": "🪣", "cat": "services", "niveau": 1, "cout": {"pierre": 10, "bois": 5}, "duree": 1, "hygiene": 40, "desc": "Hygiène pour 400 habitants, aide contre les incendies."},
+    {"cle": "taverne", "nom": "Taverne", "icone": "🍻", "cat": "services", "niveau": 2, "cout": {"planches": 20, "pierre": 8}, "duree": 2, "ouvriers": 1, "taverne": 60, "unites": ["espion"], "desc": "Sert bière ou vin à 600 habitants ; on y recrute des espions."},
+    {"cle": "eglise", "nom": "Église", "icone": "⛪", "cat": "services", "niveau": 2, "cout": {"pierre": 40, "planches": 15}, "duree": 4, "ouvriers": 1, "foi": 80, "desc": "Foi pour 800 habitants."},
     {"cle": "jardin", "nom": "Jardin à la française", "icone": "🌷", "cat": "services", "niveau": 2, "cout": {"bois": 8, "or": 50}, "duree": 1, "decor": 3, "desc": "Décoration (+bonheur)."},
     {"cle": "ecole", "nom": "Petite école", "icone": "📚", "cat": "services", "niveau": 3, "cout": {"planches": 25, "pierre": 25, "or": 100}, "duree": 3, "ouvriers": 2, "savoir": 5, "desc": "+5 savoir par mois (moitié l'été) ; les ateliers de la ville +2 %."},
     {"cle": "fontaine", "nom": "Fontaine", "icone": "⛲", "cat": "services", "niveau": 3, "cout": {"pierre": 40, "or": 60}, "duree": 2, "hygiene": 80, "decor": 3, "desc": "Hygiène pour 80 et décoration."},
@@ -97,7 +97,7 @@
     {"cle": "academie", "nom": "Académie des sciences", "icone": "🔭", "cat": "services", "niveau": 4, "tech": "lumieres", "cout": {"pierre": 80, "planches": 40, "or": 400}, "duree": 5, "ouvriers": 3, "savoir": 15, "decor": 2, "desc": "+15 savoir par mois ; vos espions réussissent mieux."},
     {"cle": "theatre", "nom": "Théâtre", "icone": "🎭", "cat": "services", "niveau": 4, "cout": {"pierre": 70, "planches": 40, "tissu": 20, "or": 300}, "duree": 5, "ouvriers": 2, "decor": 8, "desc": "Grande animation (+bonheur)."},
     {"cle": "hopital", "nom": "Hôtel-Dieu", "icone": "🏥", "cat": "services", "niveau": 4, "tech": "lumieres", "cout": {"pierre": 70, "planches": 30, "or": 250}, "duree": 4, "ouvriers": 3, "hygiene": 200, "desc": "Hygiène pour 200 et protège des épidémies."},
-    {"cle": "cathedrale", "nom": "Cathédrale", "icone": "🔔", "cat": "services", "niveau": 4, "cout": {"pierre": 250, "planches": 80, "outils": 30, "or": 800}, "duree": 18, "ouvriers": 4, "foi": 300, "decor": 6, "desc": "Foi pour 300 habitants et prestige."},
+    {"cle": "cathedrale", "nom": "Cathédrale", "icone": "🔔", "cat": "services", "niveau": 4, "cout": {"pierre": 250, "planches": 80, "outils": 30, "or": 800}, "duree": 18, "ouvriers": 4, "foi": 300, "decor": 6, "desc": "Foi pour 3000 habitants et prestige."},
     {"cle": "palais", "nom": "Palais royal", "icone": "👑", "cat": "services", "niveau": 5, "cout": {"pierre": 500, "planches": 200, "outils": 80, "fer": 60, "tissu": 60, "or": 5000}, "duree": 30, "ouvriers": 8, "decor": 15, "desc": "Merveille : condition de victoire par la prospérité."},
 
     {"cle": "caserne", "nom": "Caserne", "icone": "🛡️", "cat": "militaire", "niveau": 1, "cout": {"bois": 35, "pierre": 25}, "duree": 2, "ouvriers": 1, "unites": ["milice", "mousquetaire", "grenadier", "fusilier", "chasseur_pied"], "desc": "Forme l'infanterie."},
@@ -107,26 +107,26 @@
     {"cle": "remparts", "nom": "Bastions Vauban", "icone": "🧱", "cat": "aucune", "niveau": 99, "duree": 4, "desc": "Obsolète : les remparts sont désormais une amélioration de la ville (fortifications)."},
     {"cle": "citadelle", "nom": "Citadelle étoilée", "icone": "🏯", "cat": "aucune", "niveau": 99, "duree": 8, "desc": "Obsolète : la citadelle est désormais le niveau 4 des fortifications de la ville."},
 
-    {"cle": "colonie", "nom": "Colonie", "icone": "🚩", "cat": "admin", "niveau": 2, "cout": {"bois": 60, "planches": 40, "pierre": 40, "outils": 10, "or": 250}, "duree": 6, "colons": 12, "desc": "Fonde un village hors de vos frontières (12 colons, à 4 cases au moins d'une ville)."},
+    {"cle": "colonie", "nom": "Colonie", "icone": "🚩", "cat": "admin", "niveau": 2, "cout": {"bois": 60, "planches": 40, "pierre": 40, "outils": 10, "or": 250}, "duree": 6, "colons": 12, "desc": "Fonde un village hors de vos frontières (120 colons, à 4 cases au moins d'une ville)."},
     {"cle": "hotel", "nom": "Hôtel de ville", "icone": "🏰", "cat": "aucune", "niveau": 99, "duree": 1, "desc": "Cœur de la ville."}
   ],
   "unites": [
     {"cle": "milice", "nom": "Milice", "icone": "🗡️", "genre": "infanterie", "att": 2, "def": 3, "vitesse": 4, "cout": {"or": 15, "bois": 5}, "desc": "Paysans armés, bon marché.", "obsolete": "levee_masse"},
     {"cle": "mousquetaire", "nom": "Mousquetaire", "icone": "🔫", "genre": "infanterie", "att": 4, "def": 4, "vitesse": 4, "cout": {"or": 25, "armes": 1}, "desc": "Infanterie de ligne au fusil.", "obsolete": "levee_masse"},
-    {"cle": "grenadier", "nom": "Grenadier", "icone": "💂", "genre": "infanterie", "att": 6, "def": 6, "vitesse": 4, "cout": {"or": 40, "armes": 2}, "niveau": 3, "tech": "silex", "desc": "Troupe d'élite."},
+    {"cle": "grenadier", "nom": "Grenadier", "icone": "💂", "genre": "infanterie", "att": 7, "def": 7, "vitesse": 4, "cout": {"or": 40, "armes": 2}, "niveau": 3, "tech": "silex", "desc": "Troupe d'élite."},
     {"cle": "fusilier", "nom": "Fusilier de ligne", "icone": "🎖️", "genre": "infanterie", "att": 6, "def": 6, "vitesse": 5, "cout": {"or": 25, "armes": 1}, "tech": "levee_masse", "desc": "L'armée de masse de la Révolution.", "obsolete": "percussion"},
     {"cle": "chasseur_pied", "nom": "Chasseur à pied", "icone": "🪖", "genre": "infanterie", "att": 9, "def": 7, "vitesse": 5, "cout": {"or": 35, "armes": 1}, "tech": "percussion", "desc": "Fusil à percussion, tire même sous la pluie."},
-    {"cle": "dragon", "nom": "Dragon", "icone": "🐎", "genre": "cavalerie", "att": 6, "def": 4, "vitesse": 6, "cout": {"or": 45, "armes": 1, "ble": 10}, "desc": "Infanterie montée, polyvalente."},
-    {"cle": "hussard", "nom": "Hussard", "icone": "🏇", "genre": "cavalerie", "att": 7, "def": 3, "vitesse": 8, "cout": {"or": 50, "ble": 10}, "niveau": 3, "desc": "Cavalerie légère, très rapide."},
+    {"cle": "dragon", "nom": "Dragon", "icone": "🐎", "genre": "cavalerie", "att": 6, "def": 5, "vitesse": 6, "cout": {"or": 40, "armes": 1, "ble": 10}, "desc": "Infanterie montée, polyvalente."},
+    {"cle": "hussard", "nom": "Hussard", "icone": "🏇", "genre": "cavalerie", "att": 7, "def": 4, "vitesse": 8, "cout": {"or": 50, "ble": 10}, "niveau": 3, "desc": "Cavalerie légère, très rapide."},
     {"cle": "cuirassier", "nom": "Cuirassier", "icone": "⚔️", "genre": "cavalerie", "att": 10, "def": 7, "vitesse": 5, "cout": {"or": 80, "armes": 1, "fer": 4, "ble": 10}, "niveau": 4, "desc": "Cavalerie lourde cuirassée."},
-    {"cle": "canon", "nom": "Canon", "icone": "💣", "genre": "artillerie", "att": 5, "siege": 4, "def": 1, "vitesse": 3, "cout": {"or": 90, "fer": 10, "planches": 10}, "desc": "Lourd, redoutable contre les murailles.", "obsolete": "gribeauval"},
-    {"cle": "canon_gribeauval", "nom": "Canon Gribeauval", "icone": "💥", "genre": "artillerie", "att": 9, "siege": 4, "def": 2, "vitesse": 4, "cout": {"or": 100, "fer": 10, "planches": 8}, "tech": "gribeauval", "desc": "Artillerie de campagne standardisée."},
+    {"cle": "canon", "nom": "Canon", "icone": "💣", "genre": "artillerie", "att": 5, "siege": 4, "def": 2, "vitesse": 3, "cout": {"or": 90, "fer": 10, "planches": 10}, "desc": "Lourd, redoutable contre les murailles.", "obsolete": "gribeauval"},
+    {"cle": "canon_gribeauval", "nom": "Canon Gribeauval", "icone": "💥", "genre": "artillerie", "att": 9, "siege": 4, "def": 3, "vitesse": 4, "cout": {"or": 100, "fer": 10, "planches": 8}, "tech": "gribeauval", "desc": "Artillerie de campagne standardisée."},
     {"cle": "espion", "nom": "Espion", "icone": "🕵️", "genre": "espion", "vitesse": 7, "cout": {"or": 120}, "entretien": 2, "desc": "Invisible, il renseigne, vole des plans ou sabote dans les villes étrangères."},
-    {"cle": "flute", "nom": "Flûte marchande", "icone": "⛵", "genre": "marine", "att": 1, "def": 2, "vitesse": 5, "transport": 15, "commerce": true, "cout": {"or": 80, "planches": 30}, "niveau": 3, "entretien": 1, "desc": "Commerce par mer (au port) et transport d'une armée (15 soldats)."},
+    {"cle": "flute", "nom": "Flûte marchande", "icone": "⛵", "genre": "marine", "att": 1, "def": 2, "vitesse": 5, "transport": 15, "commerce": true, "cout": {"or": 80, "planches": 30}, "niveau": 3, "entretien": 1, "desc": "Commerce par mer (au port) et transport d'une armée (150 soldats)."},
     {"cle": "corvette", "nom": "Corvette", "icone": "🚤", "genre": "marine", "att": 3, "def": 3, "vitesse": 8, "cout": {"or": 120, "planches": 30, "fer": 5}, "niveau": 3, "entretien": 1.5, "desc": "Rapide : blocus des ports ennemis, escorte des convois."},
     {"cle": "fregate", "nom": "Frégate", "icone": "🛥️", "genre": "marine", "att": 7, "def": 6, "vitesse": 6, "cout": {"or": 220, "planches": 50, "fer": 10, "armes": 2}, "niveau": 3, "tech": "cartographie", "entretien": 2.5, "desc": "Navire de combat polyvalent."},
     {"cle": "vaisseau", "nom": "Vaisseau de ligne", "icone": "🚢", "genre": "marine", "att": 14, "def": 12, "vitesse": 4, "cout": {"or": 450, "planches": 100, "fer": 25, "armes": 6}, "niveau": 4, "tech": "marine_royale", "entretien": 5, "desc": "Trois ponts et soixante-quatorze canons : maître des mers."},
-    {"cle": "vapeur_navire", "nom": "Navire à vapeur", "icone": "🛳️", "genre": "marine", "att": 16, "def": 12, "vitesse": 9, "transport": 20, "cout": {"or": 500, "fer": 40, "charbon": 20, "outils": 10}, "niveau": 4, "tech": "vapeur", "entretien": 5, "desc": "Rapide quel que soit le vent ; combat et transporte 20 soldats."}
+    {"cle": "vapeur_navire", "nom": "Navire à vapeur", "icone": "🛳️", "genre": "marine", "att": 16, "def": 12, "vitesse": 9, "transport": 20, "cout": {"or": 500, "fer": 40, "charbon": 20, "outils": 10}, "niveau": 4, "tech": "vapeur", "entretien": 5, "desc": "Rapide quel que soit le vent ; combat et transporte 200 soldats."}
   ],
   "techs": [
     {"cle": "assolement", "nom": "Assolement", "annee": 1700, "cout": 40, "desc": "Fermes +20 %."},
@@ -163,6 +163,7 @@
     {"niveau": 3, "nom": "Bastions à la Vauban", "icone": "⭐", "rang": 3, "tech": "vauban", "cout": {"pierre": 220, "planches": 40, "outils": 15, "or": 400}, "murs": 50, "defense": 1.5, "duree": 6, "enceinte": 1, "desc": "Enceinte bastionnée : elle englobe les cases voisines de la mairie."},
     {"niveau": 4, "nom": "Citadelle", "icone": "🏯", "rang": 4, "tech": "vauban", "cout": {"pierre": 350, "planches": 80, "outils": 40, "or": 900}, "murs": 80, "defense": 1.8, "duree": 10, "enceinte": 1, "territoire": 1, "desc": "Double enceinte et demi-lunes ; le territoire de la ville s'étend d'une case."}
   ],
+  "achat_terre": {"or": 60, "hausse": 20, "desc": "Acheter une case de terres libres qui touche votre royaume : elle vous appartient aussitôt, sans attendre que vos villes grandissent. Chaque achat coûte plus cher que le précédent."},
   "retranchement": {"duree": 1, "defense": 1.25, "desc": "Tranchées, abattis et gabions : une armée qui ne bouge plus se protège en un mois de travaux, jusqu'à ce qu'elle reparte."},
   "forts": {
     "distance": 3,

@@ -26,6 +26,7 @@ export function installerUI(jeu, actions) {
 
 // ------------------------------------------------------------------ utilitaires
 const R = () => J.R;
+const HOMMES = 10; // soldats par régiment, habitants par foyer du moteur (comme regles.rs : HOMMES)
 const res = cle => R().ressources.find(r => r.cle === cle) || { nom: cle, icone: '' };
 const bat = cle => R().batiments.find(b => b.cle === cle);
 const unite = cle => R().unites.find(u => u.cle === cle);
@@ -144,13 +145,14 @@ async function clic(el) {
     case 'ici': await envoyer({ action: 'construire', cle: d.v, case: +d.c }, () => fermerFeuille()); break;
     case 'demolir': if (await modale('Démolir ?', '<p>La moitié des matériaux sera récupérée.</p>', [{ l: 'Démolir', c: 'rouge', v: true }, { l: 'Annuler', c: 'b2', v: false }])) await envoyer({ action: 'demolir', case: +d.c }, () => fermerFeuille()); break;
     case 'pause': await envoyer({ action: 'pause', batiment: +d.v }); break;
-    case 'recruter': await envoyer({ action: 'recruter', batiment: +d.b, unite: d.v }); break;
+    case 'recruter': await envoyer({ action: 'recruter', batiment: +d.b, unite: d.v, nombre: +(d.n || 1) }); break;
     case 'ameliorer': await envoyer({ action: 'ameliorer', ville: +d.v }); break;
     case 'armee': A.choisirArmee(+d.v); break;
     case 'deplacer': A.modeDeplacer(+d.v); break;
     case 'halte': await envoyer({ action: 'halte', armee: +d.v }); break;
     case 'centrer': A.centrer(+d.v); break;
     case 'case': A.inspecter(+d.c); break;
+    case 'acheter': await envoyer({ action: 'acheter_terre', case: +d.c }); break;
     case 'viser': A.viserCase(+d.c); break;
     case 'fortifier': await envoyer({ action: 'fortifier', ville: +d.v }); break;
     case 'eclairer': await envoyer({ action: 'eclairer', ville: +d.v, actif: d.s === '1' }); break;
@@ -169,6 +171,7 @@ async function clic(el) {
     case 'mission': await envoyer({ action: 'mission', espion: +d.v, genre: d.g, ville: +d.c }); break;
     case 'assaut': assaut(+d.v); break;
     case 'diviser': diviser(+d.v); break;
+    case 'fusionner': await envoyer({ action: 'fusionner', armee: +d.v, avec: +d.f }); break;
     case 'diplo': if (d.v === 'guerre' && !await modale('Déclarer la guerre ?', `<p>Vous allez entrer en guerre contre <b>${e(roy(+d.r).nom)}</b>. ${trahison(roy(+d.r)) || 'Les autres royaumes vous jugeront belliqueux.'}</p>`, [{ l: '⚔️ Guerre !', c: 'rouge', v: true }, { l: 'Annuler', c: 'b2', v: false }])) break;
       if (d.v === 'rompre' && !await modale('Rompre l\'alliance ?', `<p><b>${e(roy(+d.r).nom)}</b> y verra une trahison, et s'en souviendra longtemps.</p>`, [{ l: '💔 Rompre', c: 'rouge', v: true }, { l: 'Annuler', c: 'b2', v: false }])) break;
       await envoyer({ action: 'diplo', royaume: +d.r, acte: d.v }); break;
@@ -245,10 +248,12 @@ export function vueCase(i) {
   if (C.poissons[i]) h += ligne('Ressource', '🐟 Banc de poissons');
   if (E.cases.foret[i]) h += ligne('Bois sur pied', `🪵 ${E.cases.bois[i]}`);
   h += ligne('Territoire', pr >= 0 ? pastille(pr) + e(roy(pr).nom) : 'Terres libres') + '</div>';
+  // terres libres au bord du royaume : on peut les acheter (le serveur vérifie tout)
+  if (pr === -1 && C.terrain[i] >= 3 && voisins(i).some(v => E.cases.proprio[v] === 0)) h += `<div class="boite"><div class="mini" style="margin-bottom:5px">${e(R().achat_terre.desc)}</div><div class="btns"><button class="btn" data-a="acheter" data-c="${i}" ${j.stock.or >= j.prix_terre ? '' : 'disabled'}>🗺️ Acheter ces terres (${j.prix_terre} 🪙)</button></div></div>`;
   if (o.siege) h += vueSiege(o.siege);
   if (o.fort) h += vueFort(o.fort);
   for (const a of o.armees) {
-    h += `<div class="boite"><h4>${pastille(a.proprio)}${a.proprio === 0 ? 'Votre armée' : 'Armée — ' + e(roy(a.proprio).nom)} · ${a.effectif} soldats</h4><div class="mini">${unitesTexte(a.unites)}${a.retranche ? ` · ${retranche(a.retranche)}` : ''}</div>${a.proprio === 0 ? `<div class="btns"><button class="btn" data-a="armee" data-v="${a.id}">Commander</button></div>` : ''}</div>`;
+    h += `<div class="boite"><h4>${pastille(a.proprio)}${a.proprio === 0 ? 'Votre armée' : 'Armée — ' + e(roy(a.proprio).nom)} · ${a.effectif} soldats</h4><div class="mini">${troupesTexte(a.unites)}${a.retranche ? ` · ${retranche(a.retranche)}` : ''}</div>${a.proprio === 0 ? `<div class="btns"><button class="btn" data-a="armee" data-v="${a.id}">Commander</button></div>` : ''}</div>`;
   }
   for (const f of o.flottes) {
     h += `<div class="boite"><h4>${pastille(f.proprio)}${f.proprio === 0 ? 'Votre flotte' : 'Flotte — ' + e(roy(f.proprio).nom)}</h4><div class="mini">${unitesTexte(f.navires)}${f.armee ? ` · 🎖️ ${f.armee.effectif} soldats à bord` : ''}</div>${f.proprio === 0 ? `<div class="btns"><button class="btn" data-a="flotte" data-v="${f.id}">Commander</button></div>` : ''}</div>`;
@@ -290,7 +295,7 @@ export function vueCase(i) {
       const ud = unite(u), prix = j.prix_unites?.[u] || ud.cout;
       if (!ok.includes(u)) continue;
       const stats = ud.genre === 'espion' ? '🚶' + ud.vitesse : `⚔${ud.att} 🛡${ud.def}${ud.siege ? ' · siège ×' + ud.siege : ''}${ud.transport ? ' · ⛵' + ud.transport + ' soldats' : ''} · ${ud.genre === 'marine' ? '🧭' : '🚶'}${ud.vitesse}`;
-      h += `<div class="ligne"><span>${ud.icone} <b>${e(ud.nom)}</b> <span class="mini">${stats}</span><br><span class="couts" style="display:inline-flex">${couts(prix)}</span></span><button class="btn" data-a="recruter" data-b="${b.id}" data-v="${u}" ${peutPayer(prix) ? '' : 'disabled'}>Recruter</button></div>`;
+      h += `<div class="ligne"><span>${ud.icone} <b>${e(ud.nom)}</b> <span class="mini">${stats}</span><br><span class="couts" style="display:inline-flex">${couts(prix)}</span></span><span class="btns" style="margin:0;flex-wrap:nowrap"><button class="btn" data-a="recruter" data-b="${b.id}" data-v="${u}" ${peutPayer(prix) ? '' : 'disabled'} title="Un régiment de ${HOMMES} soldats">Recruter ${HOMMES}</button><button class="btn b2" data-a="recruter" data-b="${b.id}" data-v="${u}" data-n="5" ${peutPayer(prix) ? '' : 'disabled'} title="Cinq régiments (autant que possible)">×5 (${5 * HOMMES})</button></span></div>`;
     }
     const verrou = d.unites.filter(u => !ok.includes(u)).map(u => unite(u)).filter(Boolean);
     if (verrou.length) h += `<div class="mini">🔒 Plus tard : ${verrou.map(u => u.icone + ' ' + e(u.nom)).join(', ')}</div>`;
@@ -332,6 +337,8 @@ function vueVille(v) {
   return h;
 }
 const unitesTexte = u => Object.entries(u).filter(([, n]) => n > 0).map(([k, n]) => `${unite(k)?.icone || ''} ${n} ${e(unite(k)?.nom || k)}`).join(' · ') || '—';
+// une armée : chaque unité du moteur est un régiment de HOMMES soldats
+const troupesTexte = u => Object.entries(u).filter(([, n]) => n > 0).map(([k, n]) => `${unite(k)?.icone || ''} ${n * HOMMES} ${e(unite(k)?.nom || k)}`).join(' · ') || '—';
 
 // --- sièges : la même fiche pour l'assiégeant et l'assiégé
 function vueSiege(s) {
@@ -395,10 +402,13 @@ export function vueArmee(id) {
   if (!a) return null;
   const eau = J.carte.terrain[a.case] < 3, s = E.sieges.find(x => x.case === a.case && x.assiegeant === 0);
   const ordres = eau ? '⚓ Débarque à la fin du mois' : a.chemin.length ? `🚶 En marche : ${a.chemin.length} cases, ~${a.mois} mois` : s ? '🏰 Assiège la place' : '⛺ Stationnée';
-  let h = `<div class="boite">${ligne('Position', lieuDe(a.case))}${ligne('Effectif', `${a.effectif} soldats`)}${ligne('Puissance', `⚔ ${Math.round(a.att)} · 🛡 ${Math.round(a.def)}`)}${ligne('Ordres', ordres)}${a.retranche ? ligne('Retranchement', retranche(a.retranche)) : ''}<div class="mini" style="margin-top:4px">${unitesTexte(a.unites)}</div></div>`;
+  let h = `<div class="boite">${ligne('Position', lieuDe(a.case))}${ligne('Effectif', `${a.effectif} soldats`)}${ligne('Puissance', `⚔ ${Math.round(a.att)} · 🛡 ${Math.round(a.def)}`)}${ligne('Ordres', ordres)}${a.retranche ? ligne('Retranchement', retranche(a.retranche)) : ''}<div class="mini" style="margin-top:4px">${troupesTexte(a.unites)}</div></div>`;
   if (s) h += vueSiege(s);
   const fort = E.forts.find(f => f.case === a.case && f.proprio === 0);
   if (fort) h += vueFort(fort);
+  // nos autres armées arrêtées sur la même case : on peut les fusionner avec celle-ci
+  const voisines = eau || a.chemin.length ? [] : E.armees.filter(x => x.proprio === 0 && x.id !== a.id && x.case === a.case && !x.chemin.length);
+  if (voisines.length) h += `<div class="boite"><h4>🤝 Fusionner</h4>${voisines.map(x => `<div class="ligne"><span>${x.effectif} soldats <span class="mini">· ${troupesTexte(x.unites)}</span></span><button class="btn" data-a="fusionner" data-v="${a.id}" data-f="${x.id}">Fusionner</button></div>`).join('')}</div>`;
   const flottes = E.flottes.filter(f => f.proprio === 0 && !f.armee && f.capacite > 0 && accostable(a, f));
   if (flottes.length) h += `<div class="boite"><h4>⛵ Embarquer</h4>${flottes.map(f => `<div class="ligne"><span>${unitesTexte(f.navires)} <span class="mini">· ${f.capacite} places</span></span><button class="btn" data-a="embarquer" data-f="${f.id}" data-v="${a.id}" ${a.effectif > f.capacite ? 'disabled' : ''}>Embarquer</button></div>${a.effectif > f.capacite ? '<div class="mini">Trop de soldats pour ces navires : divisez l\'armée.</div>' : ''}`).join('')}</div>`;
   if (!eau) {
@@ -417,7 +427,7 @@ export function vueFlotte(id) {
   if (!f) return null;
   const ordres = f.chemin.length ? `⛵ En mer : ${f.chemin.length} cases, ~${f.mois} mois` : f.commerce ? '⚖️ Commerce par mer' : '⚓ Au mouillage';
   let h = `<div class="boite">${ligne('Position', `${NOM_T[J.carte.terrain[f.case]]}${f.a_quai ? ' · à quai' : ''}`)}${ligne('Navires', unitesTexte(f.navires))}${ligne('Puissance', `⚔ ${Math.round(f.att)} · 🛡 ${Math.round(f.def)}${f.guerre ? '' : ' · sans navire de guerre'}`)}${ligne('Transport', f.capacite ? `🎖️ ${f.armee ? f.armee.effectif : 0}/${f.capacite} soldats` : 'aucun')}${ligne('Ordres', ordres)}</div>`;
-  if (f.armee) h += `<div class="boite"><h4>🎖️ Armée à bord · ${f.armee.effectif} soldats</h4><div class="mini">${unitesTexte(f.armee.unites)}</div><div class="btns"><button class="btn" data-a="debarquer" data-v="${f.id}">⚓ Débarquer</button></div><div class="mini">Elle descend sur une case de terre voisine (pas une montagne) et touche terre à la fin du mois.</div></div>`;
+  if (f.armee) h += `<div class="boite"><h4>🎖️ Armée à bord · ${f.armee.effectif} soldats</h4><div class="mini">${troupesTexte(f.armee.unites)}</div><div class="btns"><button class="btn" data-a="debarquer" data-v="${f.id}">⚓ Débarquer</button></div><div class="mini">Elle descend sur une case de terre voisine (pas une montagne) et touche terre à la fin du mois.</div></div>`;
   else if (f.capacite) {
     const armees = E.armees.filter(a => a.proprio === 0 && J.carte.terrain[a.case] >= 3 && accostable(a, f));
     h += `<div class="boite"><h4>⛵ Embarquer une armée</h4>${armees.map(a => `<div class="ligne"><span>${lieuDe(a.case)} · ${a.effectif} soldats</span><button class="btn" data-a="embarquer" data-f="${f.id}" data-v="${a.id}" ${a.effectif > f.capacite ? 'disabled' : ''}>Embarquer</button></div>`).join('') || '<div class="mini">Aucune armée à côté : amenez-en une sur la côte voisine, ou dans la ville du port.</div>'}${armees.some(a => a.effectif > f.capacite) ? `<div class="mini">${f.capacite} places : divisez les armées trop nombreuses.</div>` : ''}</div>`;
@@ -452,26 +462,30 @@ function vueArmees() {
   for (const s of E.sieges.filter(x => x.assiegeant === 0 || x.proprio === 0)) h += `<div class="boite" style="border-color:${s.proprio === 0 ? '#c0392b' : '#c8932f'}"><div class="ligne"><span>${s.assiegeant === 0 ? '⚔️ Vous assiégez' : `🏰 ${pastille(s.assiegeant)}${e(roy(s.assiegeant).nom)} assiège`} <b>${e(s.nom || '?')}</b> · ${s.mois} mois · murs ${s.murs_pct} %</span><button class="btn b2" data-a="case" data-c="${s.case}">Voir</button></div></div>`;
   h += mien.length ? '' : '<p class="mini">Aucune armée. Construisez une Caserne pour recruter.</p>';
   for (const a of mien) {
-    h += `<div class="boite"><h4>${lieuDe(a.case)} · ${a.effectif} soldats</h4><div class="mini">${unitesTexte(a.unites)}</div><div class="mini">${a.chemin.length ? `🚶 En marche (~${a.mois} mois)` : a.assiege ? '🏰 Assiège' : 'Stationnée'}${a.retranche ? ' · ' + retranche(a.retranche) : ''} · ⚔ ${Math.round(a.att)} 🛡 ${Math.round(a.def)}</div><div class="btns"><button class="btn" data-a="armee" data-v="${a.id}">Commander</button><button class="btn b2" data-a="centrer" data-v="${a.id}">🎯</button></div></div>`;
+    h += `<div class="boite"><h4>${lieuDe(a.case)} · ${a.effectif} soldats</h4><div class="mini">${troupesTexte(a.unites)}</div><div class="mini">${a.chemin.length ? `🚶 En marche (~${a.mois} mois)` : a.assiege ? '🏰 Assiège' : 'Stationnée'}${a.retranche ? ' · ' + retranche(a.retranche) : ''} · ⚔ ${Math.round(a.att)} 🛡 ${Math.round(a.def)}</div><div class="btns"><button class="btn" data-a="armee" data-v="${a.id}">Commander</button><button class="btn b2" data-a="centrer" data-v="${a.id}">🎯</button></div></div>`;
   }
   const flottes = E.flottes.filter(f => f.proprio === 0), espions = E.espions.filter(x => x.proprio === 0), forts = E.forts.filter(f => f.proprio === 0);
   if (flottes.length) h += `<div class="boite"><h4>⛵ Flottes</h4>${flottes.map(f => `<div class="ligne"><span>${unitesTexte(f.navires)}${f.armee ? ` · 🎖️ ${f.armee.effectif}` : ''}<br><span class="mini">${f.chemin.length ? `En mer (~${f.mois} mois)` : f.commerce ? '⚖️ Commerce' : 'Au mouillage'}</span></span><button class="btn" data-a="flotte" data-v="${f.id}">Commander</button></div>`).join('')}</div>`;
   if (espions.length) h += `<div class="boite"><h4>🕵️ Espions</h4>${espions.map(x => `<div class="ligne"><span class="mini">${lieuDe(x.case)} · ${ordresEspion(x)}</span><button class="btn" data-a="espion" data-v="${x.id}">Commander</button></div>`).join('')}</div>`;
   if (forts.length) h += `<div class="boite"><h4>🛡️ Forts</h4>${forts.map(f => `<div class="ligne"><span>${f.icone || '🏗️'} ${e(f.nom)}${f.travaux ? ` <span class="mini">· travaux ${f.travaux} mois</span>` : ''}</span><button class="btn b2" data-a="case" data-c="${f.case}">Voir</button></div>`).join('')}</div>`;
   if (menaces.length) h += `<div class="boite" style="border-color:#c0392b"><h4>⚠️ Menaces en approche</h4>${menaces.map(a => { const fin = a.chemin[a.chemin.length - 1], v = E.villes.find(x => x.case === fin); return `<div class="ligne"><span>${pastille(a.proprio)}${e(roy(a.proprio).nom)} · ${a.effectif} soldats → ${v ? e(v.nom) : '?'} (~${a.mois} mois)</span><button class="btn b2" data-a="centrer" data-v="${a.id}">🎯</button></div>`; }).join('')}</div>`;
-  return h + `<p class="mini">Solde : ${(j.soldats * 0.5).toFixed(0)} 🪙 par mois pour ${j.soldats} soldats · marine et espions ${Math.round(j.entretien_flotte || 0)} 🪙 · forts ${Math.round(j.entretien_forts || 0)} 🪙. Navires au Port, espions à la Taverne.</p>`;
+  return h + `<p class="mini">Solde : ${(j.soldats / HOMMES * 0.5).toFixed(0)} 🪙 par mois pour ${j.soldats} soldats · marine et espions ${Math.round(j.entretien_flotte || 0)} 🪙 · forts ${Math.round(j.entretien_forts || 0)} 🪙. Navires au Port, espions à la Taverne.</p>`;
 }
-let partage = {};
+let partage = {}, fois = 1;
 async function diviser(id) {
   const a = J.etat.armees.find(x => x.id === id);
   if (!a) return;
-  partage = {};
+  partage = {}; fois = 1;
   for (const u in a.unites) partage[u] = Math.floor(a.unites[u] / 2);
-  const html = `<p>Unités de la nouvelle armée :</p>${Object.keys(a.unites).map(u => `<div class="ligne"><span>${unite(u).icone} ${e(unite(u).nom)} <span class="mini">(${a.unites[u]})</span></span><span class="pas"><button data-u="${u}" data-d="-1">−</button><b id="pt_${u}">${partage[u]}</b><button data-u="${u}" data-d="1">+</button></span></div>`).join('')}`;
+  const html = `<p>Chaque nouvelle armée emmène (en régiments de ${HOMMES} soldats) :</p>${Object.keys(a.unites).map(u => `<div class="ligne"><span>${unite(u).icone} ${e(unite(u).nom)} <span class="mini">(${a.unites[u]} rég.)</span></span><span class="pas"><button data-u="${u}" data-d="-1">−</button><b id="pt_${u}">${partage[u]}</b><button data-u="${u}" data-d="1">+</button></span></div>`).join('')}
+    <div class="ligne"><span><b>Nombre de nouvelles armées</b></span><span class="pas"><button data-n="-1">−</button><b id="pt_fois">1</b><button data-n="1">+</button></span></div>`;
   const p = modale('✂️ Diviser l\'armée', html, [{ l: 'Former', v: true }, { l: 'Annuler', c: 'b2', v: false }]);
-  setTimeout(() => document.querySelectorAll('#modale-boite .pas button').forEach(b => (b.onclick = () => { const u = b.dataset.u; partage[u] = Math.max(0, Math.min(a.unites[u], partage[u] + +b.dataset.d)); document.getElementById('pt_' + u).textContent = partage[u]; })), 20);
+  setTimeout(() => document.querySelectorAll('#modale-boite .pas button').forEach(b => (b.onclick = () => {
+    if (b.dataset.n) { fois = Math.max(1, fois + +b.dataset.n); document.getElementById('pt_fois').textContent = fois; return; }
+    const u = b.dataset.u; partage[u] = Math.max(0, Math.min(a.unites[u], partage[u] + +b.dataset.d)); document.getElementById('pt_' + u).textContent = partage[u];
+  })), 20);
   if (!await p) return;
-  const r = await A.cmd({ action: 'diviser', armee: id, unites: partage });
+  const r = await A.cmd({ action: 'diviser', armee: id, unites: partage, fois });
   if (!r.ok) return annonce('❌ ' + r.msg, 'guerre');
   annonce(r.msg, 'bon');
   A.choisirArmee(r.armee);
@@ -554,7 +568,7 @@ function vueRoyaume() {
   const E = J.etat, j = E.joueur, rv = j.revenus || {};
   let h = `<div class="onglets">${[['apercu', '👑 Aperçu'], ['sciences', '💡 Sciences'], ['stocks', '📦 Stocks'], ['victoire', '🏆 Victoire'], ['journal', '📜 Journal']].map(([k, n]) => `<button class="onglet ${ongletRoyaume === k ? 'on' : ''}" data-a="ktab" data-v="${k}">${n}</button>`).join('')}</div>`;
   if (ongletRoyaume === 'apercu') {
-    h += `<div class="boite"><h4>👥 Population</h4><div class="ligne"><span class="k">Habitants / logements</span><span class="v">${j.pop} / ${j.logement}</span></div><div class="ligne"><span class="k">Ouvriers libres</span><span class="v">👷 ${j.ouvriers_libres}</span></div><div class="ligne"><span class="k">Soldats</span><span class="v">🛡 ${j.soldats}</span></div><div class="ligne"><span class="k">Consommation</span><span class="v">🍽️ ${(j.pop * 0.3).toFixed(1)}/mois · variété ${j.variete}</span></div>${j.chauffage ? `<div class="ligne"><span class="k">Chauffage (ce mois)</span><span class="v">🪵 ${j.chauffage.toFixed(1)}${E.epoque.cle === 'industrie' ? ' (⚫ charbon d\'abord)' : ''}</span></div>` : ''}</div>`;
+    h += `<div class="boite"><h4>👥 Population</h4><div class="ligne"><span class="k">Habitants / logements</span><span class="v">${j.pop} / ${j.logement}</span></div><div class="ligne"><span class="k">Ouvriers libres</span><span class="v">👷 ${j.ouvriers_libres}</span></div><div class="ligne"><span class="k">Soldats</span><span class="v">🛡 ${j.soldats}</span></div><div class="ligne"><span class="k">Consommation</span><span class="v">🍽️ ${(j.pop / HOMMES * 0.3).toFixed(1)}/mois · variété ${j.variete}</span></div>${j.chauffage ? `<div class="ligne"><span class="k">Chauffage (ce mois)</span><span class="v">🪵 ${j.chauffage.toFixed(1)}${E.epoque.cle === 'industrie' ? ' (⚫ charbon d\'abord)' : ''}</span></div>` : ''}</div>`;
     h += `<div class="boite"><h4>${j.bonheur >= 60 ? '😊' : j.bonheur >= 35 ? '😐' : '😠'} Bonheur ${Math.round(j.bonheur)} %</h4>${(j.detail_bonheur || []).map(([k, v]) => `<div class="ligne"><span class="k">${e(k)}</span><span class="v" style="color:${v > 0 ? '#8f8' : v < 0 ? '#f98' : '#ccc'}">${v > 0 ? '+' : ''}${Math.round(v)}</span></div>`).join('') || '<div class="mini">Calculé à la fin du premier mois.</div>'}</div>`;
     h += `<div class="boite"><h4>🪙 Finances du mois</h4><div class="ligne"><span class="k">Impôts</span><span class="v">+${(rv.impots || 0).toFixed(0)}</span></div><div class="ligne"><span class="k">Routes commerciales</span><span class="v">+${(rv.commerce || 0).toFixed(0)}</span></div><div class="ligne"><span class="k">Commerce maritime</span><span class="v">+${(rv.commerce_mer || 0).toFixed(0)}</span></div><div class="ligne"><span class="k">Entretien</span><span class="v">−${(rv.entretien || 0).toFixed(0)}</span></div><div class="ligne"><span class="k">dont marine et espions · forts</span><span class="v">−${(j.entretien_flotte || 0).toFixed(0)} · −${(j.entretien_forts || 0).toFixed(0)}</span></div>${vieOr(j).length ? `<div class="ligne"><span class="k">Vie des villes</span><span class="v">${vieOr(j).join(' · ')}</span></div>` : ''}<div class="ligne"><span class="k">Taux d'imposition</span><span class="v btns" style="margin:0">${[['bas', 'Bas'], ['normal', 'Normal'], ['eleve', 'Élevé']].map(([k, n]) => `<button class="onglet ${j.impots === k ? 'on' : ''}" data-a="impots" data-v="${k}">${n}</button>`).join('')}</span></div></div>`;
     const rt = j.routes;
@@ -571,7 +585,7 @@ function vueRoyaume() {
   } else if (ongletRoyaume === 'victoire') {
     const ais = E.royaumes.filter(r => !r.joueur), vivants = ais.filter(r => r.vivant);
     h += `<div class="boite"><h4>⚔️ Conquête</h4><div class="mini">Anéantir tous les rivaux : ${ais.length - vivants.length}/${ais.length}</div></div>
-    <div class="boite"><h4>👑 Prospérité</h4><div class="mini">Capitale au rang Cité (${j.niveau_capitale}/5) · Palais royal ${E.batiments.some(b => b.proprio === 0 && b.cle === 'palais' && !b.reste) ? '✅' : '❌'} · 400 habitants (${j.pop})</div></div>
+    <div class="boite"><h4>👑 Prospérité</h4><div class="mini">Capitale au rang Cité (${j.niveau_capitale}/5) · Palais royal ${E.batiments.some(b => b.proprio === 0 && b.cle === 'palais' && !b.reste) ? '✅' : '❌'} · ${400 * HOMMES} habitants (${j.pop})</div></div>
     <div class="boite"><h4>🤝 Diplomatie</h4><div class="mini">Alliance avec tous les survivants : ${vivants.filter(r => r.statut === 'alliance').length}/${vivants.length}</div></div>
     <div class="boite"><h4>⏳ 1850</h4><div class="mini">En décembre 1850, le royaume le plus puissant l'emporte.</div></div>`;
   } else h += `<div class="boite mini">${E.journal.map(l => `<div class="evt">${e(l)}</div>`).join('') || 'Rien à signaler.'}</div>`;
@@ -607,7 +621,7 @@ export function recap(rapport, etat) {
     <div class="boite"><h4>Événements</h4>${rapport.evenements.map(ev => `<div class="evt ${ev.genre}">${e(ev.texte)}${ev.case != null ? ` <button class="mini-btn" data-a="viser" data-c="${ev.case}" aria-label="Voir sur la carte">🎯</button>` : ''}</div>`).join('') || '<div class="mini">Un mois paisible.</div>'}</div>
     ${etat.sieges.some(s => s.assiegeant === 0 || s.proprio === 0) ? `<div class="boite"><h4>🏰 Sièges</h4>${etat.sieges.filter(s => s.assiegeant === 0 || s.proprio === 0).map(s => `<div class="ligne"><span>${s.assiegeant === 0 ? '⚔️' : '🛡️'} ${e(s.nom || '?')} · ${s.mois} mois · murs ${s.murs_pct} % · ${s.vivres > 0 ? Math.ceil(s.vivres) + ' mois de vivres' : 'famine'}</span><button class="btn b2" data-a="case" data-c="${s.case}">Voir</button></div>`).join('')}</div>` : ''}
     <div class="boite"><h4>Stocks</h4><div class="prev">${lignes.map(([r, v]) => `<span style="color:${v > 0 ? '#9f9' : '#f99'}">${res(r).icone} ${v > 0 ? '+' : ''}${Math.round(v)}</span>`).join('') || '<span>—</span>'}</div>
-    <div class="mini" style="margin-top:6px">👥 ${rapport.pop_avant} → ${rapport.pop_apres} habitants · bonheur ${Math.round(j.bonheur)} %</div>
+    <div class="mini" style="margin-top:6px">👥 ${rapport.pop_avant * HOMMES} → ${rapport.pop_apres * HOMMES} habitants · bonheur ${Math.round(j.bonheur)} %</div>
     <div class="mini">🪙 Impôts +${Math.round(j.revenus?.impots || 0)} · commerce +${Math.round(j.revenus?.commerce || 0)} · par mer +${Math.round(j.commerce_mer || 0)} · entretien −${Math.round(j.revenus?.entretien || 0)} (marine et espions ${Math.round(j.entretien_flotte || 0)}, forts ${Math.round(j.entretien_forts || 0)})</div>
     ${vieOr(j).length || vieBonheur(j).length ? `<div class="mini">🏘️ Vie des villes : ${[...vieOr(j), ...vieBonheur(j).map(([k, v]) => `${e(k)} ${signe(v)} 😊`)].join(' · ')}</div>` : ''}</div>
     <div class="boite"><h4>${ICONE_METEO[etat.meteo.genre]} ${e(etat.date)} : ${NOM_METEO[etat.meteo.genre]}, ${Math.round(etat.meteo.temperature)} °C</h4>${(etat.meteo.effets || []).map(x => `<div class="evt">${e(x)}</div>`).join('') || '<div class="mini">Pas d\'effet particulier.</div>'}</div>`, false);
@@ -616,7 +630,7 @@ export function recap(rapport, etat) {
 // --- événement à choix : la carte de la maquette (illustration, titre, date, texte, options et leurs effets) ;
 // rend l'indice de l'option choisie. Les options trop chères sont grisées ; la dernière ne coûte rien.
 const ILLUSTRE = ['inventeur', 'philosophe', 'disette'];
-const EFFET = { savoir: n => `${n > 0 ? '+' : ''}${n} 💡`, bonheur: n => `${n > 0 ? '+' : ''}${n} 😊`, pop: n => `${n > 0 ? '+' : ''}${n} 👥`, relation: n => `relation ${n > 0 ? '+' : ''}${n}`, tech: () => '💡 une technologie', gisement: () => '⛏️ un gisement' };
+const EFFET = { savoir: n => `${n > 0 ? '+' : ''}${n} 💡`, bonheur: n => `${n > 0 ? '+' : ''}${n} 😊`, pop: n => `${n > 0 ? '+' : ''}${n * HOMMES} 👥`, relation: n => `relation ${n > 0 ? '+' : ''}${n}`, tech: () => '💡 une technologie', gisement: () => '⛏️ un gisement' };
 function effetsOption(o, d) {
   const t = Object.entries(o.cout || {}).map(([r, n]) => `−${n} ${res(r).icone}`);
   for (const [k, n] of Object.entries(d?.effets || {})) t.push(EFFET[k] ? EFFET[k](n) : `${n > 0 ? '+' : ''}${n} ${res(k).icone}`);

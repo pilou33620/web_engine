@@ -14,7 +14,7 @@ import { majChroniques } from '../graphismes/rendu/chroniques.js';
 import { majRoutes, effacerRoutes, niveauRoutes } from '../graphismes/rendu/routes.js';
 import { toutEffacer, effet } from '../graphismes/rendu/etiquettes.js';
 import * as ui from './ui.js';
-import './bivouacs.js'; // armées au repos la nuit : le bivouac de web_engine 2.12
+import { suivreArmees } from './bivouacs.js'; // armées au repos (la nuit, ou campées hors des villes) : le bivouac de web_engine 2.12
 
 const $ = s => document.querySelector(s);
 const J = { R: null, carte: null, etat: null, info: null, mode: null, occupe: false, versionCarte: -1 };
@@ -75,14 +75,14 @@ function appliquer(etat, rapport) {
   J.etat = etat;
   plateau.majEtat(etat);
   plateau.majSaison(etat.saison, etat.meteo.neige_sol);
-  synchroniser(etat);
+  synchroniser(etat); suivreArmees(etat);
   majBrouillard(etat); majMarine(etat); majEspions(etat, rapport);
   niveauRoutes(etat.joueur?.routes?.niveau || 1);
   majRoutes(etat.routes);
   majVie(etat, rapport);
   majQuartiers(etat);
   appliquerMeteo(etat.meteo, etat.saison);
-  majChroniques(etat, rapport);  // incendies, épidémie, famine, feux d'artifice, bateaux (après la météo : la famine vide les champs)
+  majChroniques(etat, rapport);  // incendies, épidémie, famine, feux d'artifice, bateaux, traces de bataille, couronnement, révolte, mariage, fuite des assiégés (après la météo : la famine vide les champs)
   ui.majHUD();
 }
 async function lancer() {

@@ -502,6 +502,7 @@ pub fn mois(p: &mut Partie, k: usize) {
     commerce(p, k, &b);
     let b = bilan(p, k, q.horizon);
     colonie(p, k, &b);
+    terres(p, k, &q);
     demolir_inutile(p, k, &b);
     construire(p, k, &b, &q);
     if p.hasard.p(0.1) && p.royaumes[k].stock["or"] > 500.0 {
@@ -699,6 +700,30 @@ fn routes(p: &mut Partie, k: usize) {
     }
 }
 
+/// Comme le joueur, il achète une terre libre au bord du royaume quand il manque de place pour bâtir et que l'or
+/// lui reste après l'achat (d'autant plus souvent qu'il est habile) : la meilleure (gisement, terre fertile, plaine), la plus proche de sa capitale.
+fn terres(p: &mut Partie, k: usize, q: &Qualite) {
+    let id = k as i32;
+    let prix = Panier::from([("or".to_string(), p.prix_terre(id))]);
+    // l'armée d'abord : en paix seulement, avec de quoi se défendre
+    if places_libres(p, id) >= 4 || p.royaumes[k].statut == "guerre" || p.stats(id).soldats < 10 || !peut_depenser(p, k, &prix, 400.0) || !p.hasard.p(0.05 + 0.3 * q.jugement) {
+        return;
+    }
+    let Some(cap) = p.capitale(id).map(|vi| p.villes[vi].case) else { return };
+    let valeur = |c: usize| {
+        let x = &p.carte.cases[c];
+        (x.gisement.is_some() as i32) * 3 + (x.fertile as i32) * 2 + (x.t == Terrain::Plaine) as i32 - p.carte.dist(c, cap)
+    };
+    // une terre où bâtir (ni forêt, ni montagne) : c'est la place qui lui manque
+    let choix = (0..p.carte.cases.len())
+        .filter(|&c| { let x = &p.carte.cases[c]; x.terre() && x.t != Terrain::Montagne && !x.foret && x.proprio == -1 })
+        .filter(|&c| p.carte.voisins(c).iter().any(|&v| p.carte.cases[v].proprio == id))
+        .max_by_key(|&c| valeur(c));
+    if let Some(c) = choix {
+        let _ = p.acheter_terre(id, c);
+    }
+}
+
 /// Une colonie quand le pays est à l'étroit : un Village au moins, de quoi la payer, des colons disponibles,
 /// une terre libre et bonne (plaines, bois, eau) à portée de ses frontières.
 fn colonie(p: &mut Partie, k: usize, b: &Bilan) {
@@ -866,6 +891,26 @@ fn construire(p: &mut Partie, k: usize, b: &Bilan, q: &Qualite) {
 mod essais {
     use super::*;
     use crate::carte::Options;
+
+    #[test]
+    fn le_rival_a_l_etroit_achete_des_terres() {
+        let mut p = Partie::nouvelle(Options { graine: 11, ..Options::default() });
+        p.royaumes[1].stock.insert("or".into(), 2000.0);
+        let ai = p.armees.iter().position(|a| a.proprio == 1).unwrap();
+        p.armees[ai].unites.insert("milice".into(), 12);
+        p.royaumes[1].pop = 200;
+        terres(&mut p, 1, &qualite(1.35));
+        assert!(p.terres.is_empty(), "assez de place : il n'achète pas");
+        for k in p.carte.cases.iter_mut().filter(|k| k.proprio == 1 && k.bat.is_none()) {
+            k.foret = true; // plus de place pour bâtir
+        }
+        while p.terres.is_empty() {
+            terres(&mut p, 1, &qualite(1.35)); // pas tous les mois (hasard)
+        }
+        assert_eq!(p.terres.len(), 1);
+        assert_eq!(p.carte.cases[p.terres[0][0] as usize].proprio, 1);
+        assert!(p.royaumes[1].stock["or"] < 2000.0);
+    }
 
     #[test]
     fn le_rival_construit_avec_ses_reserves_et_au_bon_endroit() {

@@ -218,6 +218,14 @@ function parcellesRepli(i, C, bati, foret) {
 }
 
 // ------------------------------------------------------------------ fêtes, arc-en-ciel : ce qui dépend du mois précédent
+/** Une corde à linge entre deux piquets ; les draps se soulèvent sous le vent. */
+const DRAPS = [0xf6f2ea, 0x9fc4e8, 0xf2d6d6, 0xf6f2ea, 0xe8d38a].map(c => toon(c, { side: THREE.DoubleSide })), DRAP = new THREE.PlaneGeometry(0.045, 0.05).translate(0, -0.025, 0);
+function cordeLinge(x, y, z, cap, quand) {
+  const L = lot(); for (const o of [-0.13, 0.13]) put(L, new THREE.BoxGeometry(0.008, 0.12, 0.008), 0x8b5a2b, o, 0.06, 0, 0, 0.003); put(L, new THREE.BoxGeometry(0.26, 0.003, 0.003), 0xe9e2d0, 0, 0.115, 0, 0, 0);
+  const linge = fige(L, VIE); linge.position.set(x, y, z); linge.rotation.y = cap;
+  const draps = [0, 1, 2, 3].map(j => { const m = new THREE.Mesh(DRAP, DRAPS[(j + Math.round(x * 7)) % DRAPS.length]); m.position.set(-0.09 + j * 0.06, 0.113, 0); linge.add(m); return m; });
+  ajoute(linge, t => draps.forEach((m, j) => { m.rotation.x = Math.sin(t * (2 + climat.vent * 3) + j) * (0.15 + climat.vent * 0.5); }), quand);
+}
 const memo = { niveaux: new Map(), statuts: new Map(), fetes: new Map(), tour: -1, genre: null, arc: false };
 function fetesDuMois(etat, rapport) {
   if (etat.tour < memo.tour) { memo.niveaux.clear(); memo.statuts.clear(); memo.fetes.clear(); memo.genre = null; }
@@ -502,10 +510,7 @@ function reconstruire(etat, C, fetes, train) {
         const x = rive.x + dx * o, z = rive.z + dz * o, cp = -Math.atan2(-pz, -px), ph = o * 30;
         ajoute(A('lavandiere'), (t, dt, a) => { a.position.set(x, y + 0.005, z); a.rotation.set(0, cp, -Math.max(0, Math.sin(t * 1.8 + ph)) * 0.8 - 0.3); }, () => dehors() && climat.saison !== 0);
       }
-      const L = lot(); for (const o of [-0.13, 0.13]) put(L, new THREE.BoxGeometry(0.008, 0.12, 0.008), 0x8b5a2b, o, 0.06, 0, 0, 0.003); put(L, new THREE.BoxGeometry(0.26, 0.003, 0.003), 0xe9e2d0, 0, 0.115, 0, 0, 0);
-      const linge = fige(L, VIE); linge.position.set(kr.x + px * 0.4, y, kr.z + pz * 0.4); linge.rotation.y = -Math.atan2(dz, dx);
-      const draps = [0xf6f2ea, 0x9fc4e8, 0xf2d6d6, 0xf6f2ea].map((c, j) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(0.045, 0.05).translate(0, -0.025, 0), toon(c, { side: THREE.DoubleSide })); m.position.set(-0.09 + j * 0.06, 0.113, 0); linge.add(m); return m; });
-      ajoute(linge, t => draps.forEach((m, j) => { m.rotation.x = Math.sin(t * (2 + climat.vent * 3) + j) * (0.15 + climat.vent * 0.5); }), () => climat.saison !== 0 && !PLUIE());
+      cordeLinge(kr.x + px * 0.4, y, kr.z + pz * 0.4, -Math.atan2(dz, dx), () => climat.saison !== 0 && !PLUIE());
       const seg = rv.slice(Math.max(0, k - 5), k + 6).filter(terre);
       if (seg.length > 2) {
         const ch = cheminLisse(seg.map(j => { const p = posCase(j); return [p.x, p.z]; })), yp = Math.max(0, P.dessus(seg[0])) + 0.012;
@@ -514,6 +519,32 @@ function reconstruire(etat, C, fetes, train) {
           o.position.set(p.x, yp, p.z); o.rotation.set(0, p.cap + (sens ? 0 : Math.PI), Math.sin(t * 2 + n * 2.2) * 0.25);
         }, () => climat.saison === 0 && climat.gel > 0.3 && dehors());
       }
+    }
+  }
+
+  // ---- la foule des villes : des passants entre la place et les quartiers voisins, plus nombreux dans les grandes villes
+  // (population si le jeu la donne, sinon le rang de la ville et ses bâtiments) ; personne sous la pluie ni dans une ville assiégée
+  const PASSANTS = ['cliente', 'client', 'paysan', 'cliente2', 'enfant1', 'client', 'cliente', 'marchand'];
+  for (const v of etat.villes) {
+    const autour = voisins(v.case).filter(n => bati.has(n) && terre(n)), nb = etat.batiments.filter(b => b.ville === v.id).length;
+    const n = Math.min(18, Math.round(v.pop ? 2 + Math.sqrt(v.pop) / 6 : 2 + (v.niveau || 1) * 2 + nb / 2 + (v.capitale ? 4 : 0)));
+    const pts = [v.case, ...autour].map(i => posCase(i));
+    for (let k = 0; k < n; k++) {
+      // chacun va de la place vers un quartier voisin et revient, en flânant de côté
+      const a = pts[0], b = pts[1 + (k % Math.max(1, pts.length - 1))] || { x: a.x + Math.cos(k * 2.4) * 0.6, z: a.z + Math.sin(k * 2.4) * 0.6 };
+      const ph = hache(v.case, k, 71) * 6.28, vit = 0.08 + hache(v.case, k, 72) * 0.06, ec = (hache(v.case, k, 73) - 0.5) * 0.5, nom = PASSANTS[(k + v.case) % PASSANTS.length];
+      const px = -(b.z - a.z), pz = b.x - a.x;
+      ajoute(A(nom, nom.startsWith('enfant') ? ECH * 0.75 : ECH), (t, dt, o) => {
+        const u = (Math.sin(t * vit + ph) + 1) / 2 * 0.8 + 0.1, sens = Math.cos(t * vit + ph) >= 0 ? 1 : -1, cote = ec + Math.sin(t * 0.3 + ph) * 0.06;
+        const x = a.x + (b.x - a.x) * u + px * cote * 0.35, z = a.z + (b.z - a.z) * u + pz * cote * 0.35;
+        o.position.set(x, P.solEn(x, z) + DALLE + Math.abs(Math.sin(t * 7 + ph)) * 0.003, z); o.rotation.y = -Math.atan2((b.z - a.z) * sens, (b.x - a.x) * sens);
+      }, () => dehors() && !v.assiegee);
+    }
+    // ---- du linge qui sèche entre deux maisons (pas l'hiver, ni sous la pluie)
+    for (let j = 0; j < Math.min(3, 1 + (v.niveau || 1) / 2 | 0); j++) {
+      const i = j === 0 ? v.case : autour[j - 1]; if (i == null) break;
+      const q = posCase(i), an = hache(i, j, 74) * 6.28, x = q.x + Math.cos(an) * 0.62, z = q.z + Math.sin(an) * 0.62;
+      cordeLinge(x, P.solEn(x, z), z, an + Math.PI / 2, () => climat.saison !== 0 && !PLUIE() && JOUR());
     }
   }
 
@@ -697,7 +728,8 @@ export function partFoyers() {
   let part = ph === 'aube' ? 1 : ph === 'crepuscule' ? 0.75 : ph === 'nuit' ? 0.3 : 0.45;
   if (hiver) part = Math.max(part, ph === 'nuit' ? 0.7 : 1); else if (climat.saison === 3) part += 0.15; else if (climat.saison === 2) part *= 0.5;
   if (climat.genre === 'canicule') part = 0.06;
-  return { part, pas: hiver ? 0.55 : 0.85, k: hiver ? 1.15 : 0.9 };
+  const gel = Math.min(1, climat.gel || 0);  // plus il gèle, plus on chauffe : fumées serrées et épaisses
+  return { part, pas: hiver ? 0.42 - gel * 0.12 : 0.85, k: hiver ? 1.35 + gel * 0.3 : 0.9 };
 }
 
 chaqueImage((dt, t) => {

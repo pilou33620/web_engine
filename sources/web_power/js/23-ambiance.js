@@ -25,23 +25,34 @@ function dessinerRoutes() {
   // puis une desserte vers chaque ouvrage qui ne touche ni une ville ni une route, du plus proche au plus loin
   const ouvrages = UNITES.filter(u => u.type !== 'frontiere' && !estEau(u.t)).sort((x, y) => Math.min(...VILLES.map(v => dist(v.centre, x.t))) - Math.min(...VILLES.map(v => dist(v.centre, y.t))));
   const goudron = annee(S.min) >= 1930;
+  // l'usure : chaque tronçon compte les trajets qui l'empruntent (pondérés par la taille des villes reliées) ; les plus passants s'élargissent et se pavent
+  const usure = new Map(), user = (p, w) => p.forEach(t => usure.set(t, (usure.get(t) || 0) + w));
+  const habDe = t => VILLES.find(v => v.centre === t)?.hab || 0;
+  // le sol du moteur (pentes des collines comprises), en unités du jeu
+  const sol = (x, z) => { const q = versMoteur(x, 0, z); return Math.max(0, PLATEAU_M.hauteurEn(q.x, q.z) * R); };
   const tracer = (p, acces, chemin = false, benne = false) => {
-    p.forEach(t => reseau.add(t));
     const pts = p.map((t, i) => [t.x + (i && i < p.length - 1 ? (hache(t.q, t.r, 17) - .5) * 3 : 0), t.z + (i && i < p.length - 1 ? (hache(t.q, t.r, 19) - .5) * 3 : 0)]);
     if (acces) { pts[0][0] += (pts[1][0] - pts[0][0]) * .45; pts[0][1] += (pts[1][1] - pts[0][1]) * .45; }  // la desserte s'arrête au pied de l'ouvrage
     const lisse = []; for (let i = 0; i < pts.length - 1; i++) for (let s = 0; s < 4; s++) { const k = s / 4; lisse.push([pts[i][0] + (pts[i + 1][0] - pts[i][0]) * k, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * k]); } lisse.push(pts.at(-1));
-    const haut = i => { const t = versHex(lisse[i][0], lisse[i][1]); return t ? Math.max(t.top, 0) : 0; };
+    const haut = i => sol(lisse[i][0], lisse[i][1]), umax = Math.max(1, ...usure.values());
     // chemins de terre et routes goudronnées sur les matériaux de la bibliothèque : boue, route mouillée et flaques sous la pluie
-    const pave = goudron && !chemin;
-    for (let i = 0; i < lisse.length - 1; i++) { const y = Math.max(haut(i), haut(i + 1)) + .18; put(pave ? LP : LT, ruban([lisse[i], lisse[i + 1]], chemin ? .7 : acces ? 1.2 : 1.7, y), pave ? 0x6f6c66 : 0xc9a874, 0, 0, 0, 0, 0); if (i % (pave ? 4 : 2) === 1) eau.push([lisse[i][0], y, lisse[i][1]]); }
+    for (let i = 0; i < lisse.length - 1; i++) {
+      const a = lisse[i], b = lisse[i + 1], j = Math.min(p.length - 2, i >> 2), k = chemin ? 0 : clamp(Math.min(usure.get(p[j]) || 0, usure.get(p[j + 1]) || 0) / umax, 0, 1);
+      const pave = !chemin && (goudron || k > .5), y = Math.max(haut(i), haut(i + 1), sol((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)) + .18;  // le ruban suit les pentes
+      put(pave ? LP : LT, ruban([a, b], (chemin ? .7 : acces ? 1.2 : 1.7) * (1 + .6 * k), y), pave ? (goudron ? 0x6f6c66 : 0x8a837a) : 0xc9a874, 0, 0, 0, 0, 0);
+      if (i % (pave ? 4 : 2) === 1) eau.push([a[0], y, a[1]]);
+    }
     if (chemin) return;  // chemin de ferme : pas de trafic
     const v3 = lisse.map((q, i) => new THREE.Vector3(q[0], haut(i) + .7, q[1])), long = [0]; for (let i = 1; i < v3.length; i++) long.push(long[i - 1] + v3[i].distanceTo(v3[i - 1]));
     for (let k = 0, n = benne ? clamp(Math.round(S.dec.camions / 6), 1, 6) : Math.max(1, Math.round(long.at(-1) / (acces ? 28 : 18))); k < n; k++) VEHIC.push({ pts: v3, long, s: k / n, sens: k % 2 ? 1 : -1, v: .8 + hache(k, n, 3) * .4, h: hache(k, VEHIC.length, 5), h2: hache(VEHIC.length, k, 6), acces, benne });  // vers un site de déchets : les camions de collecte
   };
-  for (const [a, b] of liens) { const p = cheminRoute(a, b, reseau); if (p && p.length >= 2) tracer(p, false); }
-  for (const u of ouvrages) { if (voisins(u.t).some(n => reseau.has(n)) || reseau.has(u.t)) continue; const p = cheminRoute(u.t, reseau, reseau); if (p && p.length >= 2) tracer(p, true, false, estDecU(u)); }
+  // d'abord tous les trajets (les troncs communs se forment dans l'ordre), puis le dessin, une fois l'usure connue
+  const traces = [];
+  for (const [a, b] of liens) { const p = cheminRoute(a, b, reseau); if (p && p.length >= 2) { p.forEach(t => reseau.add(t)); user(p, 1 + (habDe(a) + habDe(b)) / 40000); traces.push([p, false, false, false]); } }
+  for (const u of ouvrages) { if (voisins(u.t).some(n => reseau.has(n)) || reseau.has(u.t)) continue; const p = cheminRoute(u.t, reseau, reseau); if (p && p.length >= 2) { p.forEach(t => reseau.add(t)); user(p, estDecU(u) ? .6 : .3); traces.push([p, true, false, estDecU(u)]); } }
+  for (const [p, ...o] of traces) tracer(p, ...o);
   // chemins de terre vers les fermes isolées
-  for (const t of LISTE.filter(t => t.ferme && !t.occ && !t.ville)) { if (reseau.has(t) || voisins(t).some(n => reseau.has(n))) continue; const p = cheminRoute(t, reseau, reseau); if (p && p.length >= 2) tracer(p, true, true); }
+  for (const t of LISTE.filter(t => t.ferme && !t.occ && !t.ville)) { if (reseau.has(t) || voisins(t).some(n => reseau.has(n))) continue; const p = cheminRoute(t, reseau, reseau); if (p && p.length >= 2) { p.forEach(t => reseau.add(t)); tracer(p, true, true); } }
   const B = MOTEUR.boue;
   if (LT.g.length) fige(LT, ROUTES, B.MAT_TERRE);
   if (LP.g.length) fige(LP, ROUTES, B.MAT_PAVE);
