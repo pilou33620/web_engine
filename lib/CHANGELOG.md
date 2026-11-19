@@ -3,6 +3,13 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.10.0 — 2026-11-19
+
+Les armées de web_royaumes (`modeles.js`, `maillageArmee`) deviennent un grand bataillon, validé sur la maquette `armees-propositions.html` :
+- trois lignes de huit fantassins (24 au lieu de 6), piquiers au centre en 1700, grenadiers au bout ensuite, tirailleurs en avant à partir de 1825 ;
+- l'officier et trois cavaliers à l'arrière, deux canons et leurs servants sur le flanc droit ;
+- le fourgon (chariot de ravitaillement de 1832) est supprimé ; la garde (`maillageGarde`) ne change pas.
+
 ## 2.9.0 — 2026-11-19
 
 Pour montrer tous les rendus hors partie (la carte complète) :

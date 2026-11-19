@@ -20,13 +20,13 @@
   <b>Armées : propositions</b>
   <label>Couleur <select name="couleur"><option value="#3b6fd1">Bleu</option><option value="#c0392b">Rouge</option><option value="#2e8b57">Vert</option><option value="#d4a017">Jaune</option></select></label>
 </form>
-<p class="note">À valider : les armées de web_royaumes avec plus d'infanterie (au moins 3 lignes) et sans chariot de ravitaillement. Une rangée par palier (1700 → 1832), une colonne par proposition. Mêmes soldats, canons et chevaux que lib/rendu/modeles.js.</p>
+<p class="note">Validée le 19/11/2026 : le grand bataillon (P3), avec des canons sur le flanc droit et des cavaliers à l’arrière à côté de l’officier, sans fourgon (lib 2.10.0, colonne « Retenue »). La garde ne change pas. Une rangée par palier (1700 → 1832).</p>
 <p class="aide">Glisser : déplacer · clic droit ou Maj : tourner · molette : zoom</p>
 <script type="module">
 // Les propositions sont écrites dans les conventions de armee() de modeles.js (unités du modèle, face à +z), pour que celle qui sera retenue y passe telle quelle.
 import { THREE, scene, cam, camera, apresCamera } from '../../lib/rendu/scene.js';
 import { lot, put, fige, cyl, boite, sphere, jeter } from '../../lib/rendu/toon.js';
-import { fantassin, canon, tete, PALIERS } from '../../lib/rendu/modeles.js';
+import { fantassin, canon, tete, PALIERS, maillageArmee } from '../../lib/rendu/modeles.js';
 import { appliquerMeteo } from '../../lib/rendu/meteo.js';
 import { climat } from '../../lib/rendu/vie.js';
 
@@ -89,6 +89,7 @@ const PROPOSITIONS = [
     if (P.chasseurs) { fantassin(L, P, -3.4, 5.6, roy, 'chasseur'); fantassin(L, P, 0.6, 5.9, roy, 'chasseur'); fantassin(L, P, 3.6, 5.5, roy, 'chasseur'); }
     cavalier(L, P, -2.2, -1.4, roy, officier(P));
   } },
+  { nom: 'Retenue (bibliothèque)', txt: 'le grand bataillon, avec des canons sur le flanc droit et des cavaliers à côté de l’officier, tel que dessiné par modeles.js', lib: true },
 ];
 
 // ---- la vitrine : une rangée par palier, une colonne par proposition
@@ -96,7 +97,7 @@ const PAS = 2.6, SOL = 0x84c450, groupe = new THREE.Group(), etiq = document.get
 let poses = [];
 scene.add(groupe);
 function afficher() {
-  for (const o of [...groupe.children]) jeter(o);
+  for (const o of [...groupe.children]) o.userData.cache ? groupe.remove(o) : jeter(o);
   etiq.textContent = ''; poses = [];
   const roy = f.couleur.value;
   PROPOSITIONS.forEach((pr, c) => { const el = document.createElement('span'); el.className = 'titre'; el.textContent = pr.nom; el.title = pr.txt; etiq.append(el); poses.push({ el, p: new THREE.Vector3(c * PAS, 0, -PAS * 0.75), titre: true }); });
@@ -107,6 +108,7 @@ function afficher() {
       const x = c * PAS, z = r * PAS, T = lot();
       put(T, cyl(1.2, 1.24, 0.16, 6), SOL, 0, -0.08, 0, 0, 0);
       fige(T, groupe).position.set(x, 0, z);
+      if (pr.lib) { const m = maillageArmee(roy, r); m.position.set(x, 0, z); m.userData.cache = true; groupe.add(m); return; }  // géométries en cache dans modeles.js
       const L = lot(); pr.armee(L, P, roy);
       const m = fige(L, groupe); m.scale.setScalar(0.1); m.position.set(x, 0, z);
     });
@@ -120,7 +122,7 @@ appliquerMeteo({ genre: 'soleil', temperature: 20, pluie: 0, vent: 0.4, neige_so
 climat.nuages = 0;  // vue de loin, les nuages passent devant les armées
 f.addEventListener('change', afficher);
 afficher();
-Object.assign(cam, { l: 3 * PAS, h: 6 * PAS, x: PAS, z: 2.5 * PAS, cible: 15, d: 15, lacet: 0, auto: false });
+Object.assign(cam, { l: 4 * PAS, h: 6 * PAS, x: 1.5 * PAS, z: 2.5 * PAS, cible: 15, d: 15, lacet: 0, auto: false });
 </script>
 </body>
 </html>
