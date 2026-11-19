@@ -1,6 +1,6 @@
 {
   "name": "web-engine-graphismes",
-  "version": "2.12.0",
+  "version": "2.13.0",
   "description": "Bibliothèque graphique commune des jeux : moteur et modèles de web_royaumes et de web_power, three.js r186.",
   "type": "module",
   "private": true,

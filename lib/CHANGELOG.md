@@ -3,6 +3,17 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.13.0 — 2026-11-19
+
+Les routes vivent avec la météo, dans `rendu/boue.js` (nouveau) :
+- `humidite.v` (0 à 1) monte sous la pluie, redescend quand elle s'arrête, retombe à zéro sous la neige au sol ;
+- `MAT_TERRE` : les chemins de terre virent à la boue ; `MAT_PAVE` : routes pavées et goudronnées foncent, comme mouillées ;
+  `TEINTE_ROUTES` : la teinte de fond qu'un jeu peut leur donner (les vues réseau de web_power assombrissent la carte) ;
+- `flaques(parent, points, r)` : des flaques le long des routes, qui grandissent chacune à leur tour puis sèchent dans l'ordre inverse,
+  avec les ronds de la pluie à leur surface ;
+- `routes.js` s'en sert : rien à changer dans web_royaumes ; un jeu qui trace ses routes lui-même (web_power) dessine ses chemins
+  avec `MAT_TERRE`, ses routes avec `MAT_PAVE`, et pose `flaques()` sur leurs points.
+
 ## 2.12.0 — 2026-11-19
 
 Les armées au repos et au travail :
