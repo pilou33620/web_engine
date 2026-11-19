@@ -54,6 +54,7 @@ pub fn carte(m: &Carte, version: u32) -> Value {
         "arbres": m.cases.iter().map(|k| k.arbres).collect::<Vec<_>>(),
         "foret": m.cases.iter().map(|k| k.foret as u8).collect::<Vec<_>>(),
         "rivieres": m.rivieres,
+        "biome": m.cases.iter().map(|k| k.biome.clone()).collect::<Vec<_>>(),
     })
 }
 

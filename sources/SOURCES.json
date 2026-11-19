@@ -1,14 +1,14 @@
 {
  "depots": {
   "web_royaumes": {
-   "commit": "a2eee54e75f3fb9118588f392d9a9c6e6637465d",
+   "commit": "6b93ff1e6178d3533b7c466847d3f02421f3ffce",
    "date": "2026-11-19",
-   "message": "Merge remote-tracking branch 'origin/main'"
+   "message": "Carte : biomes marais, désert et toundra tirés par le générateur ; graphismes 2.21.0"
   },
   "web_power": {
-   "commit": "ee6bd4b5567d8cf654d331504e12f8ad49f8c604",
+   "commit": "1868d8042d98e251951d80d309b3e79c7f80feba",
    "date": "2026-11-19",
-   "message": "Graphismes : bibliothèque web_engine 2.20.0, crises et relief"
+   "message": "Graphismes : bibliothèque web_engine 2.21.0"
   }
  },
  "maquettes": [

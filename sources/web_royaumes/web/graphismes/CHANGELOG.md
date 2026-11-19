@@ -3,6 +3,11 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.21.0 — 2026-11-19
+
+Biomes donnés par le jeu : si la carte passée à `construire()` porte `biome` (une valeur par case : 'marais', 'desert',
+'toundra' ou null), le plateau prend ces biomes au lieu de les déduire (le générateur de web_royaumes les tire désormais).
+
 ## 2.20.0 — 2026-11-19
 
 Relief, biomes, vie des villes, guerre et crises :

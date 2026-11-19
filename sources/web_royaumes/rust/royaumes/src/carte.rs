@@ -154,6 +154,9 @@ pub struct Case {
     /// Route qui passe sur la case : 0 aucune, 1 chemin de terre, 2 route pavée, 3 route royale.
     #[serde(default)]
     pub route: u8,
+    /// Biome (rendu, et le marais n'est pas cultivable) : "marais", "desert", "toundra" ou rien.
+    #[serde(default)]
+    pub biome: Option<String>,
 }
 
 impl Case {
@@ -548,6 +551,7 @@ impl Carte {
                     bat: None,
                     comp: -1,
                     route: 0,
+                    biome: None,
                 });
             }
         }
@@ -723,14 +727,60 @@ impl Carte {
                 k.arbres = 1;
             }
         }
+        m.biomes(o.graine);
         m.composantes();
         m
+    }
+
+    /// Les biomes, tirés à part (leur propre bruit) : les cartes d'avant restent les mêmes.
+    /// Désert : les plaines et le sable les plus secs, loin de toute eau ; marais : plaines basses au bord d'un lac ou d'une
+    /// rivière (plus cultivables) ; toundra : le nord de la carte et les terres prises entre des montagnes.
+    fn biomes(&mut self, graine: u64) {
+        let (nd, nm) = (Bruit::new(graine.wrapping_add(505)), Bruit::new(graine.wrapping_add(606)));
+        let n = self.cases.len();
+        let f = 3.0 / (SQ3 * self.l as f64);
+        let bruit = |b: &Bruit, k: &Case| { let (x, z) = k.pos(); b.octaves(x * f, z * f, 3) };
+        // seuil : la valeur au-dessus de laquelle se trouve la part p des cases de terre (des taches, pas des cases isolées)
+        let terre: Vec<usize> = (0..n).filter(|&i| self.cases[i].terre()).collect();
+        let seuil = |b: &Bruit, p: f64| {
+            let mut v: Vec<f64> = terre.iter().map(|&i| bruit(b, &self.cases[i])).collect();
+            v.sort_by(|a, b| b.total_cmp(a));
+            v.get((v.len() as f64 * p) as usize).copied().unwrap_or(f64::MAX)
+        };
+        let (sd, sm) = (seuil(&nd, 0.10), seuil(&nm, 0.45));
+        for i in 0..n {
+            let vs = self.voisins(i);
+            let k = &self.cases[i];
+            let eau = vs.iter().any(|&j| !self.cases[j].terre() || self.cases[j].riviere);
+            let montagnes = vs.iter().filter(|&&j| self.cases[j].t == Terrain::Montagne).count();
+            let b = if matches!(k.t, Terrain::Plaine | Terrain::Sable) && !k.foret && !k.riviere && !k.fertile && !eau && bruit(&nd, k) >= sd {
+                Some("desert")
+            } else if k.t == Terrain::Plaine && !k.foret && vs.iter().any(|&j| self.cases[j].t == Terrain::Lac || self.cases[j].riviere) && bruit(&nm, k) >= sm {
+                Some("marais")
+            } else if matches!(k.t, Terrain::Plaine | Terrain::Colline) && ((k.r as f64) < self.h as f64 * 0.08 || montagnes >= 2) {
+                Some("toundra")
+            } else {
+                None
+            };
+            if b == Some("marais") { self.cases[i].fertile = false; }
+            self.cases[i].biome = b.map(String::from);
+        }
     }
 }
 
 #[cfg(test)]
 mod essais {
     use super::*;
+
+    #[test]
+    fn biomes() {
+        let m = Carte::generer(&Options::default());
+        let compte = |b: &str| m.cases.iter().filter(|k| k.biome.as_deref() == Some(b)).count();
+        let terre = m.cases.iter().filter(|k| k.terre()).count();
+        for b in ["desert", "marais", "toundra"] { assert!(compte(b) > 0 && compte(b) < terre / 4, "{b} : {} sur {terre}", compte(b)); }
+        assert!(m.cases.iter().all(|k| k.biome.as_deref() != Some("marais") || !k.fertile), "un marais ne se cultive pas");
+        assert!(m.cases.iter().all(|k| k.biome.is_none() || k.terre()));
+    }
 
     #[test]
     fn generation_reglable() {

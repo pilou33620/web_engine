@@ -2,7 +2,7 @@
 
 Généré par `outils/synchroniser.sh` : ne pas modifier à la main.
 
-## web_royaumes — `a2eee54` (2026-11-19)
+## web_royaumes — `6b93ff1` (2026-11-19)
 
 | Fichier | Taille | Rôle (en-tête du fichier) |
 |---|---:|---|
@@ -82,7 +82,7 @@ Généré par `outils/synchroniser.sh` : ne pas modifier à la main.
 | `web/js/ui.js` | 68 ko | L'interface : barre du haut, panneaux (construire, diplomatie, armées, royaume, menu), fiche d'une case |
 | `web/manifest.webmanifest` | 0 ko |  |
 
-## web_power — `ee6bd4b` (2026-11-19)
+## web_power — `1868d80` (2026-11-19)
 
 | Fichier | Taille | Rôle (en-tête du fichier) |
 |---|---:|---|
