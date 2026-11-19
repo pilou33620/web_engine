@@ -1,7 +1,7 @@
 // L'interface : barre du haut, panneaux (construire, diplomatie, armées, royaume, menu), fiche d'une case
 // (ville, bâtiment, armées, flottes, espions, fort, siège), récapitulatif du mois, événements à choix, annonces.
-import { echapper as e } from '../graphismes/royaumes/etiquettes.js';
-import { voisins } from '../graphismes/royaumes/scene.js';
+import { echapper as e } from '../graphismes/rendu/etiquettes.js';
+import { voisins } from '../graphismes/rendu/scene.js';
 
 const $ = s => document.querySelector(s);
 let J = null, A = null;
@@ -169,7 +169,11 @@ async function clic(el) {
     case 'mission': await envoyer({ action: 'mission', espion: +d.v, genre: d.g, ville: +d.c }); break;
     case 'assaut': assaut(+d.v); break;
     case 'diviser': diviser(+d.v); break;
-    case 'diplo': if (d.v === 'guerre' && !await modale('Déclarer la guerre ?', `<p>Vous allez entrer en guerre contre <b>${e(roy(+d.r).nom)}</b>. Les autres royaumes vous jugeront belliqueux.</p>`, [{ l: '⚔️ Guerre !', c: 'rouge', v: true }, { l: 'Annuler', c: 'b2', v: false }])) break; await envoyer({ action: 'diplo', royaume: +d.r, acte: d.v }); break;
+    case 'diplo': if (d.v === 'guerre' && !await modale('Déclarer la guerre ?', `<p>Vous allez entrer en guerre contre <b>${e(roy(+d.r).nom)}</b>. ${trahison(roy(+d.r)) || 'Les autres royaumes vous jugeront belliqueux.'}</p>`, [{ l: '⚔️ Guerre !', c: 'rouge', v: true }, { l: 'Annuler', c: 'b2', v: false }])) break;
+      if (d.v === 'rompre' && !await modale('Rompre l\'alliance ?', `<p><b>${e(roy(+d.r).nom)}</b> y verra une trahison, et s'en souviendra longtemps.</p>`, [{ l: '💔 Rompre', c: 'rouge', v: true }, { l: 'Annuler', c: 'b2', v: false }])) break;
+      await envoyer({ action: 'diplo', royaume: +d.r, acte: d.v }); break;
+    case 'aide': await envoyer({ action: 'diplo', royaume: +d.r, acte: 'aide', contre: +d.c }); break;
+    case 'repondre': await envoyer({ action: 'repondre', proposition: +d.v, accepte: d.s === '1' }); break;
     case 'marche': marcheDe = +d.r; rafraichir(); break;
     case 'retour': marcheDe = null; rafraichir(); break;
     case 'echange': await envoyer({ action: 'echanger', royaume: +d.r, ressource: d.v, achat: d.s === '1' }); break;
@@ -477,20 +481,56 @@ async function diviser(id) {
 // --- diplomatie
 let marcheDe = null;
 function relation(r) { const p = (r.relation + 100) / 2; return `<div class="relation"><i style="left:calc(${p}% - 2px)"></i></div><div class="mini">Relation : <b>${Math.round(r.relation)}</b> · ${e(r.caractere)}</div>`; }
+// la diplomatie du moteur (ia_diplomatie.rs) : souverains, traités entre royaumes, coalitions, mémoire
+const TRAITS = [['agressivite', '⚔️ Agressivité'], ['fidelite', '🤝 Fidélité'], ['avidite', '💰 Avidité'], ['prudence', '🛡️ Prudence']];
+const points = v => '●'.repeat(Math.round(v * 5)) + '○'.repeat(5 - Math.round(v * 5));
+const noms = ids => ids.map(i => `${pastille(i)}${e(roy(i).nom)}`).join(', ');
+function trahison(r) {
+  if (r.statut === 'alliance') return '<b>C\'est votre allié</b> : rompre l\'alliance par la guerre est une trahison dont tous se souviendront.';
+  if (r.diplo?.treve) return `<b>Une trêve court encore ${r.diplo.treve} mois</b> : la rompre est une trahison dont tous se souviendront.`;
+  return '';
+}
+const TITRE_PROPOSITION = { echange: '⚖️ Échange', alliance: '🤝 Alliance', paix: '🕊️ Paix', tribut: '💰 Ultimatum', marchand: '🧳 Colporteur', aide: '🆘 Demande d\'aide' };
+function vuePropositions(E) {
+  const ps = E.propositions || [];
+  if (!ps.length) return '';
+  return `<div class="boite propositions"><h4>✉️ Propositions en attente</h4>${ps.map(p => `<div class="evt">${p.de > 0 ? pastille(p.de) : ''}<b>${p.manche ? '↩️ Contre-proposition' : TITRE_PROPOSITION[p.genre] || 'Proposition'}</b> · ${e(p.texte)}
+    <div class="btns"><button class="btn vert" data-a="repondre" data-v="${p.id}" data-s="1">${p.genre === 'tribut' ? 'Payer' : p.genre === 'aide' ? '⚔️ Entrer en guerre' : 'Accepter'}</button><button class="btn ${p.genre === 'tribut' ? 'rouge' : 'b2'}" data-a="repondre" data-v="${p.id}" data-s="0">${p.genre === 'tribut' ? 'Refuser' : 'Décliner'}</button></div></div>`).join('')}
+    <div class="mini">Sans réponse à la fin du mois, une proposition est refusée.</div></div>`;
+}
+function vueCoalitions(E) {
+  return (E.coalitions || []).map(c => `<div class="boite coalition"><h4>⚔️ Coalition contre ${c.cible === 0 ? 'vous' : pastille(c.cible) + e(roy(c.cible).nom)}</h4><div class="mini">${noms(c.membres)} · depuis ${Math.max(0, E.tour - c.depuis)} mois</div></div>`).join('');
+}
+function vueSouverain(r) {
+  const d = r.diplo || {}, s = d.souverain;
+  if (!d.connu) return '<div class="mini">❔ Royaume pas encore rencontré : son souverain et ses alliances vous sont inconnus.</div>';
+  let h = s ? `<div class="mini">👑 <b>${e(s.nom)}</b> · ${e(s.caractere)} · ${s.age} ans · règne depuis ${s.regne ? s.regne + ' an' + (s.regne > 1 ? 's' : '') : 'peu'}</div><div class="traits">${TRAITS.map(([k, n]) => `<span>${n} <b>${points(s.traits[k])}</b></span>`).join('')}</div>` : '';
+  const liens = [d.guerres?.length && `⚔️ en guerre contre ${noms(d.guerres)}`, d.allies?.length && `🤝 allié de ${noms(d.allies)}`, d.routes?.length && `🛤️ commerce avec ${noms(d.routes)}`].filter(Boolean);
+  if (liens.length) h += `<div class="mini">${liens.join(' · ')}</div>`;
+  if (d.coalition) h += `<div class="mini" style="color:#f98">⚔️ Une coalition le combat : ${noms(d.coalition)}</div>`;
+  if (d.souvenir) h += `<div class="mini souvenir">« ${e(d.souvenir)} »</div>`;
+  return h;
+}
 function vueDiplomatie() {
   const E = J.etat;
   if (marcheDe != null) return vueMarche(roy(marcheDe));
   const P = E.royaumes[0].puissance, com = E.joueur.comptoir || E.joueur.port;
-  let h = `<p class="mini">Votre puissance : <b>${P}</b>. ${com ? '⚖️ Commerce possible.' : 'Construisez un Comptoir de commerce pour commercer.'}</p>`;
+  let h = `<p class="mini">Votre puissance : <b>${P}</b>. ${com ? '⚖️ Commerce possible.' : 'Construisez un Comptoir de commerce pour commercer.'}</p>` + vuePropositions(E) + vueCoalitions(E);
+  // vos ennemis : un allié peut entrer en guerre contre eux à vos côtés
+  const ennemis = E.royaumes.filter(x => !x.joueur && x.vivant && x.statut === 'guerre');
   for (const r of E.royaumes.filter(x => !x.joueur)) {
     if (!r.vivant) { h += `<div class="boite" style="opacity:.5"><h4>${pastille(r.id)}${e(r.nom)}</h4><div class="mini">☠️ Anéanti</div></div>`; continue; }
-    const villes = E.villes.filter(v => v.proprio === r.id);
-    h += `<div class="boite"><div style="display:flex;justify-content:space-between;align-items:center"><h4 style="margin:0">${pastille(r.id)}${e(r.nom)}</h4><span class="statut ${r.statut}">${STATUT[r.statut] || r.statut}</span></div>${relation(r)}
-    <div class="mini">🏰 ${villes.map(v => `${e(v.nom)} (${v.niveau})`).join(', ')} · ⚔ ${r.puissance}${r.puissance > P * 1.3 ? ' <span style="color:#f98">(plus fort)</span>' : r.puissance < P * 0.7 ? ' <span style="color:#8f8">(plus faible)</span>' : ''} · 💡 ${r.techs} techs${r.commerce ? ' · 🛤️ route' : ''}</div>
-    <div class="mini">Vend bon marché : ${r.surplus.map(x => res(x).icone).join(' ')} · Achète cher : ${r.demande.map(x => res(x).icone).join(' ')}</div>
+    const villes = E.villes.filter(v => v.proprio === r.id), d = r.diplo || {};
+    const statut = r.statut === 'paix' && d.treve ? `🕊️ Trêve ${d.treve} mois` : STATUT[r.statut] || r.statut;
+    const aides = r.statut === 'alliance' ? ennemis.filter(x => x.id !== r.id && !(d.guerres || []).includes(x.id)) : [];
+    h += `<div class="boite"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px"><h4 style="margin:0">${pastille(r.id)}${e(r.nom)}</h4><span class="statut ${r.statut}">${statut}</span></div>${vueSouverain(r)}${relation(r)}
+    <div class="mini">🏰 ${villes.map(v => `${e(v.nom)} (${v.niveau})`).join(', ')} · 👥 ~${r.population} · ⚔ ${r.puissance}${r.puissance > P * 1.3 ? ' <span style="color:#f98">(plus fort)</span>' : r.puissance < P * 0.7 ? ' <span style="color:#8f8">(plus faible)</span>' : ''} · 💡 ${r.techs} techs${r.commerce ? ' · 🛤️ route' : ''}</div>
+    <div class="mini">Vend bon marché : ${r.surplus.map(x => res(x).icone).join(' ') || '—'} · Achète cher : ${r.demande.map(x => res(x).icone).join(' ') || '—'}</div>
     <div class="btns"><button class="btn b2" data-a="diplo" data-r="${r.id}" data-v="cadeau">🎁 Cadeau 100🪙</button>
-    ${r.statut === 'guerre' ? `<button class="btn vert" data-a="diplo" data-r="${r.id}" data-v="paix">🕊️ Paix</button>` : `<button class="btn rouge" data-a="diplo" data-r="${r.id}" data-v="guerre">⚔️ Guerre</button>`}
+    ${r.statut === 'guerre' ? `<button class="btn vert" data-a="diplo" data-r="${r.id}" data-v="paix">🕊️ Paix</button><button class="btn b2" data-a="diplo" data-r="${r.id}" data-v="paix_ville">🏰 Paix contre une ville</button><button class="btn b2" data-a="diplo" data-r="${r.id}" data-v="paix_or">💰 Paix contre réparations</button>` : `<button class="btn rouge" data-a="diplo" data-r="${r.id}" data-v="guerre">⚔️ Guerre</button>`}
     ${r.statut !== 'guerre' && r.statut !== 'alliance' ? `<button class="btn b2" data-a="diplo" data-r="${r.id}" data-v="alliance">🤝 Alliance</button>` : ''}
+    ${r.statut === 'alliance' ? `<button class="btn b2" data-a="diplo" data-r="${r.id}" data-v="rompre">💔 Rompre</button>` : ''}
+    ${aides.map(x => `<button class="btn" data-a="aide" data-r="${r.id}" data-c="${x.id}">🆘 Son aide contre ${e(x.nom)}</button>`).join('')}
     ${r.statut !== 'guerre' && !r.commerce ? `<button class="btn b2" data-a="diplo" data-r="${r.id}" data-v="route">🛤️ Route 150🪙</button>` : ''}
     ${r.statut !== 'guerre' ? `<button class="btn" data-a="marche" data-r="${r.id}">⚖️ Marché</button>` : ''}
     <button class="btn b2" data-a="diplo" data-r="${r.id}" data-v="tribut">💰 Tribut</button></div></div>`;
@@ -586,7 +626,7 @@ function effetsOption(o, d) {
 }
 export function carteChoix(c) {
   const E = J.etat, def = R().evenements_choix?.find(d => d.cle === c.cle);
-  const illus = ILLUSTRE.includes(c.cle) ? `<img src="graphismes/royaumes/img/evenement-${c.cle}.svg" alt="">` : `<span>${c.icone}</span>`;
+  const illus = ILLUSTRE.includes(c.cle) ? `<img src="graphismes/rendu/img/evenement-${c.cle}.svg" alt="">` : `<span>${c.icone}</span>`;
   const n = c.options.length;
   return modale(`${c.icone} ${e(c.titre)}`, `<div class="illus">${illus}</div><p class="mini">${e(E.date)} · ${e(E.epoque.nom)}</p><p>${e(c.texte)}</p>`,
     c.options.map((o, i) => { const fx = effetsOption(o, def?.options[i]); return { l: `${e(o.texte)}${fx ? ` · ${fx}` : ''}`, c: i === n - 1 ? 'rouge' : i === 0 ? 'vert' : 'b2', v: i, d: !o.possible }; }), 'choix');

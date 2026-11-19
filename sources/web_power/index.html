@@ -38,7 +38,8 @@
   </header>
 
   <main id="zone">
-    <canvas id="scene" aria-label="Carte hexagonale de la région"></canvas>
+    <canvas id="carte" aria-label="Carte hexagonale de la région"></canvas>
+    <div id="eclair"></div>
     <div id="etiquettes"></div>
     <div id="temps" class="flottant temps" role="group" aria-label="Vitesse du temps"></div>
     <nav class="flottant lentilles" id="lentilles" aria-label="Lentilles de la carte"></nav>
@@ -71,19 +72,14 @@
 <div id="modale" class="modale" hidden><div class="boite" role="dialog" aria-modal="true" aria-labelledby="modale-titre"><div id="modale-contenu" style="display:flex;flex-direction:column;gap:12px"></div></div></div>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-<!-- les graphismes viennent de la bibliothèque commune web_engine (graphismes/, voir outils/maj-graphismes.sh) ; three.js à sa version (r186),
-     depuis le CDN pour que la page s'ouvre aussi en file:// (où les modules locaux sont refusés) -->
-<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/" } }</script>
-<script type="module">
-// three.js arrive en module depuis le CDN ; le jeu, en scripts classiques (defer) qui partagent leurs déclarations, s'exécute après, dans l'ordre des balises
-import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-Object.assign(window, { THREE, mergeGeometries });
-</script>
-<script defer src="graphismes/power/01-outils.js"></script>
+<!-- les graphismes viennent de la bibliothèque commune web_engine (graphismes/, voir outils/maj-graphismes.sh) : son moteur unique
+     tient le canevas, la caméra, le plateau et le ciel (js/01-moteur.js) ; le jeu se sert d'un serveur (serveur.py), les modules locaux
+     étant refusés en file:// -->
+<script type="importmap">{ "imports": { "three": "./graphismes/three/three.module.js" } }</script>
+<script type="module" src="js/01-moteur.js"></script>
+<script defer src="js/01-outils.js"></script>
 <script defer src="js/02-terrain.js"></script>
-<script defer src="graphismes/power/03-moteur-3d.js"></script>
-<script defer src="graphismes/power/04-modeles.js"></script>
+<script defer src="js/03-plateau.js"></script>
 <script defer src="js/05-catalogue.js"></script>
 <script defer src="js/06-eau.js"></script>
 <script defer src="js/06b-dechets.js"></script>
@@ -104,8 +100,8 @@ Object.assign(window, { THREE, mergeGeometries });
 <script defer src="js/20-actions.js"></script>
 <script defer src="js/21-partie.js"></script>
 <script defer src="js/22-banc.js"></script>
-<script defer src="graphismes/power/23-ambiance.js"></script>
-<script defer src="graphismes/power/24-ciel.js"></script>
+<script defer src="js/23-ambiance.js"></script>
+<script defer src="js/24-ciel.js"></script>
 <script defer src="js/25-boucle.js"></script>
 
 </body>

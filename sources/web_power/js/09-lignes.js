@@ -37,15 +37,7 @@ function capLigne(l) {
   if (rd('dlr')) { const w = meteo(S.min); if (w.temp < 8 || w.vent > 9) k += .15; }
   return KV[l.kv].cap * k;
 }
-function pylone(L, x, y, z, ry, kv) {
-  const m = lot(), s = kv === 15 ? .8 : kv === 63 ? .58 : kv === 225 ? .78 : 1;
-  if (kv === 15) { put(m, cyl(.28, .36, 8.4, 6), 0x7a5a3a, 0, 4.2, 0, 0, .16); put(m, boite(6.8, .35, .35), 0x7a5a3a, 0, 8.2, 0, 0, .14); transfere(m, L, x, y, z, ry, s); return; }  // poteau en bois
-  const f = cyl(.45, 1.5, 9.4, 4); f.rotateY(Math.PI / 4); put(m, f, 0x99a2ac, 0, 4.7, 0, 0, .2);
-  put(m, boite(7.2, .45, .55), 0x99a2ac, 0, 8.4, 0, 0, .18);
-  if (kv !== 63) put(m, boite(kv === 400 ? 9 : 4.4, .4, .5), 0x99a2ac, 0, 6.6, 0, 0, .18);
-  put(m, cone(.5, 1.6, 4), 0x99a2ac, 0, 10.2, 0, 0, .14);
-  transfere(m, L, x, y, z, ry, s);
-}
+// pylone(L, x, y, z, ry, kv) : le modèle de la bibliothèque (graphismes/rendu/modernes.js)
 function tracerLigne(a, b, kv, { immediat = false, chemin: p0 = null } = {}) {
   a = bout(a); b = bout(b);
   const p = p0 || chemin(a, b); if (!p) return null;

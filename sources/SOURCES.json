@@ -1,14 +1,14 @@
 {
  "depots": {
   "web_royaumes": {
-   "commit": "97e4caf02f9cdf9dfc5518aa1c3bcfa6ddf3603b",
-   "date": "2026-11-18",
-   "message": "Graphismes : images et icônes viennent aussi de la bibliothèque web_engine (1.1.0)"
+   "commit": "b46183c280973368f156f2b2d7b96fa65084ff06",
+   "date": "2026-11-19",
+   "message": "Graphismes : bibliothèque web_engine 2.15.0, parties ancien et guerre (avec leurs dépendances : tout)"
   },
   "web_power": {
-   "commit": "1e2fef409f2037fbcfe722e8d66299343cd297ed",
-   "date": "2026-11-18",
-   "message": "Graphismes : bibliothèque web_engine 1.0.0 (documentation des jeux branchés)"
+   "commit": "bb6ef44ed4c89ba3e91c19de332dfe087362b3e2",
+   "date": "2026-11-19",
+   "message": "Graphismes : bibliothèque web_engine 2.15.0, partie moderne seulement (avec socle et three)"
   }
  },
  "maquettes": [

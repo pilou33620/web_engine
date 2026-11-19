@@ -62,24 +62,47 @@ function nouvellePartie(diff, def = carteDef('valmont')) {
   sauver();
 }
 const CLE = 'gridmaster-campagne-v1';
+let sauverKO = false;  // prévient une seule fois quand le navigateur refuse d'enregistrer
 function sauver() {
   if (!S?.enJeu || BANC_ON) return;
+  try { localStorage.setItem(CLE, JSON.stringify(donneesPartie())); if (sauverKO) { sauverKO = false; log('La sauvegarde automatique fonctionne de nouveau.', 'bon'); } }
+  catch (e) { if (!sauverKO) { sauverKO = true; log('Sauvegarde automatique impossible : le navigateur refuse d’enregistrer (navigation privée ou stockage plein). Exportez la partie depuis le menu pour ne pas la perdre.', 'mauvais'); toast('La partie n’est plus enregistrée : exportez-la depuis le menu.'); } }
+}
+function donneesPartie() {
   const d = { S: { ...S, hist: S.hist.slice(-96), fhist: undefined, D: undefined }, uid, gs, carte: CARTE,
     unites: UNITES.map(u => ({ id: u.id, type: u.type, k: u.t.k, nom: u.nom, dispo: u.dispo, panne: u.panne, fin: u.fin, debut: u.debut, soc: u.soc, mode: u.mode, niv: u.niv, etapes: u.etapes, reut: u.reut, rempli: u.rempli, amelio: u.amelio })),
     aretes: [...ARETES.values()].map(e => [e.a.k, e.b.k, e.type, e.an]),
     lignes: LIGNES.map(l => ({ id: l.id, a: l.a.k, b: l.b.k, kv: l.kv, fin: l.fin, hs: l.hs, chemin: l.tuiles.map(t => t.k) })), villes: VILLES.map(v => ({ nom: v.nom, couleur: v.couleur, rang: v.rang, rayon: v.rayon, i: v.i, prochaine: v.prochaine, fondee: v.fondee, grace: v.grace, base: v.base, bac: v.bac, moy: v.moy, sauvage: v.sauvage, centre: v.centre.k, tuiles: v.tuiles.map(t => [t.k, t.quartier]) })) };
-  try { localStorage.setItem(CLE, JSON.stringify(d)); } catch (e) { /* stockage indisponible : la partie continue sans sauvegarde */ }
+  return d;
 }
-function lireSauvegarde() { try { const d = JSON.parse(localStorage.getItem(CLE)); return d && d.S && d.unites && d.carte ? d : null; } catch (e) { return null; } }
-function charger() {
-  const d = lireSauvegarde(); if (!d) { toast('Aucune partie enregistrée.'); return false; }
+const partieValide = d => d && typeof d === 'object' && d.S && typeof d.S.min === 'number' && DIFF[d.S.diff] && Array.isArray(d.unites) && Array.isArray(d.villes) && Array.isArray(d.lignes) && d.carte ? d : null;
+function lireSauvegarde() { try { return partieValide(JSON.parse(localStorage.getItem(CLE))); } catch (e) { return null; } }
+// export et import d'un fichier : une partie par fichier, pour en garder plusieurs ou changer d'appareil
+function exporterPartie() {
+  const d = S.enJeu ? donneesPartie() : lireSauvegarde(); if (!d) { toast('Aucune partie à exporter.'); return; }
+  const a = document.createElement('a'), an = Math.floor(annee(d.S.min));
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(d)], { type: 'application/json' }));
+  a.download = `gridmaster-${(d.carte.id || 'carte')}-${an}.json`; document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000); toast(`Partie de ${an} exportée.`, 'ok');
+}
+function importerPartie() {
+  const f = document.createElement('input'); f.type = 'file'; f.accept = '.json,application/json';
+  f.onchange = async () => {
+    let d = null; try { d = partieValide(JSON.parse(await f.files[0].text())); } catch (e) { /* fichier illisible */ }
+    if (!d) { toast('Ce fichier n’est pas une partie GridMaster.'); return; }
+    if (charger(d)) { $('#modale').hidden = true; sauver(); }
+  };
+  f.click();
+}
+function charger(d = lireSauvegarde()) {
+  if (!d) { toast('Aucune partie enregistrée.'); return false; }
   toutEffacer(); genererCarte(d.carte);
   S = Object.assign(etatInitial(d.S.diff), d.S, { fhist: Array(200).fill(50), enJeu: true, pause: true }); uid = d.uid; gs = d.gs;
   for (const v of VILLES) { for (const t of v.tuiles) { jeter(t.grpQ); t.grpQ = null; t.ville = null; t.quartier = null; t.t = t.t0; t.top = TERR[t.t].h; } v.el?.remove(); }
   FUMEES.splice(0, FUMEES.length, ...FUMEES.filter(f => !f.q)); VILLES = [];
   for (const x of d.villes) {
     const v = { ...x, centre: T.get(x.centre), tuiles: [], servie: false };
-    for (const [k, q] of x.tuiles) { const t = T.get(k); Object.assign(t, { ville: v, quartier: q, t: 'ville' }); t.top = Math.max(t.top, TERR.ville.h); v.tuiles.push(t); dessinerQuartier(t, false); }
+    for (const [k, q] of x.tuiles) { const t = T.get(k); Object.assign(t, { ville: v, quartier: q, t: 'ville' }); t.top = TERR.ville.h; v.tuiles.push(t); dessinerQuartier(t, false); }
     v.hab = v.hab0 = habVille(v); v.rang0 = v.base ? 'capitale' : v.rang; VILLES.push(v);
   }
   for (const s of d.unites) { const u = creerUnite(T.get(s.k), s.type, { immediat: !s.fin, nom: s.nom, fin: s.fin }); Object.assign(u, { id: s.id, dispo: s.dispo, panne: s.panne, debut: s.debut, soc: s.soc, mode: s.mode }); if (s.niv !== undefined) u.niv = s.niv; if (s.etapes) u.etapes = s.etapes; if (s.reut) u.reut = true; if (s.rempli !== undefined) u.rempli = s.rempli; if (s.amelio) u.amelio = s.amelio; }

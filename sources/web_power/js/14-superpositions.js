@@ -52,16 +52,13 @@ const coulTaux = b => (b.fin ? '#8d8f96' : b.hs > S.min ? '#6b6f68' : b.taux > 1
 function couleurCables() { for (const l of LIGNES) if (l.cables && !l.fin) (l.cables.userData.m0 || l.cables.material).color.set(S.lentille === 'charge' && !mode ? coulTaux(l) : l.hs > S.min ? '#8a3a30' : '#2d2621'); }
 
 // ============================================================ fumées
-const BOULE = new THREE.IcosahedronGeometry(1, 1), MFUM = new THREE.MeshToonMaterial({ color: 0x8f8f8f, gradientMap: degrade }), MVAP = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: degrade });
-const BOULES = []; for (let i = 0; i < 110; i++) { const m = new THREE.Mesh(BOULE, MFUM); m.visible = false; scene.add(m); BOULES.push({ m, vie: 0 }); }
+const CHARBON = new Set(['usine', 'charbon', 'charbonG']);
+// les bouffées du moteur (vie.js), qui dérivent avec le vent ; seuls les ouvrages en marche fument
 function animFumees(dt) {
   for (const f of FUMEES) {
     const marche = f.u ? (estDecU(f.u) ? enService(f.u) && f.u.q > 1 : actifU(f.u) && f.u.p > 1) : true; if (!marche) continue;
-    f.tic -= dt; if (f.tic <= 0) { f.tic = f.vap ? .55 : .7; const b = BOULES.find(b => b.vie <= 0); if (b) { b.vie = 1; b.p = f.p.clone(); b.vap = f.vap; b.m.material = f.vap ? MVAP : MFUM; b.m.visible = true; } }
-  }
-  for (const b of BOULES) {
-    if (b.vie <= 0) continue; b.vie -= dt / (b.vap ? 3.2 : 3.6); if (b.vie <= 0) { b.m.visible = false; continue; }
-    const a = 1 - b.vie, s = (b.vap ? 1.6 : 1.1) * (.6 + a * 1.6) * Math.min(1, b.vie * 3);
-    b.m.position.set(b.p.x + a * 7, b.p.y + a * 9, b.p.z - a * 2); b.m.scale.setScalar(s);
+    // le charbon fume plus noir et plus épais
+    const charbon = f.u && CHARBON.has(f.u.type);
+    f.tic -= dt; if (f.tic <= 0) { f.tic = f.vap ? .55 : charbon ? .4 : .7; const p = versMoteur(f.p.x, f.p.y, f.p.z); MOTEUR.bouffee(p.x, p.y, p.z, f.vap ? 'blanche' : 'noire', charbon && !f.vap ? 1.9 : undefined); }
   }
 }

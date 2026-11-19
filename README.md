@@ -33,7 +33,7 @@ carte-test/                la carte test : tous les bâtiments de toutes les ép
 galerie/                   les pages de la galerie : elles chargent le code de sources/ tel quel
   visionneuse.css
   web_royaumes/            visionneuse.html (bâtiments), monde.html (monde vivant), donnees/ (carte et état du moteur)
-  web_power/               visionneuse.html + visionneuse.js (bâtiments), monde.html (monde vivant)
+  web_power/               visionneuse.html (bâtiments, dessinés par lib/rendu/modernes.js), monde.html (le jeu, piloté)
 outils/
   synchroniser.sh          recopie les deux dépôts, régénère SOURCES.json et INVENTAIRE.md, signale les graphismes à reporter dans lib/
   installer.sh             installe lib/ dans le dossier graphismes/ d'un jeu (avec VERSION.json)

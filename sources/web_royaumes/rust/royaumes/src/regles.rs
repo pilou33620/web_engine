@@ -95,8 +95,6 @@ pub struct DefMarine {
     pub commerce_partenaire: f64,
     pub commerce_distance: f64,
     pub commerce_max: f64,
-    /// or perdu chaque mois par un royaume de l'ordinateur pour chaque ville bloquée
-    pub blocus_ia: f64,
     /// part des navires perdus par le vaincu d'une bataille navale
     pub pertes_vaincu: f64,
 }
@@ -139,8 +137,6 @@ pub struct DefSiege {
     pub vauban_attaque: f64,
     pub vauban_defense: f64,
     pub gribeauval: f64,
-    /// part du coût des fortifications payée par l'ordinateur (en or, son économie est résumée)
-    pub fortif_ia: f64,
     /// pillage d'un faubourg : or, part du coût du bâtiment emportée, mois d'arrêt
     pub pillage_or: f64,
     pub pillage_part: f64,
@@ -324,8 +320,6 @@ pub struct DefJourMarche {
     pub bonheur: f64,
     pub bonheur_max: f64,
     pub disette: f64,
-    /// or par halle ouverte pour un royaume de l'ordinateur (son économie est résumée)
-    pub ia_or: f64,
     pub desc: String,
 }
 
@@ -342,9 +336,6 @@ pub struct DefEcoles {
     pub ignorance_rang: u32,
     pub ignorance_savoir: f64,
     pub ignorance_bonheur: f64,
-    /// ordinateur : or par école (son savoir), or perdu par ville ignorante
-    pub ia_or: f64,
-    pub ia_ignorance: f64,
     pub desc: String,
 }
 
@@ -504,10 +495,10 @@ mod essais {
         // la vie des villes : jour de marché, écoles, chauffage, éclairage
         let (m, e, c, l) = (&r.jour_marche, &r.ecoles, &r.chauffage, &r.eclairage);
         assert!((2..=12).contains(&m.tous_les) && m.impots > 0.0 && m.impots <= 0.2, "jour de marché");
-        assert!(m.bonheur > 0.0 && m.bonheur_max >= m.bonheur && m.disette < 0.0 && m.ia_or > 0.0, "jour de marché : bonus et malus");
+        assert!(m.bonheur > 0.0 && m.bonheur_max >= m.bonheur && m.disette < 0.0, "jour de marché : bonus et malus");
         assert!(r.bat("marche").is_some_and(|b| b.taxe > 0.0) && r.bat("ecole").is_some_and(|b| b.savoir > 0.0 && b.ouvriers > 0));
         assert!(e.ete > 0.0 && e.ete < 1.0 && e.ateliers > 0.0 && e.ateliers_max >= e.ateliers && e.ateliers_max <= 0.25, "écoles");
-        assert!(r.niveau(e.ignorance_rang).is_some() && e.ignorance_savoir > 0.0 && e.ignorance_bonheur > 0.0 && e.ia_or > 0.0 && e.ia_ignorance > 0.0, "ignorance");
+        assert!(r.niveau(e.ignorance_rang).is_some() && e.ignorance_savoir > 0.0 && e.ignorance_bonheur > 0.0, "ignorance");
         assert!(c.par_habitant > 0.0 && c.par_habitant < 0.5 && c.grand_froid >= 1.0 && c.charbon >= 1.0 && res.contains(&"charbon") && res.contains(&"bois"), "chauffage");
         assert!(c.malus < 0.0 && c.pertes > 0.0 && c.pertes < 0.1 && c.reserve >= 1.0 && c.bonus > 0.0 && c.bonus < -c.malus, "chauffage : bonus et malus");
         assert!(r.niveau(l.rang).is_some() && r.niveau(l.delinquance_rang).is_some() && l.delinquance_rang >= l.rang, "éclairage : rangs");

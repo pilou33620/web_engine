@@ -21,9 +21,9 @@ La région a trois réseaux à gérer : l'électricité, l'eau et les déchets. 
 
 ## Jouer
 
-Le jeu est une page web, sans installation, sans compilation ni serveur obligatoire : `index.html` charge ses styles (`css/`) et ses scripts (`js/`). Voir [Organisation des fichiers](#organisation-des-fichiers).
+Le jeu est une page web, sans installation ni compilation : `index.html` charge ses styles (`css/`), ses scripts (`js/`) et le moteur graphique de web_engine (`graphismes/`). Voir [Organisation des fichiers](#organisation-des-fichiers).
 
-- **Localement** : ouvrez `index.html` dans un navigateur récent. Une connexion internet est nécessaire pour charger three.js et les polices.
+- **Localement** : `python3 serveur.py --local`, puis l'adresse affichée. Le moteur est en modules JavaScript, que les navigateurs refusent quand on ouvre `index.html` directement (`file://`). Seules les polices viennent d'internet : sans connexion, le jeu marche avec les polices du système.
 - **En ligne** : activez GitHub Pages sur la branche `main` (Settings → Pages). Le jeu sera alors disponible à l'adresse `https://pilou33620.github.io/web_power/`.
 
 - **Sur le réseau local** (tablette, autre poste) : `python3 serveur.py`, ou le bouton de `web_launcher` (port 8794). Bibliothèque standard Python seulement, rien à installer ; marche pareil sous Raspberry Pi, Windows et Termux.
@@ -31,7 +31,7 @@ Le jeu est une page web, sans installation, sans compilation ni serveur obligato
   - Options : `--port N`, `--local` (127.0.0.1 seulement), `--sans-navigateur`, `--sans-pause`, `--sans-maj` (au démarrage, le serveur met le dépôt à jour par `git pull --ff-only`, sauf sous `web_launcher`, qui s'en charge).
   - Banc du serveur : `python test/banc-serveur.py` (affiche `OK`).
 
-La partie s'enregistre automatiquement dans le navigateur à chaque jour de jeu : chaque appareil a donc sa propre partie, et le serveur ne stocke rien.
+La partie s'enregistre automatiquement dans le navigateur à chaque jour de jeu : chaque appareil a donc sa propre partie, et le serveur ne stocke rien. Menu → Exporter la partie la télécharge dans un fichier, Importer une partie la reprend (pour garder plusieurs parties ou changer d'appareil). Si le navigateur refuse d'enregistrer (navigation privée, stockage plein), le jeu prévient.
 
 ## Écrans
 
@@ -85,7 +85,7 @@ On construit dans la vue de chaque réseau.
   - La nuit, seules les villes alimentées s'allument : une coupure se voit.
 - **Partie tutoriel guidée** (Menu → Partie tutoriel guidée, ou depuis le tutoriel en fiches) : une vraie partie en 15 étapes, avec une fiche de guidage en bas à gauche. On construit une usine et sa ligne, on épure les eaux usées avec un lagunage et un égout, on dimensionne la flotte de camions et la collecte, puis on découvre les malus d'un bâtiment et les liens entre les réseaux. Chaque étape se valide toute seule ; un bouton montre où aller.
 - **Tutoriel en fiches** (s'ouvre seul à la première partie, puis Menu → Tutoriel) : quatre sujets, électricité, eau, déchets et territoire. Il reprend la chaîne de l'électricité (centrale → 225/400 kV → poste 225/63 kV → 63 kV → ville) celle de l'eau (captage → potabilisation → château d'eau → ville → égout → épuration → rivière) et celle des déchets (ville → bacs → camions → tri, compost, incinération → décharge), étape par étape.
-- **Économie** : tarifs, combustibles, taxe carbone qui augmente chaque année, prêts.
+- **Économie** : tarifs, combustibles, taxe carbone qui augmente chaque année, prêts. Chaque 1er janvier, l'impôt sur les bénéfices (taux historiques simplifiés : 15 % en 1917, 50 % en 1948, 33 % en 1993, 25 % en 2022) puis, à partir de 1946, un dividende à l'État (la moitié du reste) sont prélevés ; les investissements de l'année sont déduits, l'argent qui dort ne l'est pas.
 - **R&D** : 55 technologies réparties en 6 branches et 5 niveaux.
 - **Événements** : pannes, tempêtes, vagues de froid, canicules, sécheresses, crise du gaz.
 - **Ambiance** : fermes sur les plaines et les prairies, bateaux, oiseaux, vaches, cerfs et tracteurs.
@@ -159,14 +159,14 @@ Le découpage reprend celui de web_cao : une page, un dossier `css/` et des scri
 
 | Fichier | Contenu |
 |---|---|
-| `index.html` | la page : structure HTML, chargement de three.js et des scripts |
-| `graphismes/` | **la bibliothèque graphique commune web_engine** (outils et grille, moteur 3D, modèles, ambiance, ciel). Ne pas modifier ici : les graphismes se modifient dans web_engine (`lib/`), puis `bash outils/maj-graphismes.sh` ; la CI vérifie que ce dossier est identique à web_engine, et l'action « graphismes » propose chaque lundi la dernière version |
+| `index.html` | la page : structure HTML, chargement du moteur et des scripts |
+| `graphismes/` | **la bibliothèque graphique commune web_engine** : son moteur unique (`rendu/` : scène, caméra, plateau, nature, météo, heure du jour, modèles des installations et des quartiers) et three.js (`three/`). Ne pas modifier ici : les graphismes se modifient dans web_engine (`lib/`), puis `bash outils/maj-graphismes.sh` ; la CI vérifie que ce dossier est identique à web_engine, et l'action « graphismes » propose chaque lundi la dernière version |
 | `css/style.css` | tous les styles, mises en page paysage et portrait comprises |
 | `js/00-appareil.js` | détection ordinateur, tablette ou téléphone, avant l'affichage |
-| `graphismes/power/01-outils.js` | utilitaires, grille hexagonale |
+| `js/01-moteur.js` | branche le moteur de web_engine : canevas, caméra, boucle, plateau, ciel ; `MONDE`, le groupe où le jeu dessine en ses unités |
+| `js/01-outils.js` | utilitaires, grille hexagonale |
 | `js/02-terrain.js` | génération des cartes et du terrain |
-| `graphismes/power/03-moteur-3d.js` | scène three.js, matériaux, plateau |
-| `graphismes/power/04-modeles.js` | modèles 3D des installations et des quartiers |
+| `js/03-plateau.js` | la carte du jeu donnée au moteur (terrain, rivière, villes, fermes, terres inexplorées), matériaux, quartiers, fumées et éoliennes du jeu |
 | `js/05-catalogue.js` | catalogue des centrales et des postes, tensions des lignes |
 | `js/06-eau.js` | réseau d'eau : ouvrages, conduites, qualité, simulation |
 | `js/06b-dechets.js` | déchets : sites, collecte, tri, traitement, marché, simulation journalière |
@@ -179,7 +179,7 @@ Le découpage reprend celui de web_cao : une page, un dossier `css/` et des scri
 | `js/12-dispatch.js` | appel des centrales, stockage, import |
 | `js/13-simulation.js` | pas de 15 minutes : économie, pannes, événements |
 | `js/14-superpositions.js` | survol, sélection, lentilles, fumées |
-| `js/15-camera.js` | caméra et commandes tactiles ou souris |
+| `js/15-camera.js` | la caméra du moteur vue du jeu (regard, clics, survol) |
 | `js/16-interface.js` | barre de construction, survol, clics sur la carte |
 | `js/17-panneaux.js` | panneaux de gestion (électricité, eau et déchets) |
 | `js/18-hud.js` | barre du haut, étiquettes, mini-carte |
@@ -187,13 +187,15 @@ Le découpage reprend celui de web_cao : une page, un dossier `css/` et des scri
 | `js/20-actions.js` | boutons, menu, tutoriel, bilans annuels |
 | `js/21-partie.js` | nouvelle partie, sauvegarde, chargement |
 | `js/22-banc.js` | stratégies programmées du banc d'équilibrage |
-| `graphismes/power/23-ambiance.js` | routes, véhicules, animaux, bateaux |
-| `graphismes/power/24-ciel.js` | jour et nuit, nuages, pluie, neige, saisons, lumières |
-| `js/25-boucle.js` | démarrage et boucle d'animation |
+| `js/23-ambiance.js` | routes, véhicules, animaux, bateaux |
+| `js/24-ciel.js` | l'heure, la météo, la saison et la neige du jeu données au moteur ; lumières des villes |
+| `js/25-boucle.js` | démarrage ; l'image du jeu, appelée par la boucle du moteur |
 
-Les scripts sont des scripts classiques chargés dans l'ordre de leur numéro : ils partagent leurs déclarations, donc un fichier peut utiliser ce que les précédents ont défini. Seul three.js arrive en module ES, depuis le CDN.
+Les scripts sont des scripts classiques chargés dans l'ordre de leur numéro : ils partagent leurs déclarations, donc un fichier peut utiliser ce que les précédents ont défini. Seul le moteur (`js/01-moteur.js` et `graphismes/`) est en modules ES : le jeu se joue donc par un serveur (`serveur.py`), pas en ouvrant `index.html` directement.
 
-Le serveur (`serveur.py`) ne sert que la page, `css/*.css` et `js/*.js`.
+**Le moteur et le jeu :** le moteur de web_engine compte une case pour 1 et place la case (0, 0) à l'origine ; le jeu garde ses unités (une case de 10, carte centrée) et dessine dans `MONDE`, un groupe ramené à l'échelle du moteur. Le plateau, la caméra, la météo, l'heure du jour et la brume des terres inexplorées sont ceux du moteur ; le jeu leur donne sa carte, son horloge et sa météo.
+
+Le serveur (`serveur.py`) ne sert que la page, `css/*.css`, `js/*.js` et les modules du moteur (`graphismes/rendu/*.js`, `graphismes/three/`).
 
 ## Banc d'équilibrage
 

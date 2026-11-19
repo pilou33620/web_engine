@@ -59,8 +59,8 @@ function texteEtiDec(u) {  // [texte, alerte]
 }
 function placerEtiquettes() {
   const s = clamp(240 / distc, .7, 1.15), proche = distc < 430;
-  for (const v of VILLES) { if (!v.el) continue; VA.set(v.centre.x, v.centre.top + 19, v.centre.z).project(cam); v.el.style.transform = `translate(${(VA.x + 1) / 2 * ZW}px, ${(1 - VA.y) / 2 * ZH}px) translate(-50%, -100%) scale(${s})`; v.el.style.display = VA.z < 1 ? '' : 'none'; }
-  for (const u of UNITES) { if (!u.eti) continue; VA.set(u.t.x, Math.max(u.t.top, 0) + 17, u.t.z).project(cam); u.eti.style.display = proche && VA.z < 1 && reseauU(u) === vue ? '' : 'none'; u.eti.style.transform = `translate(${(VA.x + 1) / 2 * ZW}px, ${(1 - VA.y) / 2 * ZH}px) translate(-50%, -100%)`; }
+  for (const v of VILLES) { if (!v.el) continue; ecran(v.centre.x, v.centre.top + 19, v.centre.z); v.el.style.transform = `translate(${VA.x}px, ${VA.y}px) translate(-50%, -100%) scale(${s})`; v.el.style.display = VA.z < 1 ? '' : 'none'; }
+  for (const u of UNITES) { if (!u.eti) continue; ecran(u.t.x, Math.max(u.t.top, 0) + 17, u.t.z); u.eti.style.display = proche && VA.z < 1 && reseauU(u) === vue ? '' : 'none'; u.eti.style.transform = `translate(${VA.x}px, ${VA.y}px) translate(-50%, -100%)`; }
 }
 const mini = $('#mini'), mctx = mini.getContext('2d'), fondMini = document.createElement('canvas'); fondMini.width = mini.width; fondMini.height = mini.height;
 const MX = OX + R * SQ3, MZ = OZ + R * 1.5, ech = Math.min(mini.width / (2 * MX), mini.height / (2 * MZ));
@@ -81,7 +81,7 @@ function dessinerMini() {
 }
 function majMini() {
   mctx.drawImage(fondMini, 0, 0); mctx.strokeStyle = '#ffffff'; mctx.lineWidth = 3; mctx.beginPath();
-  [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([x, y], i) => { NDC.set(x, y); ray.setFromCamera(NDC, cam); PL.constant = 0; if (!ray.ray.intersectPlane(PL, PT)) PT.copy(cible); const [a, b] = versMini(PT.x, PT.z); i ? mctx.lineTo(a, b) : mctx.moveTo(a, b); });
+  [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([x, y], i) => { NDC.set(x, y); ray.setFromCamera(NDC, cam); if (!auSol(0)) PT.copy(cible); const [a, b] = versMini(PT.x, PT.z); i ? mctx.lineTo(a, b) : mctx.moveTo(a, b); });
   mctx.closePath(); mctx.stroke();
 }
 mini.addEventListener('pointerdown', e => { const r = mini.getBoundingClientRect(); cible.x = ((e.clientX - r.left) / r.width * mini.width - mini.width / 2) / ech; cible.z = ((e.clientY - r.top) / r.height * mini.height - mini.height / 2) / ech - 30; majCam(); });

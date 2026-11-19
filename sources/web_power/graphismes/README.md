@@ -8,78 +8,79 @@ La bibliothèque graphique commune des jeux. Elle vit dans `web_engine/lib/`, et
 
 ## Contenu
 
-| Dossier | Contenu | Forme |
+**Tous les rendus sont dans un seul dossier, `rendu/`.** Un seul moteur, celui du style web_royaumes, dessine le terrain, la nature (forêts, montagnes, rivières, champs, mer), la météo, l'heure du jour, la vie, les bâtiments anciens (1700 → 1816) et les bâtiments modernes (1900 → 2035). Les bâtiments modernes reprennent les modèles de web_power, qui ne fournit que ceux-là.
+
+| Partie | Contenu | A besoin de |
 |---|---|---|
-| `three/` | three.js r186 (`three.module.js`, `three.core.js`) et `addons/utils/BufferGeometryUtils.js` | modules ES |
-| `royaumes/` | moteur et rendu de web_royaumes : scène, toon, plateau (terrain, nature), modèles, vie, quartiers, météo, routes, remparts, forts, marine, sièges, espions, brouillard, étiquettes ; `rendu.css` | modules ES |
-| `power/` | outils, moteur 3D, modèles, ambiance et ciel de web_power | scripts classiques |
-| `power/pont.js` | les modèles de web_power utilisables dans la scène du moteur royaumes | module ES |
+| `three` | `three/` : three.js r186 (`three.module.js`, `three.core.js`) et `addons/utils/BufferGeometryUtils.js` : une bibliothèque tierce, pas un rendu | — |
+| `socle` | `rendu/` : `scene`, `toon`, `plateau`, `meteo`, `vie`, `boue`, `ambiance`, `routes`, `brouillard`, `etiquettes`, `rendu.css` | `three` |
+| `moderne` | `rendu/modernes.js` | `socle` |
+| `antique` | `rendu/antiques.js` | `moderne` |
+| `ancien` | `rendu/` : `modeles`, `monde`, `quartiers`, `animations`, `img/` (illustrations des événements, SVG), `icons/` (icônes de l'application, PNG) | `socle`, `moderne`, `antique`, `guerre` |
+| `guerre` | `rendu/` : `guerre_commun`, `remparts`, `forts`, `sieges`, `marine`, `espions` | `ancien` |
+| `rendu` | tout (les jeux d'avant la 2.15.0) | toutes |
 
-### `royaumes/` : le moteur en modules ES
+Depuis la 2.15.0, **les parties sont des listes de fichiers de `rendu/`** (dans `outils/installer.sh`) : un jeu qui prend moins de parties a moins
+de fichiers, mais les chemins d'import ne changent pas (`graphismes/rendu/…`). Le socle ne dépend ni de `monde.js` ni de la guerre :
+`monde.js` s'inscrit lui-même auprès de `vie.js` (`MONDE`) et de `ambiance.js` (`toitsDe`) quand il est chargé. L'installateur vérifie
+que chaque import d'un fichier installé trouve son fichier, et échoue sinon.
 
-- **Mise en route :** le moteur démarre à l'import de `scene.js`. La page doit contenir `<canvas id="carte">`, `<div id="etiquettes">` et `<div id="eclair">`, et charger `royaumes/rendu.css`.
-- **Pilotage :** on donne au moteur une carte et un état de partie au format du serveur de web_royaumes. L'ordre d'appel est celui de `appliquer()` dans son `main.js` :
+| Module de `rendu/` | Rôle |
+|---|---|
+| `scene.js`, `toon.js` | la scène, la caméra et la lumière ; l'ombrage toon et les contours, les briques des modèles (`lot`, `put`, `fige`, `boite`, `cyl`, `cone`, `sphere`) |
+| `plateau.js` | le terrain et la nature : cases, mer, rivières, forêts, collines, montagnes, champs, saisons et neige |
+| `modeles.js` | les bâtiments anciens (styles Ancien Régime, Lumières, Empire, Révolution industrielle) et les armées |
+| `modernes.js` | les bâtiments modernes : installations électriques, lignes (`pylone`, `BAT.ligne15`…`ligne400`), eau, déchets, quartiers, fermes ; leur catalogue (`INSTALLATIONS`, `QUARTIERS`) et les époques modernes (`EPOQUES`) ; les parties mobiles (`piece`) et leur animation (`modele`, `animer`) |
+| `animations.js` | la vie des bâtiments anciens hors partie : `animationsAncien(cle, epoque, boites, couleur)`, une recette par bâtiment (artisans, porteurs, passants, charrettes, bêtes, soldats, wagonnets, train) posée dans ses espaces libres ; `bivouacAncien(palier, couleur)`, l'armée au repos ; animés par `modele()` et `animer()` |
+| `antiques.js` | l'Antiquité : bâtiments gaulois (bois, torchis, chaume) et romains, armées gauloises et romaines (`ANT`), leur catalogue (`ANTIQUES`) ; assemblés et animés par `modele()` et `animer()` de `modernes.js` |
+| `monde.js`, `vie.js`, `quartiers.js` | ce qui vit sur le plateau : bâtiments posés, fumées, drapeaux, habitants, bêtes, bateaux, vie des quartiers |
+| `meteo.js`, `routes.js`, `boue.js`, `ambiance.js`, `etiquettes.js` | le temps et l'heure du jour ; les routes ; la pluie (routes boueuses et mouillées, flaques, crue, eau sale, traces de boue des armées) ; brume du matin, feuilles d'automne, givre sur les toits ; les bannières et étiquettes HTML. Les effets suivent `climat` (vie.js) : un jeu peut y poser `pollution` et `eauSale` |
+| `remparts.js`, `forts.js`, `sieges.js`, `marine.js`, `espions.js`, `brouillard.js`, `guerre_commun.js` | la guerre : remparts, forts, sièges, flottes, espions, brouillard de guerre |
+
+### Mise en route
+
+- **La page :** le moteur démarre à l'import de `scene.js`. La page doit contenir `<canvas id="carte">`, `<div id="etiquettes">` et `<div id="eclair">`, et charger `rendu/rendu.css`.
+- **Une partie complète :** on donne au moteur une carte et un état de partie au format du serveur de web_royaumes, dans l'ordre de `appliquer()` de son `main.js` :
 
 ```js
-import * as plateau from './graphismes/royaumes/plateau.js';
-import { initMonde, synchroniser } from './graphismes/royaumes/monde.js';
-import { majVie } from './graphismes/royaumes/vie.js';
-import { majQuartiers } from './graphismes/royaumes/quartiers.js';
-import { appliquerMeteo } from './graphismes/royaumes/meteo.js';
+import * as plateau from './graphismes/rendu/plateau.js';
+import { initMonde, synchroniser } from './graphismes/rendu/monde.js';
+import { majVie } from './graphismes/rendu/vie.js';
+import { majQuartiers } from './graphismes/rendu/quartiers.js';
+import { appliquerMeteo } from './graphismes/rendu/meteo.js';
 
 initMonde(regles); plateau.construire(carte);
 plateau.majEtat(etat); plateau.majSaison(etat.saison, etat.meteo.neige_sol); synchroniser(etat);
 majVie(etat); majQuartiers(etat); appliquerMeteo(etat.meteo, etat.saison);
 ```
 
-- **Briques de modélisation :** pour un modèle neuf, `toon.js` fournit `lot`, `put`, `fige`, `boite`, `cyl`, `cone`, `sphere`, `MAT` et `CONT` (ombrage toon et contours bruns). Les unités sont de 10 par case, et le groupe est ramené à l'échelle du plateau par `ECH_BAT` (0,1).
-- **Exemples complets :** `web_engine/galerie/web_royaumes/monde.html` et `web_engine/carte-test/carte.js`.
-
-### `power/` : les scripts de web_power
-
-- **Chargement :** ce sont des scripts classiques qui partagent leurs déclarations, chargés avec `defer` dans l'ordre de leurs numéros, entre les scripts du jeu. `01-outils.js` fournit le hasard, le bruit et la grille hexagonale. `03-moteur-3d.js`, `04-modeles.js`, `23-ambiance.js` et `24-ciel.js` utilisent les globales du jeu (terrain, villes, état `S`…).
-- **three.js :** il arrive en module par une carte d'import :
-
-```html
-<script type="importmap">{ "imports": { "three": "./graphismes/three/three.module.js", "three/addons/": "./graphismes/three/addons/" } }</script>
-<script type="module">
-import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-Object.assign(window, { THREE, mergeGeometries });
-</script>
-<script defer src="graphismes/power/01-outils.js"></script>
-```
-
-Une page qui doit aussi s'ouvrir directement en `file://` ne peut pas charger de module local : Chrome les refuse.
-Dans ce cas, pointez la carte d'import vers le CDN, **à la même version** que `three/VERSION` :
-`https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js` et `…/three@0.186.1/examples/jsm/`. Les scripts classiques de `power/` se chargent normalement en `file://`.
-C'est ce que fait web_power.
-
-### `power/pont.js` : les modèles de web_power dans le moteur royaumes
+- **Les bâtiments modernes :**
 
 ```js
-import { chargerPower, modele } from './graphismes/power/pont.js';
-const P = await chargerPower();                  // P.BAT (installations), P.QBAT (quartiers), P.bFerme, P.rotor
-const { groupe, fumees, rotors } = modele(P.BAT.nucleaire, 1);
-scene.add(groupe);                               // à l'échelle du plateau royaumes
+import { BAT, QBAT, bFerme, modele, animer, INSTALLATIONS, EPOQUES } from './graphismes/rendu/modernes.js';
+const m = modele(BAT.nucleaire, 1);   // à l'échelle du plateau (une case de 10 → 1) ; modele(…, { chantier: true }) : en travaux
+m.groupe.position.set(x, y, z); scene.add(m.groupe);
+animer(m, { pop: true });             // fumées, éoliennes au vent, fenêtres la nuit, courant des lignes, rebond de construction
+const en1960 = INSTALLATIONS.filter(t => t.an <= 1960 && !(t.fin && t.fin < 1960));
 ```
 
-`chargerPower([urls])` évalue aussi, si on les lui donne, les scripts de catalogue d'un jeu (`TYPES`, `ERES`, `QUART`). C'est ainsi que la carte test sait quelles installations existent à chaque époque.
+- **Un modèle neuf :** utilisez les briques de `toon.js`, en unités de 10 par case, puis ramenez le groupe à l'échelle du plateau (× 0,1, `ECH_BAT`).
+- **Exemples complets :** `web_engine/carte-test/carte.js` (toutes les époques sur une carte) et `web_engine/galerie/web_royaumes/monde.html`.
 
 ## Jeux qui utilisent la bibliothèque
 
-| Jeu | Dossier | Parties utilisées |
+| Jeu | Dossier | `PARTIES` |
 |---|---|---|
-| web_royaumes | `web/graphismes/` | `three/`, `royaumes/` (servi par le serveur Rust) |
-| web_power | `graphismes/` | `power/` (servi par `serveur.py` ; three.js r186 depuis le CDN, pour l'ouverture en `file://`) |
+| web_royaumes | `web/graphismes/` | `ancien guerre` (donc tout ; servi par le serveur Rust) |
+| web_power | `graphismes/` | `moderne` (avec `socle` et `three` ; le moteur unique depuis la 2.3.0 : le jeu dessine dans un groupe à son échelle, voir son `js/01-moteur.js`) |
 
 ## Utiliser la bibliothèque dans un jeu
 
-1. **Copier le script :** placez `web_engine/outils/jeu/maj-graphismes.sh` dans `outils/` du jeu, et changez la ligne `DEST=` si le dossier servi n'est pas la racine (par exemple `DEST=web/graphismes`).
-2. **Installer :** lancez `bash outils/maj-graphismes.sh`. Le dossier est créé, avec `VERSION.json`. Commitez-le.
+1. **Copier le script :** placez `web_engine/outils/jeu/maj-graphismes.sh` dans `outils/` du jeu, puis réglez deux lignes : `PARTIES=`, les parties dont le jeu a besoin (leurs dépendances suivent toutes seules), et `DEST=`, si le dossier servi n'est pas la racine (par exemple `DEST=web/graphismes`).
+2. **Installer :** lancez `bash outils/maj-graphismes.sh`. Le dossier est créé avec ces parties seulement, et `VERSION.json`. Commitez-le.
 3. **Charger :** importez les modules depuis ce dossier (voir plus haut).
 4. **Vérifier en CI :** ajoutez une étape `bash outils/maj-graphismes.sh --verifier`. Elle échoue si quelqu'un modifie les graphismes dans le jeu au lieu de web_engine.
-5. **Recevoir les mises à jour :** copiez `web_engine/outils/jeu/graphismes.yml` dans `.github/workflows/`. Chaque lundi, ou à la demande, il ouvre une demande de fusion avec la dernière version.
+5. **Recevoir les mises à jour :** copiez `web_engine/outils/jeu/graphismes.yml` dans `.github/workflows/`. Chaque lundi, ou à la demande, il ouvre une demande de fusion, **seulement si l'une des parties du jeu a changé**. Une version qui ne touche pas ses parties ne lui propose rien.
 
 ## Faire évoluer la bibliothèque
 

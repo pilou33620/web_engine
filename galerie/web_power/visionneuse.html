@@ -5,33 +5,73 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rendus web_power</title>
 <link rel="stylesheet" href="../visionneuse.css">
+<style>
+  #etiquettes span { font-size: 11px; background: rgba(20, 26, 19, .72); }
+  #etiquettes span.titre { font-size: 14px; font-weight: 600; background: rgba(20, 26, 19, .88); }
+</style>
 </head>
 <body>
-<div id="zone"><canvas id="scene" aria-label="Bâtiments de web_power"></canvas></div>
+<canvas id="carte" aria-label="Bâtiments de web_power"></canvas>
 <div id="etiquettes"></div>
+<div id="eclair"></div>
 <form class="barre" id="choix">
   <label>Époque <select name="ere"></select></label>
   <label>Saison <select name="saison"><option value="0">Hiver</option><option value="3" selected>Printemps</option><option value="6">Été</option><option value="9">Automne</option></select></label>
   <label><input type="checkbox" name="neige"> Neige au sol</label>
   <label>Bâtiment <select name="bat"><option value="">Tous</option></select></label>
 </form>
-<p class="aide">Glisser : déplacer · molette : zoom</p>
-
-<script type="importmap">{ "imports": { "three": "../../lib/three/three.module.js", "three/addons/": "../../lib/three/addons/" } }</script>
+<p class="aide">Glisser : déplacer · clic droit ou Maj : tourner · molette : zoom</p>
 <script type="module">
-import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-Object.assign(window, { THREE, mergeGeometries });
+// Les bâtiments de web_power d'une époque, dessinés par la bibliothèque (lib/rendu/modernes.js, le moteur unique depuis la 2.3.0),
+// avec leurs animations ; saison et neige passent par la météo du moteur.
+import { THREE, scene, cam, camera, apresCamera } from '../../lib/rendu/scene.js';
+import { lot, put, fige, jeter, cyl, boite } from '../../lib/rendu/toon.js';
+import { appliquerMeteo, forcerHeure } from '../../lib/rendu/meteo.js';
+import { climat } from '../../lib/rendu/vie.js';
+import { BAT, QBAT, bFerme, modele, animer, INSTALLATIONS, QUARTIERS, EPOQUES } from '../../lib/rendu/modernes.js';
+
+const MER = ['offshore'], RIVIERE = ['fil', 'barrage', 'prise'], PAS = 2.3, SOL = 0x7fb04f, EAU = 0x4f8fc0;
+const f = document.getElementById('choix'), etiq = document.getElementById('etiquettes'), carte = new THREE.Group();
+scene.add(carte);
+for (const e of EPOQUES) f.ere.add(new Option(`${e.an} · ${e.nom}`, e.an));
+f.ere.value = 2020;
+const liste = an => [
+  ...INSTALLATIONS.filter(t => t.an <= an && !(t.fin && t.fin < an)).map(t => ({ id: t.cle, nom: t.nom, groupe: t.groupe, dessin: BAT[t.cle] })),
+  ...QUARTIERS.map(q => ({ id: 'q-' + q.cle, nom: q.nom, groupe: 'Villes et fermes', dessin: QBAT[q.cle] })),
+  { id: 'f-culture', nom: 'Ferme céréalière', groupe: 'Villes et fermes', dessin: (L, ex) => bFerme(L, false, ex) },
+  { id: 'f-elevage', nom: 'Ferme d’élevage', groupe: 'Villes et fermes', dessin: (L, ex) => bFerme(L, true, ex) },
+];
+let poses = [];
+function afficher() {
+  const an = +f.ere.value, tout = liste(an), choisi = f.bat.value;
+  f.bat.length = 1;
+  for (const [g, bs] of Map.groupBy(tout, b => b.groupe)) { const og = document.createElement('optgroup'); og.label = g; for (const b of bs) og.append(new Option(b.nom, b.id)); f.bat.append(og); }
+  f.bat.value = tout.some(b => b.id === choisi) ? choisi : '';
+  const vus = f.bat.value ? tout.filter(b => b.id === f.bat.value) : tout, cols = Math.ceil(Math.sqrt(vus.length));
+  for (const o of [...carte.children]) jeter(o);
+  etiq.textContent = ''; poses = [];
+  vus.forEach((b, i) => {
+    const x = (i % cols) * PAS + (Math.floor(i / cols) % 2) * PAS / 2, z = Math.floor(i / cols) * PAS, T = lot();
+    put(T, cyl(0.965, 1, 0.16, 6), MER.includes(b.id) ? EAU : SOL, 0, -0.08, 0, 0, 0);
+    if (RIVIERE.includes(b.id)) put(T, boite(0.35, 0.02, 1.75), EAU, 0, 0.005, 0, 0, 0);
+    fige(T, carte).position.set(x, 0, z);
+    const m = b.id === 'grue' ? modele(BAT.poste, i, { chantier: true }) : modele(b.dessin, i + 1);
+    m.groupe.position.set(x, b.id === 'barrage' ? -0.1 : 0, z); carte.add(m.groupe); animer(m);
+    const n = document.createElement('span'); n.textContent = b.nom; etiq.append(n); poses.push({ el: n, p: new THREE.Vector3(x, 0, z + 0.85) });
+  });
+  const lignes = Math.ceil(vus.length / cols);
+  Object.assign(cam, { l: cols * PAS + 2, h: lignes * PAS + 2, x: (cols - 1) * PAS / 2, z: (lignes - 1) * PAS / 2, cible: Math.max(6, cols * 2.6), d: Math.max(6, cols * 2.6), lacet: 0, auto: false });
+  const saison = +f.saison.value / 3;
+  appliquerMeteo({ genre: f.neige.checked ? 'neige' : 'soleil', temperature: f.neige.checked ? -2 : [4, 14, 24, 12][saison], pluie: f.neige.checked ? 0.4 : 0, vent: 0.5, neige_sol: f.neige.checked ? 1 : 0 }, saison);
+  climat.nuages = 0;  // vue de loin, les nuages passent devant les bâtiments
+}
+apresCamera(() => {
+  const v = new THREE.Vector3();
+  for (const { el, p } of poses) { v.copy(p).project(camera); el.hidden = v.z > 1 || cam.d > 18; el.style.transform = `translate(${(v.x + 1) / 2 * innerWidth}px, ${(1 - v.y) / 2 * innerHeight}px) translate(-50%, -50%)`; }
+});
+forcerHeure('jour');
+f.addEventListener('change', afficher);
+afficher();
 </script>
-<!-- le rendu propre du jeu web_power (sa copie : sources/web_power/graphismes/power : outils, moteur 3D, modèles) ; catalogue et époques : données du jeu (sources/web_power/js) -->
-<script defer src="../../sources/web_power/graphismes/power/01-outils.js"></script>
-<script defer src="../../sources/web_power/js/02-terrain.js"></script>
-<script defer src="../../sources/web_power/graphismes/power/03-moteur-3d.js"></script>
-<script defer src="../../sources/web_power/graphismes/power/04-modeles.js"></script>
-<script defer src="../../sources/web_power/js/05-catalogue.js"></script>
-<script defer src="../../sources/web_power/js/06-eau.js"></script>
-<script defer src="../../sources/web_power/js/06b-dechets.js"></script>
-<script defer src="../../sources/web_power/js/07-epoques-rd.js"></script>
-<script defer src="visionneuse.js"></script>
 </body>
 </html>

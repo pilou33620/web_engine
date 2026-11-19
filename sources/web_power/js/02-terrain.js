@@ -3,7 +3,7 @@
 const TERR = {
   mer: { nom: 'Mer', col: 0x1d5a86, h: -5.5, eau: true }, cote: { nom: 'Côte', col: 0xe6d49a, h: -2.4, eau: true }, lac: { nom: 'Lac de retenue', col: 0xd2c88f, h: -2.4, eau: true },
   prairie: { nom: 'Prairie', col: 0x84c450, h: 0 }, plaine: { nom: 'Plaine cultivée', col: 0xc9c65c, h: 0 }, foret: { nom: 'Forêt', col: 0x5d9b3a, h: .2 },
-  colline: { nom: 'Collines', col: 0xa2b65a, h: 2.6 }, montagne: { nom: 'Montagne', col: 0x8f8879, h: 4.6 }, ville: { nom: 'Ville', col: 0xd3c7a6, h: .3 },
+  colline: { nom: 'Collines', col: 0xa2b65a, h: 2.6 }, montagne: { nom: 'Montagne', col: 0x8f8879, h: 4.6 }, ville: { nom: 'Ville', col: 0xd3c7a6, h: 0 },
   brume: { nom: 'Terres inexplorées', col: 0xdcc79a, h: .9 },
 };
 const estEau = t => TERR[t.t].eau;

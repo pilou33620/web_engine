@@ -66,6 +66,8 @@ document.addEventListener('click', ev => {
   else if (act === 'banc-go') lancerBanc();
   else if (act === 'banc-voir') voirBanc();
   else if (act === 'banc-copier') { const txt = JSON.stringify(bancRes, null, 1); navigator.clipboard?.writeText(txt).then(() => toast('Résultats copiés.', 'ok'), () => toast('Copie refusée par le navigateur.')); }
+  else if (act === 'exporter') exporterPartie();
+  else if (act === 'importer') importerPartie();
   else if (act === 'continuer') { if (charger()) $('#modale').hidden = true; }
   else if (act === 'continuer-apres') { $('#modale').hidden = true; S.fini = 'continue'; S.pause = false; }
 });
@@ -80,7 +82,7 @@ function menu() {
   const sv = lireSauvegarde();
   if (S.enJeu && !S.pause) { S.pause = true; S.pauseModale = true; }
   const cartes = [...Object.entries(CARTES), ['aleatoire', { nom: 'Carte aléatoire', sous: `Graine ${graineAlea}` }]];
-  modale(`<h2 class="logo" id="modale-titre">GridMaster</h2><p style="text-align:center">Produire, transporter et distribuer l’électricité d’une région qui grandit. Sans coupure, sans faillite, et bas carbone en 2050.</p>
+  modale(`<h2 class="logo" id="modale-titre">GridMaster</h2><p style="text-align:center">Électricité, eau et déchets d’une région qui grandit, de 1900 à 2050. Sans coupure ni faillite, avec en 2050 une électricité bas carbone, une eau potable conforme et des déchets valorisés.</p>
     ${S.enJeu ? '<button type="button" class="btn" data-act="fermer-modale">Reprendre la partie</button>' : ''}
     ${sv && !S.enJeu ? `<button type="button" class="btn" data-act="continuer">Continuer · ${sv.carte.nom} · ${dateTxt(sv.S.min)} · ${DIFF[sv.S.diff].nom}</button>` : ''}
     <div class="section" style="margin-top:4px">Nouvelle partie · carte</div>
@@ -94,7 +96,8 @@ function menu() {
     <button type="button" class="btn secondaire" data-act="tuto-partie">Partie tutoriel guidée · les trois réseaux pas à pas</button>
     <button type="button" class="btn secondaire petit" data-act="tuto" data-id="elec:0">Tutoriel en fiches · électricité, eau, déchets, territoire</button>
     <button type="button" class="btn secondaire petit" data-act="banc">Banc d’équilibrage</button>
-    <p class="verrou">La partie est enregistrée automatiquement dans ce navigateur chaque jour de jeu.</p>`);
+    <div style="display:flex;gap:8px">${S.enJeu || sv ? '<button type="button" class="btn secondaire petit" style="flex:1" data-act="exporter">Exporter la partie</button>' : ''}<button type="button" class="btn secondaire petit" style="flex:1" data-act="importer">Importer une partie</button></div>
+    <p class="verrou">La partie est enregistrée automatiquement dans ce navigateur chaque jour de jeu. Exportez-la dans un fichier pour en garder plusieurs ou la reprendre sur un autre appareil.</p>`);
 }
 // tutoriel : la chaîne de chaque réseau, étape par étape (les ouvrages concernés s'allument)
 const TUTO_IC = {
@@ -205,7 +208,7 @@ function rapportAnnuel(r, er) {
   modale(`<h2 id="modale-titre">${fin ? (gagne ? 'Objectif 2050 atteint !' : 'Objectif 2050 manqué') : `${er.an} · ${er.nom}`}</h2>
     ${fin ? `<p>${gagne ? `${CARTE.nom} produit une électricité bas carbone, fiable et abordable. Bravo, dispatcheur.` : 'La région n’a pas atteint tous ses objectifs. Vous pouvez continuer à jouer pour les remplir.'}</p>` : `<p>${er.txt}</p>${neufs.length ? `<div class="chips">${neufs.map(n => `<span class="chip or">${n}</span>`).join('')}</div>` : ''}`}
     <div class="section" style="margin-top:0">Bilan de ${r.an}</div>
-    <div class="stat"><span>Villes</span><b>${VILLES.length} · ${nf(VILLES.reduce((a, v) => a + v.hab, 0))} habitants</b><span>Énergie livrée</span><b>${nf(r.e / 1e3, r.e < 1e4 ? 1 : 0)} GWh</b><span>Pointe</span><b>${nf(r.pointe, r.pointe < 50 ? 1 : 0)} MW</b><span>Émissions</span><b>${nf(r.co2)} gCO₂/kWh</b><span>Coupure</span><b>${nf(r.coupure)} min</b><span>Eau servie · conforme</span><b>${nf(r.eauServi ?? 0)} % · ${nf(r.eauConf ?? 0)} %</b><span>Déchets valorisés · recyclés</span><b>${nf(r.decVal ?? 0)} % · ${nf(r.decRec ?? 0)} %</b><span>Résultat</span><b class="${r.res < 0 ? 'neg' : 'pos'}">${nf(r.res / 1e6, 1)} M€</b></div>
+    <div class="stat"><span>Villes</span><b>${VILLES.length} · ${nf(VILLES.reduce((a, v) => a + v.hab, 0))} habitants</b><span>Énergie livrée</span><b>${nf(r.e / 1e3, r.e < 1e4 ? 1 : 0)} GWh</b><span>Pointe</span><b>${nf(r.pointe, r.pointe < 50 ? 1 : 0)} MW</b><span>Émissions</span><b>${nf(r.co2)} gCO₂/kWh</b><span>Coupure</span><b>${nf(r.coupure)} min</b><span>Eau servie · conforme</span><b>${nf(r.eauServi ?? 0)} % · ${nf(r.eauConf ?? 0)} %</b><span>Déchets valorisés · recyclés</span><b>${nf(r.decVal ?? 0)} % · ${nf(r.decRec ?? 0)} %</b>${r.impot > 0 ? `<span>Impôt et dividende</span><b>${nf(r.impot / 1e6, 1)} M€</b>` : ''}<span>Résultat</span><b class="${r.res < 0 ? 'neg' : 'pos'}">${nf(r.res / 1e6, 1)} M€</b></div>
     ${fin ? `<div class="section">Objectifs 2050</div>${ok.map(([n, b, v]) => `<div class="barre-l"><span style="width:auto;flex:1">${b ? '✓' : '✕'} ${n}</span><span style="width:auto;color:${b ? 'var(--vert)' : 'var(--rouge)'}">${v}</span></div>`).join('')}` : ''}
     <button type="button" class="btn" data-act="${fin ? 'continuer-apres' : 'fermer-modale'}">${fin ? 'Continuer à jouer' : 'Continuer'}</button>`);
 }

@@ -36,7 +36,7 @@ with sync_playwright() as p:
     x, z = pg.evaluate(JS_ECRAN, i)
     sx, sy = pg.evaluate("([x,z])=>{const v=new (window.__jeu.etat?Object:Object)();return null}", [x, z]) or (None, None)
     # projection écran via la caméra du module (exposée par un import dynamique)
-    sx, sy = pg.evaluate("""async ([x,z,i])=>{const m=await import('/graphismes/royaumes/scene.js');const p=await import('/graphismes/royaumes/plateau.js');
+    sx, sy = pg.evaluate("""async ([x,z,i])=>{const m=await import('/graphismes/rendu/scene.js');const p=await import('/graphismes/rendu/plateau.js');
        const v=new m.THREE.Vector3(x,p.dessus(i),z).project(m.camera);return [(v.x+1)/2*innerWidth,(1-v.y)/2*innerHeight]}""", [x, z, i])
     pg.mouse.click(sx, sy); pg.wait_for_timeout(1200)
     print('bâtiments du joueur :', pg.evaluate("window.__jeu.etat.batiments.filter(b=>b.proprio===0).map(b=>b.cle+(b.reste?'*':'')).join(',')"))
@@ -56,18 +56,18 @@ with sync_playwright() as p:
     pg.screenshot(path='/tmp/royaumes-7-ete.png')
     # météo forcée côté rendu : neige puis orage
     for g, t in [('neige', -3), ('orage', 22), ('brouillard', 9)]:
-        pg.evaluate(f"""async()=>{{const m=await import('/graphismes/royaumes/meteo.js');const pl=await import('/graphismes/royaumes/plateau.js');const s={0 if g=='neige' else 2};m.appliquerMeteo({{genre:'{g}',temperature:{t},vent:0.7,direction:0.4,pluie:0.8,neige_sol:{1 if g=='neige' else 0}}},s);pl.majSaison(s,{1 if g=='neige' else 0});}}""")
+        pg.evaluate(f"""async()=>{{const m=await import('/graphismes/rendu/meteo.js');const pl=await import('/graphismes/rendu/plateau.js');const s={0 if g=='neige' else 2};m.appliquerMeteo({{genre:'{g}',temperature:{t},vent:0.7,direction:0.4,pluie:0.8,neige_sol:{1 if g=='neige' else 0}}},s);pl.majSaison(s,{1 if g=='neige' else 0});}}""")
         pg.wait_for_timeout(3500)
         pg.screenshot(path=f'/tmp/royaumes-8-{g}.png')
     # vie des quartiers : de près sur la capitale, la nuit, les vraies vitres s'allument et le veilleur fait sa ronde
-    pg.evaluate("""async()=>{const s=await import('/graphismes/royaumes/scene.js'),m=await import('/graphismes/royaumes/meteo.js');const J=window.__jeu,p=s.posCase(J.etat.villes.find(v=>v.proprio===0).case);s.viser(p.x,p.z,7);m.forcerHeure('nuit');}""")
+    pg.evaluate("""async()=>{const s=await import('/graphismes/rendu/scene.js'),m=await import('/graphismes/rendu/meteo.js');const J=window.__jeu,p=s.posCase(J.etat.villes.find(v=>v.proprio===0).case);s.viser(p.x,p.z,7);m.forcerHeure('nuit');}""")
     pg.wait_for_timeout(3000)
-    q = pg.evaluate("""async()=>(await import('/graphismes/royaumes/quartiers.js')).etatQuartiers()""")
+    q = pg.evaluate("""async()=>(await import('/graphismes/rendu/quartiers.js')).etatQuartiers()""")
     print('quartiers :', q)
     assert q['proches'] > 0 and q['fenetres'] > 0, 'la vie des quartiers ne s\'est pas installée près de la capitale'
     pg.screenshot(path='/tmp/royaumes-8-quartiers-nuit.png')
-    pg.evaluate("""async()=>{const m=await import('/graphismes/royaumes/meteo.js');m.forcerHeure(null);}""")
-    pg.evaluate("""async()=>{const m=await import('/graphismes/royaumes/scene.js');m.cam.cible=50;}""")
+    pg.evaluate("""async()=>{const m=await import('/graphismes/rendu/meteo.js');m.forcerHeure(null);}""")
+    pg.evaluate("""async()=>{const m=await import('/graphismes/rendu/scene.js');m.cam.cible=50;}""")
     pg.wait_for_timeout(2500)
     pg.screenshot(path='/tmp/royaumes-9-loin.png')
     print('erreurs :', erreurs[:10])

@@ -81,16 +81,7 @@ impl Partie {
         let case = self.batiments[i].case;
         let mut butin: Panier = d.cout.iter().map(|(r, q)| (r.clone(), (q * rs.pillage_part).floor())).filter(|x| x.1 > 0.0).collect();
         *butin.entry("or".into()).or_insert(0.0) += rs.pillage_or;
-        if pr == 0 {
-            let s = self.stats(0);
-            for (r, q) in &butin {
-                let cap = self.capacite(&s, r);
-                let x = self.royaumes[0].stock.entry(r.clone()).or_insert(0.0);
-                *x = (*x + q).min(cap.max(*x));
-            }
-        } else if let Some(r) = self.royaumes.get_mut(pr as usize) {
-            r.or += regles().valeur(&butin);
-        }
+        self.crediter(pr, &butin);
         self.sieges[si].pillage = Some((case, d.cle.clone()));
         if pr == 0 || qui == 0 {
             let gain = butin.iter().map(|(r, q)| format!("{q} {}", regles().res_icone(r))).collect::<Vec<_>>().join(", ");
@@ -249,8 +240,7 @@ impl Partie {
             for a in &assiegeants {
                 self.pertes(*a, rs.usure_assiegeant);
             }
-            if s.faim > 0 && proprio == 0 && !s.fort {
-                let j = &mut self.royaumes[0];
+            if let Some(j) = self.royaume_mut(proprio).filter(|_| s.faim > 0 && !s.fort) {
                 j.bonheur = (j.bonheur - 3.0).max(0.0);
                 j.pop = (j.pop - (j.pop as f64 * 0.02).ceil() as i64).max(1);
             }
@@ -507,10 +497,10 @@ mod essais {
         for b in p.batiments.iter_mut() {
             b.arret = 0;
         }
-        let or = p.royaumes[1].or;
+        let or = p.royaumes[1].stock["or"];
         let eff = p.meteo.effets(p.tour);
         p.sieges_mois(&eff, &mut Rapport::default());
-        assert!(p.royaumes[1].or > or, "butin");
+        assert!(p.royaumes[1].stock["or"] > or, "butin");
     }
 
     #[test]

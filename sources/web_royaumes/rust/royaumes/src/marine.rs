@@ -216,8 +216,9 @@ impl Partie {
                             f.armee = None;
                         }
                     }
-                    if f.proprio == 0 {
-                        self.royaumes[0].pop = (self.royaumes[0].pop - perdus).max(1);
+                    let proprio = f.proprio;
+                    if let Some(r) = self.royaume_mut(proprio) {
+                        r.pop = (r.pop - perdus).max(1);
                     }
                 }
             }
@@ -247,8 +248,10 @@ impl Partie {
     fn couler(&mut self, i: usize, rapport: &mut Rapport) {
         let f = self.flottes.remove(i);
         let n = f.armee.as_ref().map_or(0, |a| a.effectif());
+        if let Some(r) = self.royaume_mut(f.proprio) {
+            r.pop = (r.pop - n as i64).max(1);
+        }
         if f.proprio == 0 {
-            self.royaumes[0].pop = (self.royaumes[0].pop - n as i64).max(1);
             let texte = if n > 0 { format!("🌊 Votre flotte est envoyée par le fond avec {n} soldats à bord !") } else { "🌊 Votre flotte est envoyée par le fond !".to_string() };
             self.evt(rapport, texte, "guerre", Some(f.case));
         } else if n > 0 && self.est_ennemi(0, f.proprio) {
@@ -289,19 +292,10 @@ impl Partie {
                 }
             }
         }
+        // une ville bloquée perd sa pêche, son port et son commerce par mer (tour.rs, marine.rs) : la même règle pour tous
         self.blocus = nouveaux;
         for (t, g, c) in textes {
             self.evt(rapport, t, g, Some(c));
-        }
-        // une ville bloquée de l'ordinateur perd son commerce
-        let perte = regles().marine.blocus_ia;
-        for b in self.blocus.clone() {
-            if let Some(v) = self.villes.iter().find(|v| v.id == b.ville) {
-                if v.proprio > 0 && (v.proprio as usize) < self.royaumes.len() {
-                    let r = &mut self.royaumes[v.proprio as usize];
-                    r.or = (r.or - perte).max(0.0);
-                }
-            }
         }
     }
 

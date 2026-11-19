@@ -10,6 +10,9 @@ use crate::meteo::{self, Effets, Meteo};
 use crate::partie::{Combat, Evenement, Fin, Mouvement, Partie, Rapport, BRIGANDS};
 use crate::regles::{regles, Panier};
 
+/// L'offre du colporteur : (ressource, quantité, prix en or).
+pub const COLPORTEUR: (&str, f64, f64) = ("outils", 15.0, 120.0);
+
 pub struct Quete {
     pub texte: &'static str,
     pub prime: f64,
@@ -93,7 +96,9 @@ impl Partie {
         if let Some(h) = self.meteo.historique.clone() {
             self.evt(&mut rapport, h, "meteo", None);
         }
+        // la diplomatie du monde (rencontres, souverains, humeurs entre rivaux, coalitions), puis
         // les royaumes de l'ordinateur décident (constructions, recrutement, guerre, offres)
+        crate::ia::diplomatie::monde(self, &mut rapport);
         for k in 1..self.royaumes.len() {
             if self.royaumes[k].vivant {
                 ia::mois(self, k, &mut rapport);
@@ -107,9 +112,14 @@ impl Partie {
         self.blocus_mois(&mut rapport);
         self.chantiers(&mut rapport);
         self.forts_mois(&mut rapport);
-        self.economie(&eff, &mut rapport);
-        self.recherche(&mut rapport);
-        self.evenements(&eff, &mut rapport);
+        // la même économie pour tous les royaumes encore debout
+        for k in 0..self.royaumes.len() {
+            if k == 0 || self.royaumes[k].vivant {
+                self.economie(k, &eff, &mut rapport);
+                self.recherche(k, &mut rapport);
+                self.evenements(k, &eff, &mut rapport);
+            }
+        }
         self.choix_mois(&mut rapport);
         self.explorer();
         // quêtes
@@ -369,8 +379,9 @@ impl Partie {
         }
         a.unites.retain(|_, n| *n > 0);
         let vide = a.unites.is_empty();
-        if a.proprio == 0 {
-            self.royaumes[0].pop = (self.royaumes[0].pop - perdus).max(1);
+        let proprio = a.proprio;
+        if let Some(r) = self.royaume_mut(proprio) {
+            r.pop = (r.pop - perdus).max(1);
         }
         if vide {
             self.armees.remove(i);
@@ -379,9 +390,9 @@ impl Partie {
 
     pub fn detruire_armee(&mut self, id: u32) {
         if let Some(i) = self.armee(id) {
-            if self.armees[i].proprio == 0 {
-                let n = self.armees[i].effectif() as i64;
-                self.royaumes[0].pop = (self.royaumes[0].pop - n).max(1);
+            let n = self.armees[i].effectif() as i64;
+            if let Some(r) = self.royaume_mut(self.armees[i].proprio) {
+                r.pop = (r.pop - n).max(1);
             }
             self.armees.remove(i);
         }
@@ -389,18 +400,19 @@ impl Partie {
 
     fn pillage(&mut self, id: u32, vi: usize, rapport: &mut Rapport) {
         let v = self.villes[vi].clone();
-        if v.proprio == 0 {
-            let st = &mut self.royaumes[0].stock;
-            let g = (st.get("or").copied().unwrap_or(0.0) * 0.25).floor();
-            *st.get_mut("or").unwrap() -= g;
+        if let Some(r) = self.royaume_mut(v.proprio) {
+            let st = &mut r.stock;
+            let or = st.entry("or".into()).or_insert(0.0);
+            let g = (*or * 0.25).floor();
+            *or -= g;
             for r in ["bois", "pierre", "pain", "poisson", "ble"] {
                 if let Some(x) = st.get_mut(r) {
                     *x *= 0.8;
                 }
             }
-            self.evt(rapport, format!("🏴 Les brigands pillent {} : −{g} 🪙 et des vivres", v.nom), "guerre", Some(v.case));
-        } else if v.proprio != BRIGANDS {
-            self.royaumes[v.proprio as usize].or *= 0.75;
+            if v.proprio == 0 {
+                self.evt(rapport, format!("🏴 Les brigands pillent {} : −{g} 🪙 et des vivres", v.nom), "guerre", Some(v.case));
+            }
         }
         self.detruire_armee(id);
     }
@@ -424,18 +436,28 @@ impl Partie {
         self.recalculer_territoire();
         let nom = self.villes[vi].nom.clone();
         let case = self.villes[vi].case;
-        if nouveau == 0 {
-            let r = &mut self.royaumes[ancien as usize];
-            let butin = (r.or * 0.5).floor();
-            r.or -= butin;
-            *self.royaumes[0].stock.entry("or".into()).or_insert(0.0) += butin;
+        // notée pour les coalitions et la rancune du vaincu, annoncée au joueur s'il connaît les deux royaumes ;
+        // une ville cédée par traité ne rapporte pas de butin
+        let cession = crate::ia::diplomatie::conquete(self, nouveau, ancien, vi, rapport);
+        // le vainqueur emporte la moitié du trésor d'un rival vaincu (celui du joueur reste au joueur)
+        let butin = if !cession && ancien > 0 && ancien != BRIGANDS && nouveau >= 0 && nouveau != BRIGANDS {
+            let or = self.royaumes[ancien as usize].stock.entry("or".into()).or_insert(0.0);
+            let butin = (*or * 0.5).floor();
+            *or -= butin;
+            *self.royaumes[nouveau as usize].stock.entry("or".into()).or_insert(0.0) += butin;
+            butin
+        } else {
+            0.0
+        };
+        if cession {
+            if nouveau == 0 || ancien == 0 {
+                self.noter(format!("{nom} passe à {} par traité", self.nom_royaume(nouveau)));
+            }
+        } else if nouveau == 0 {
             self.evt(rapport, format!("🏰 {nom} est conquise ! Butin : {butin} 🪙"), "bon", Some(case));
         } else if ancien == 0 {
             let qui = self.nom_royaume(nouveau);
             self.evt(rapport, format!("💀 {nom} tombe aux mains de {qui} !"), "guerre", Some(case));
-        } else {
-            let qui = self.nom_royaume(nouveau);
-            self.noter(format!("{qui} s'empare de {nom}"));
         }
         let restantes: Vec<usize> = (0..self.villes.len()).filter(|&i| self.villes[i].proprio == ancien).collect();
         if restantes.is_empty() {
@@ -490,6 +512,9 @@ impl Partie {
                 }
                 if pr == 0 {
                     self.evt(rapport, format!("🚩 La colonie de {nom} est fondée !"), "bon", Some(b.case));
+                } else if self.connait(0, b.case) {
+                    let qui = self.nom_royaume(pr);
+                    self.evt(rapport, format!("{qui} fonde la ville de {nom}"), "info", Some(b.case));
                 }
                 territoire = true;
                 continue;
@@ -524,15 +549,34 @@ impl Partie {
         }
     }
 
-    // ------------------------------------------------------------------ économie du joueur
-    fn economie(&mut self, eff: &Effets, rapport: &mut Rapport) {
+    // ------------------------------------------------------------------ économie (la même pour tous les royaumes)
+    /// Les guerres que mène `id` : le joueur contre chaque rival en guerre, un rival contre le joueur.
+    pub fn guerres(&self, id: i32) -> f64 {
+        if id == 0 {
+            self.royaumes.iter().filter(|r| !r.joueur && r.vivant && r.statut == "guerre").count() as f64
+        } else {
+            (self.royaumes[id as usize].statut == "guerre") as u8 as f64
+        }
+    }
+
+    /// Les routes commerciales ouvertes de `id` (entre le joueur et un rival en paix).
+    pub fn routes_commerciales(&self, id: i32) -> f64 {
+        let ouverte = |r: &crate::partie::Royaume| !r.joueur && r.vivant && r.commerce && r.statut != "guerre";
+        if id == 0 {
+            self.royaumes.iter().filter(|r| ouverte(r)).count() as f64
+        } else {
+            // la route avec le joueur, et celles ouvertes avec les autres rivaux (ia/diplomatie.rs)
+            let k = id as usize;
+            let rivaux = self.diplomatie.liens.iter().filter(|l| (l.a == k || l.b == k) && l.commerce && l.statut != "guerre" && self.royaumes[l.a + l.b - k].vivant).count();
+            ouverte(&self.royaumes[k]) as u8 as f64 + rivaux as f64
+        }
+    }
+
+    /// Les ouvriers de `k` : la nourriture d'abord, puis les ressources, l'artisanat, les services, l'armée.
+    pub fn affecter_ouvriers(&mut self, k: usize) {
         let rg = regles();
-        let s = self.stats(0);
-        let m = meteo::mois(self.tour);
-        let saison = meteo::saison(m);
-        let avant = self.royaumes[0].stock.clone();
-        // ouvriers : la nourriture d'abord, puis les ressources, l'artisanat, les services, l'armée
-        let mut libres = (self.royaumes[0].pop - s.soldats).max(0);
+        let id = k as i32;
+        let mut libres = (self.royaumes[k].pop - self.stats(id).soldats).max(0);
         let prio = |cle: &str| -> u32 {
             let d = rg.bat(cle).unwrap();
             if d.prod.keys().any(|r| rg.est_vivre(r)) {
@@ -550,7 +594,7 @@ impl Partie {
         let mut ordre: Vec<usize> = (0..self.batiments.len())
             .filter(|&i| {
                 let b = &self.batiments[i];
-                b.proprio == 0 && b.fini() && rg.bat(&b.cle).unwrap().ouvriers > 0
+                b.proprio == id && b.fini() && rg.bat(&b.cle).unwrap().ouvriers > 0
             })
             .collect();
         ordre.sort_by_key(|&i| (prio(&self.batiments[i].cle), self.batiments[i].id));
@@ -564,18 +608,34 @@ impl Partie {
             self.batiments[i].ouvriers = n as u32;
             libres -= n;
         }
-        self.royaumes[0].ouvriers_libres = libres;
+        self.royaumes[k].ouvriers_libres = libres;
+    }
+
+    /// Le mois de l'économie du royaume `k` : ouvriers, production des bâtiments, vivres, boissons, drap, chauffage,
+    /// bonheur, population, impôts et entretien. Les mêmes règles pour tous ; seul le joueur en reçoit le détail
+    /// dans son rapport (d'un rival, il n'apprend que la famine, s'il connaît sa capitale).
+    fn economie(&mut self, k: usize, eff: &Effets, rapport: &mut Rapport) {
+        let rg = regles();
+        let id = k as i32;
+        let s = self.stats(id);
+        let m = meteo::mois(self.tour);
+        let saison = meteo::saison(m);
+        let avant = self.royaumes[k].stock.clone();
+        let etait_affame = self.royaumes[k].famine;
+        self.affecter_ouvriers(k);
         // la vie des villes : ateliers instruits, jour de marché, ignorance, délinquance (cite.rs)
-        let vies: Vec<(usize, VieVille)> = (0..self.villes.len()).filter(|&vi| self.villes[vi].proprio == 0).map(|vi| (vi, self.vie_ville(vi))).collect();
+        let vies: Vec<(usize, VieVille)> = (0..self.villes.len()).filter(|&vi| self.villes[vi].proprio == id).map(|vi| (vi, self.vie_ville(vi))).collect();
         let ateliers: BTreeMap<u32, f64> = vies.iter().map(|(vi, x)| (self.villes[*vi].id, x.ateliers)).collect();
-        let j = &self.royaumes[0];
+        let j = &self.royaumes[k];
         let ecole = if j.a("vapeur") { 1.0 } else { 1.0 };
         let humeur = 0.75 + j.bonheur / 200.0;
-        let routes_niv = self.niveau_routes(0) as f64;
+        // au niveau le plus dur, l'ordinateur produit un peu plus (`ia::bonus_production`) : son seul avantage
+        let bonus = if j.joueur { 1.0 } else { ia::bonus_production(self.options.difficulte) };
+        let routes_niv = self.niveau_routes(id) as f64;
         let (assol, engrais, vapeur, carto) = (j.a("assolement"), j.a("engrais"), j.a("vapeur"), j.a("cartographie"));
         let cap: BTreeMap<String, f64> = rg.ressources.iter().map(|r| (r.cle.clone(), self.capacite(&s, &r.cle))).collect();
         for i in 0..self.batiments.len() {
-            if self.batiments[i].proprio != 0 || !self.batiments[i].fini() {
+            if self.batiments[i].proprio != id || !self.batiments[i].fini() {
                 continue;
             }
             let cle_b = self.batiments[i].cle.clone();
@@ -604,7 +664,7 @@ impl Partie {
                 while credit >= 1.0 - 1e-9 && !self.batiments[i].file.is_empty() {
                     let u = self.batiments[i].file.remove(0);
                     let case = self.batiments[i].case;
-                    self.recruter_dans(0, &u, case);
+                    self.recruter_dans(id, &u, case);
                     credit -= 1.0;
                     formes += 1.0;
                 }
@@ -629,8 +689,8 @@ impl Partie {
                 continue;
             }
             let b = &self.batiments[i];
-            let k = &self.carte.cases[b.case];
-            let mut f = staff * ecole * humeur;
+            let kc = &self.carte.cases[b.case];
+            let mut f = staff * ecole * humeur * bonus;
             if let Some(cult) = &d.saison {
                 f *= meteo::saisonnier(cult, m) * eff.cultures;
                 if b.cle == "ferme" || b.cle == "champ_patates" {
@@ -641,7 +701,7 @@ impl Partie {
                         f *= 1.3;
                     }
                 }
-                if b.cle == "ferme" && k.fertile {
+                if b.cle == "ferme" && kc.fertile {
                     f *= 1.5;
                 }
             }
@@ -651,7 +711,7 @@ impl Partie {
                     f *= 1.5;
                 }
             }
-            if b.cle == "carriere" && (k.gisement.as_deref() == Some("pierre") || self.carte.voisins(b.case).iter().any(|&v| self.carte.cases[v].gisement.as_deref() == Some("pierre"))) {
+            if b.cle == "carriere" && (kc.gisement.as_deref() == Some("pierre") || self.carte.voisins(b.case).iter().any(|&v| self.carte.cases[v].gisement.as_deref() == Some("pierre"))) {
                 f *= 1.4;
             }
             if d.cat == "artisanat" && vapeur {
@@ -667,7 +727,7 @@ impl Partie {
             }
             let mut manque = None;
             let mut plein = false;
-            let st = &self.royaumes[0].stock;
+            let st = &self.royaumes[k].stock;
             for (r, v) in &d.conso {
                 let dispo = st.get(r).copied().unwrap_or(0.0);
                 if dispo < v * f {
@@ -703,7 +763,7 @@ impl Partie {
             }
             let mut produit = Panier::new();
             {
-                let st = &mut self.royaumes[0].stock;
+                let st = &mut self.royaumes[k].stock;
                 for (r, v) in &d.conso {
                     let x = st.entry(r.clone()).or_insert(0.0);
                     *x = (*x - v * f).max(0.0);
@@ -724,8 +784,8 @@ impl Partie {
             self.batiments[i].produit = produit;
         }
         // nourriture
-        let pop = self.royaumes[0].pop as f64;
-        let st = &mut self.royaumes[0].stock;
+        let pop = self.royaumes[k].pop as f64;
+        let st = &mut self.royaumes[k].stock;
         let variete = rg.nourriture.iter().filter(|r| st.get(*r).copied().unwrap_or(0.0) > 0.5).count() as u32;
         let mut reste = pop * 0.3;
         for _ in 0..4 {
@@ -767,13 +827,13 @@ impl Partie {
         } else {
             false
         };
-        let chauffage = self.chauffer(pop);
+        let chauffage = self.chauffer(id, pop);
         let gele = chauffage.is_some_and(|v| v < 0.0);
         // bonheur
         let foi = (s.foi / pop.max(1.0)).min(1.0);
         let hyg = (s.hygiene / pop.max(1.0)).min(1.0);
-        let guerres = self.royaumes.iter().filter(|r| !r.joueur && r.vivant && r.statut == "guerre").count() as f64;
-        let impots = self.royaumes[0].impots.clone();
+        let guerres = self.guerres(id);
+        let impots = self.royaumes[k].impots.clone();
         let mut detail: Vec<(String, f64)> = vec![
             ("Base".into(), 35.0),
             ("Nourriture".into(), if famine { -30.0 } else { [0.0, 6.0, 11.0, 15.0, 18.0, 20.0][variete.min(5) as usize] }),
@@ -795,7 +855,7 @@ impl Partie {
         if ignorantes > 0.0 {
             detail.push(("Ignorance (villes sans école)".into(), -rg.ecoles.ignorance_bonheur * ignorantes));
         }
-        let eclairees = self.villes.iter().filter(|v| v.proprio == 0 && v.eclairage).count() as f64;
+        let eclairees = self.villes.iter().filter(|v| v.proprio == id && v.eclairage).count() as f64;
         if eclairees > 0.0 {
             detail.push(("Éclairage public".into(), (el.bonheur * eclairees).min(el.bonheur_max)));
         }
@@ -803,7 +863,7 @@ impl Partie {
             detail.push((if v > 0.0 { "Chauffage : les foyers sont chauds" } else { "Chauffage" }.into(), v));
         }
         let cible: f64 = detail.iter().map(|x| x.1).sum::<f64>().clamp(0.0, 100.0);
-        let j = &mut self.royaumes[0];
+        let j = &mut self.royaumes[k];
         j.bonheur += (cible - j.bonheur).clamp(-6.0, 6.0);
         j.detail_bonheur = detail;
         j.variete = variete;
@@ -829,13 +889,12 @@ impl Partie {
         let delinquance = vies.iter().filter(|x| x.1.delinquance).count() as f64 * el.delinquance;
         let impot = part * (1.0 + s.taxe + marche - delinquance).max(0.0);
         let routes = if j.a("routes") { 1.5 } else { 1.0 };
-        let nb_routes = self.royaumes.iter().filter(|r| !r.joueur && r.vivant && r.commerce && r.statut != "guerre").count() as f64;
-        let commerce = nb_routes * 25.0 * routes;
-        let nb_bat = self.batiments.iter().filter(|b| b.proprio == 0 && b.fini()).count() as f64;
+        let commerce = self.routes_commerciales(id) * 25.0 * routes;
+        let nb_bat = self.batiments.iter().filter(|b| b.proprio == id && b.fini()).count() as f64;
         let eclairage = eclairees * el.entretien;
-        let entretien = s.soldats as f64 * 0.5 + nb_bat * 0.2 + s.entretien_flotte + self.entretien_forts(0) + eclairage;
-        let commerce_mer = self.commerce_maritime(0);
-        let j = &mut self.royaumes[0];
+        let entretien = s.soldats as f64 * 0.5 + nb_bat * 0.2 + s.entretien_flotte + self.entretien_forts(id) + eclairage;
+        let commerce_mer = self.commerce_maritime(id);
+        let j = &mut self.royaumes[k];
         j.commerce_mer = commerce_mer;
         let or = j.stock.entry("or".into()).or_insert(0.0);
         *or += impot + commerce + commerce_mer - entretien;
@@ -866,6 +925,15 @@ impl Partie {
             }
         }
         j.bilan = bilan;
+        if k != 0 {
+            // d'un rival, le joueur n'apprend que la famine qui commence, s'il connaît sa capitale
+            let cap = self.capitale(id).map(|ci| self.villes[ci].case).filter(|&c| self.connait(0, c));
+            if famine && !etait_affame && cap.is_some() {
+                let nom = self.royaumes[k].nom.clone();
+                self.evt(rapport, format!("🍽️ La famine frappe {nom} : ses greniers sont vides."), "info", cap);
+            }
+            return;
+        }
         if famine {
             self.evt(rapport, "🍽️ Famine ! Les greniers sont vides, la population diminue.".into(), "guerre", None);
         }
@@ -906,7 +974,7 @@ impl Partie {
     }
 
     fn replanter(&mut self, i: usize, n: u32) -> u32 {
-        let case = self.batiments[i].case;
+        let (case, proprio) = (self.batiments[i].case, self.batiments[i].proprio);
         let mut faits = 0;
         for _ in 0..n {
             let cand: Vec<usize> = self
@@ -915,7 +983,7 @@ impl Partie {
                 .into_iter()
                 .filter(|&c| {
                     let k = &self.carte.cases[c];
-                    matches!(k.t, Terrain::Plaine | Terrain::Colline) && k.bat.is_none() && k.proprio == 0 && k.arbres < 6
+                    matches!(k.t, Terrain::Plaine | Terrain::Colline) && k.bat.is_none() && k.proprio == proprio && k.arbres < 6
                 })
                 .collect();
             if cand.is_empty() {
@@ -939,9 +1007,9 @@ impl Partie {
     }
 
     // ------------------------------------------------------------------ recherche
-    fn recherche(&mut self, rapport: &mut Rapport) {
-        let gain = self.savoir_mois();
-        let j = &mut self.royaumes[0];
+    fn recherche(&mut self, k: usize, rapport: &mut Rapport) {
+        let gain = self.savoir_mois(k as i32);
+        let j = &mut self.royaumes[k];
         j.savoir += gain;
         if let Some(t) = j.recherche.clone() {
             let d = regles().tech(&t).unwrap();
@@ -950,51 +1018,66 @@ impl Partie {
                 j.techs.push(t.clone());
                 j.recherche = None;
                 let nom = d.nom.clone();
-                self.evt(rapport, format!("💡 Découverte : {nom} !"), "bon", None);
+                if k == 0 {
+                    self.evt(rapport, format!("💡 Découverte : {nom} !"), "bon", None);
+                }
             }
         }
     }
 
     // ------------------------------------------------------------------ événements
-    fn evenements(&mut self, eff: &Effets, rapport: &mut Rapport) {
-        let s = self.stats(0);
-        let pop = self.joueur().pop as f64;
+    /// Les hasards du mois chez le royaume `k` : incendie, épidémie, moisson, réfugiés, gisement, colporteur (le
+    /// joueur reçoit son offre ; un rival la prend s'il en a besoin, `ia::economie::colporteur`). Seuls ceux du joueur
+    /// vont à son rapport.
+    fn evenements(&mut self, k: usize, eff: &Effets, rapport: &mut Rapport) {
+        let id = k as i32;
+        let s = self.stats(id);
+        let pop = self.royaumes[k].pop as f64;
         let hyg = s.hygiene / pop.max(1.0);
         // incendie
         if self.hasard.p(0.05 * eff.incendie) {
             let bois_: Vec<u32> = self
                 .batiments
                 .iter()
-                .filter(|b| b.proprio == 0 && b.fini() && !["hotel", "maison_pierre", "hotel_particulier", "immeuble", "eglise", "cathedrale", "tour", "palais", "puits", "fontaine"].contains(&b.cle.as_str()))
+                .filter(|b| b.proprio == id && b.fini() && !["hotel", "maison_pierre", "hotel_particulier", "immeuble", "eglise", "cathedrale", "tour", "palais", "puits", "fontaine"].contains(&b.cle.as_str()))
                 .map(|b| b.id)
                 .collect();
-            if let Some(&id) = self.hasard.choix(&bois_) {
-                self.incendie(id, hyg, rapport);
+            if let Some(&b) = self.hasard.choix(&bois_) {
+                self.incendie(b, hyg, rapport);
             }
         }
         // épidémie
-        let hopital = self.a_batiment(0, "hopital");
+        let hopital = self.a_batiment(id, "hopital");
         if hyg < 0.5 && !hopital && self.hasard.p(0.03 * eff.epidemie) && pop > 30.0 {
             let l = (pop * 0.08).ceil() as i64;
-            self.royaumes[0].pop = (self.royaumes[0].pop - l).max(1);
-            self.evt(rapport, format!("🤒 Épidémie : −{l} habitants (puits, fontaines, Hôtel-Dieu)"), "guerre", None);
+            self.royaumes[k].pop = (self.royaumes[k].pop - l).max(1);
+            if k == 0 {
+                self.evt(rapport, format!("🤒 Épidémie : −{l} habitants (puits, fontaines, Hôtel-Dieu)"), "guerre", None);
+            }
         }
         if self.tour < 6 {
             return;
         }
         let x = self.hasard.f();
-        if x < 0.04 && self.a_batiment(0, "ferme") && meteo::saison(meteo::mois(self.tour)) >= 2 {
-            let st = &mut self.royaumes[0].stock;
+        let joueur = k == 0;
+        if x < 0.04 && self.a_batiment(id, "ferme") && meteo::saison(meteo::mois(self.tour)) >= 2 {
+            let st = &mut self.royaumes[k].stock;
             *st.entry("ble".into()).or_insert(0.0) += 40.0;
-            self.evt(rapport, "🌾 Moisson exceptionnelle : +40 blé".into(), "bon", None);
-        } else if x < 0.07 && s.logement > self.joueur().pop {
-            let n = 6.min(s.logement - self.joueur().pop);
-            self.royaumes[0].pop += n;
-            self.evt(rapport, format!("🧑‍🌾 {n} familles de réfugiés s'installent chez vous"), "bon", None);
+            if joueur {
+                self.evt(rapport, "🌾 Moisson exceptionnelle : +40 blé".into(), "bon", None);
+            }
+        } else if x < 0.07 && s.logement > self.royaumes[k].pop {
+            let n = 6.min(s.logement - self.royaumes[k].pop);
+            self.royaumes[k].pop += n;
+            if joueur {
+                self.evt(rapport, format!("🧑‍🌾 {n} familles de réfugiés s'installent chez vous"), "bon", None);
+            }
         } else if x < 0.09 {
-            if let Some((c, g)) = self.decouvrir_gisement(0) {
+            if let Some((c, g)) = self.decouvrir_gisement(id).filter(|_| joueur) {
                 self.evt(rapport, format!("⛏️ Un gisement {g} est découvert !"), "or", Some(c));
             }
+        } else if x < 0.11 && !joueur {
+            crate::ia::economie::colporteur(self, k);
         } else if x < 0.11 {
             let id = self.id();
             self.propositions.push(crate::partie::Proposition {
@@ -1002,25 +1085,30 @@ impl Partie {
                 de: 0,
                 genre: "marchand".into(),
                 texte: "Un colporteur propose 15 🔨 outils pour 120 🪙.".into(),
-                donne: Panier::from([("outils".to_string(), 15.0)]),
-                demande: Panier::from([("or".to_string(), 120.0)]),
+                donne: Panier::from([(COLPORTEUR.0.to_string(), COLPORTEUR.1)]),
+                demande: Panier::from([("or".to_string(), COLPORTEUR.2)]),
+                ..Default::default()
             });
         }
     }
 
-    /// Le feu prend au bâtiment `id` du joueur : le veilleur d'une ville éclairée l'éteint une fois sur deux
+    /// Le feu prend au bâtiment `id` : le veilleur d'une ville éclairée l'éteint une fois sur deux
     /// (`eclairage.incendie`), sinon les puits (hygiène `hyg`) le maîtrisent, ou il part en fumée.
+    /// Seuls les incendies du joueur vont à son rapport.
     pub fn incendie(&mut self, id: u32, hyg: f64, rapport: &mut Rapport) {
         let Some(b) = self.bat(id).cloned() else { return };
         let nom = regles().bat(&b.cle).unwrap().nom.clone();
         let veilleur = b.ville.and_then(|vid| self.villes.iter().find(|v| v.id == vid && v.eclairage)).map(|v| v.nom.clone());
-        if let Some(ville) = veilleur.filter(|_| self.hasard.p(1.0 - regles().eclairage.incendie)) {
-            self.evt(rapport, format!("🏮 Le veilleur de nuit de {ville} donne l'alerte : le feu est éteint avant de prendre à {nom}."), "bon", Some(b.case));
+        let (texte, genre) = if let Some(ville) = veilleur.filter(|_| self.hasard.p(1.0 - regles().eclairage.incendie)) {
+            (format!("🏮 Le veilleur de nuit de {ville} donne l'alerte : le feu est éteint avant de prendre à {nom}."), "bon")
         } else if hyg >= 0.6 {
-            self.evt(rapport, format!("🔥 Un incendie à {nom} est maîtrisé grâce aux puits."), "bon", Some(b.case));
+            (format!("🔥 Un incendie à {nom} est maîtrisé grâce aux puits."), "bon")
         } else {
-            self.evt(rapport, format!("🔥 Incendie ! {nom} part en fumée."), "guerre", Some(b.case));
             let _ = self.demolir(b.case);
+            (format!("🔥 Incendie ! {nom} part en fumée."), "guerre")
+        };
+        if b.proprio == 0 {
+            self.evt(rapport, texte, genre, Some(b.case));
         }
     }
 
@@ -1089,6 +1177,11 @@ mod essais {
             let mut p = Partie::nouvelle(Options { graine: g, rivaux: 5, attitude: "agressifs".into(), ..Options::default() });
             let cap = p.villes[0].case;
             assert!((1..p.royaumes.len()).all(|k| !p.connait(k as i32, cap)), "personne ne connaît le joueur au départ");
+            // le joueur ne fait rien : une citadelle et une forte garnison le gardent assez longtemps pour voir les rivaux à l'œuvre
+            p.villes[0].fortif = 4;
+            let a = p.armees.iter().position(|a| a.proprio == 0).unwrap();
+            p.armees[a].unites.insert("grenadier".into(), 80);
+            p.royaumes[0].pop = 200;
             for _ in 0..(12 * 25) {
                 p.fin_du_mois();
                 flottes += p.flottes.iter().filter(|f| f.proprio != 0).count();

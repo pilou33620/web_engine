@@ -5,7 +5,8 @@ use serde_json::{json, Value};
 use crate::carte::{Carte, Terrain};
 use crate::commandes::{cout_recrue, prix};
 use crate::meteo::{self, Meteo};
-use crate::partie::{nom_caractere, Partie};
+use crate::ia::diplomatie;
+use crate::partie::Partie;
 use crate::regles::regles;
 use crate::tour::QUETES;
 
@@ -44,7 +45,7 @@ pub fn meteo_json(m: &Meteo, tour: u32) -> Value {
         "genre": m.genre, "titre": m.titre, "icone": m.icone, "temperature": m.temperature,
         "vent": m.vent, "direction": m.direction, "pluie": m.pluie, "neige_sol": m.neige_sol,
         "secheresse": m.secheresse, "historique": m.historique, "effets": e.resume,
-        "cultures": e.cultures, "mouvement": e.mouvement,
+        "cultures": e.cultures, "mouvement": e.mouvement, "tir": e.tir,
     })
 }
 
@@ -66,7 +67,7 @@ pub fn etat(p: &Partie) -> Value {
     for b in ["caserne", "haras", "arsenal", "port", "taverne"] {
         let l = p.unites_dispo(0, b);
         for u in &l {
-            prix_unites.insert(u.clone(), json!(cout_recrue(p, u)));
+            prix_unites.insert(u.clone(), json!(cout_recrue(p, 0, u)));
         }
         dispo.insert(b.into(), json!(l));
     }
@@ -86,7 +87,7 @@ pub fn etat(p: &Partie) -> Value {
         "niveau": nr,
         "nom": nom_routes,
         "segments": p.segments_routes(0),
-        "cout": if nr < 3 { json!(p.cout_routes(nr + 1)) } else { Value::Null },
+        "cout": if nr < 3 { json!(p.cout_routes(0, nr + 1)) } else { Value::Null },
         "verrou": if nr == 1 && p.niveau_capitale(0) < 2 { json!("Capitale au rang Village") } else if nr == 2 && !j.a("routes") { json!("Technologie « Routes royales et canaux »") } else { Value::Null },
     });
     let villes: Vec<Value> = p.villes.iter().enumerate().filter(|(_, v)| v.proprio == 0 || connu(v.case)).map(|(i, v)| {
@@ -94,7 +95,7 @@ pub fn etat(p: &Partie) -> Value {
         let suivante = rg.fortif(v.fortif + 1).filter(|_| v.proprio == 0).map(|f| {
             let verrou = p.peut_fortifier(i).err();
             json!({"niveau": f.niveau, "nom": f.nom, "icone": f.icone, "cout": f.cout, "duree": f.duree, "murs": f.murs, "defense": f.defense,
-                   "possible": verrou.is_none() && p.peut_payer(&f.cout, 1.0), "verrou": verrou})
+                   "possible": verrou.is_none() && p.peut_payer(0, &f.cout), "verrou": verrou})
         });
         // la vie de la ville (cite.rs) ; le détail n'est donné que pour les villes du joueur
         let x = p.vie_ville(i);
@@ -146,7 +147,7 @@ pub fn etat(p: &Partie) -> Value {
             "techs": j.techs,
             "recherche": j.recherche,
             "savoir": j.savoir,
-            "savoir_mois": p.savoir_mois(),
+            "savoir_mois": p.savoir_mois(0),
             // bois (ou équivalent en charbon) que brûleront les foyers à la fin du mois (0 hors de l'hiver)
             "chauffage": j.pop as f64 * p.chauffage_par_habitant(),
             "famine": j.famine,
@@ -171,10 +172,14 @@ pub fn etat(p: &Partie) -> Value {
             };
             json!({
                 "id": r.id, "nom": r.nom, "couleur": r.couleur, "joueur": r.joueur,
-                "caractere": nom_caractere(&r.caractere), "vivant": r.vivant, "statut": r.statut,
+                "caractere": p.diplomatie.souverains.get(r.id).map_or("", |s| diplomatie::nom_caractere(&s.caractere)), "vivant": r.vivant, "statut": r.statut,
                 "relation": r.relation, "commerce": r.commerce, "puissance": p.puissance(r.id as i32),
-                "surplus": r.surplus, "demande": r.demande, "tresor": r.or.floor(), "prix": prix_,
+                // ce que l'on sait d'un rival : son trésor (pour commercer) et sa population à la dizaine près, pas ses réserves
+                "surplus": r.surplus, "demande": r.demande, "tresor": r.stock.get("or").copied().unwrap_or(0.0).floor(), "prix": prix_,
+                "population": if r.joueur { r.pop } else { (r.pop as f64 / 10.0).round() as i64 * 10 },
                 "techs": r.techs.len(), "techs_liste": r.techs,
+                // souverain, trêve, guerres et alliances avec les royaumes connus, coalition, mémoire
+                "diplo": diplomatie::vue_royaume(p, r.id),
             })
         }).collect::<Vec<_>>(),
         "villes": villes,
@@ -202,7 +207,7 @@ pub fn etat(p: &Partie) -> Value {
             let suivant = rg.fort(f.niveau + 1).filter(|_| f.proprio == 0).map(|n| {
                 let verrou = p.peut_ameliorer_fort(fi).err();
                 json!({"niveau": n.niveau, "nom": n.nom, "icone": n.icone, "cout": n.cout, "duree": n.duree, "murs": n.murs, "defense": n.defense,
-                       "vision": n.vision, "entretien": n.entretien, "possible": verrou.is_none() && p.peut_payer(&n.cout, 1.0), "verrou": verrou})
+                       "vision": n.vision, "entretien": n.entretien, "possible": verrou.is_none() && p.peut_payer(0, &n.cout), "verrou": verrou})
             });
             json!({
                 "id": f.id, "proprio": f.proprio, "case": f.case, "niveau": f.niveau,
@@ -280,7 +285,7 @@ pub fn etat(p: &Partie) -> Value {
                 "options": c.options.iter().enumerate().map(|(i, t)| {
                     let o = d.and_then(|d| d.options.get(i));
                     let cout = o.map(|o| o.cout.clone()).unwrap_or_default();
-                    json!({"texte": t, "cout": cout, "possible": p.peut_payer(&cout, 1.0), "risque": o.map_or(0.0, |o| o.risque)})
+                    json!({"texte": t, "cout": cout, "possible": p.peut_payer(0, &cout), "risque": o.map_or(0.0, |o| o.risque)})
                 }).collect::<Vec<_>>(),
             })
         }).collect::<Vec<_>>(),
@@ -292,6 +297,7 @@ pub fn etat(p: &Partie) -> Value {
         },
         "routes": p.routes.iter().map(|r| json!([r[0], r[1], p.niveau_routes(r[2] as i32)])).collect::<Vec<_>>(),
         "propositions": p.propositions,
+        "coalitions": diplomatie::vue_coalitions(p),
         "journal": p.journal.iter().take(40).collect::<Vec<_>>(),
         "rapport": rapport,
         "fin": p.fin,

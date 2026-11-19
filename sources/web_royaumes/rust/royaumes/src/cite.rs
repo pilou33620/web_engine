@@ -1,6 +1,5 @@
 //! La vie des villes : le jour de marché, les écoles (vacances d'été, ateliers, ignorance), le chauffage
-//! de l'hiver et l'éclairage public. Le joueur les vit dans l'économie du mois (tour.rs) ; les rivaux,
-//! dont l'économie est résumée, en reçoivent ici l'équivalent en or (et en soldats pour le froid).
+//! de l'hiver et l'éclairage public. Chaque royaume, joueur ou rival, les vit dans l'économie du mois (tour.rs).
 //! Tous les chiffres sont dans `data/regles.json` (jour_marche, ecoles, chauffage, eclairage).
 
 use crate::meteo;
@@ -80,24 +79,24 @@ impl Partie {
         x
     }
 
-    /// Le savoir que le joueur gagne ce mois-ci : sa population, ses écoles et académies, moins l'ignorance.
-    pub fn savoir_mois(&self) -> f64 {
-        let j = self.joueur();
-        let ignorantes = (0..self.villes.len()).filter(|&vi| self.villes[vi].proprio == 0 && self.vie_ville(vi).ignorance).count() as f64;
-        let gain = (j.pop as f64 * 0.04 + self.stats(0).savoir - ignorantes * regles().ecoles.ignorance_savoir).max(0.0);
+    /// Le savoir que `id` gagne ce mois-ci : sa population, ses écoles et académies, moins l'ignorance.
+    pub fn savoir_mois(&self, id: i32) -> f64 {
+        let j = &self.royaumes[id as usize];
+        let ignorantes = (0..self.villes.len()).filter(|&vi| self.villes[vi].proprio == id && self.vie_ville(vi).ignorance).count() as f64;
+        let gain = (j.pop as f64 * 0.04 + self.stats(id).savoir - ignorantes * regles().ecoles.ignorance_savoir).max(0.0);
         gain * if j.a("lumieres") { 1.25 } else { 1.0 }
     }
 
-    /// Le chauffage du joueur ce mois-ci : il brûle le combustible (le charbon d'abord à l'ère industrielle, le bois en complément).
+    /// Le chauffage de `id` ce mois-ci : il brûle le combustible (le charbon d'abord à l'ère industrielle, le bois en complément).
     /// Rend la ligne de bonheur : `None` hors de l'hiver, le malus sans assez de combustible, le bonus avec une bonne réserve.
-    pub fn chauffer(&mut self, pop: f64) -> Option<f64> {
+    pub fn chauffer(&mut self, id: i32, pop: f64) -> Option<f64> {
         let c = &regles().chauffage;
         let besoin = pop * self.chauffage_par_habitant();
         if besoin <= 0.0 {
             return None;
         }
         let charbon = if regles().epoque(self.annee()).cle == "industrie" { c.charbon } else { 0.0 };
-        let st = &mut self.royaumes[0].stock;
+        let st = &mut self.royaumes[id as usize].stock;
         let mut reste = besoin;
         if charbon > 0.0 {
             let x = st.entry("charbon".into()).or_insert(0.0);
@@ -115,69 +114,8 @@ impl Partie {
         let reserve = st["bois"] + st.get("charbon").copied().unwrap_or(0.0) * charbon;
         Some(if reserve >= c.reserve * besoin { c.bonus } else { 0.0 })
     }
-
-    /// Un rival vit le mois de ses villes, en or : marchés, écoles (leur savoir), ateliers, ignorance, éclairage
-    /// (allumé dès que permis et que le trésor le permet), délinquance et bois de chauffage. Faute d'or pour
-    /// se chauffer, sa garnison perd des hommes (le froid et les maladies). Rend l'or gagné (ou perdu).
-    pub fn vie_ia(&mut self, k: usize) -> f64 {
-        let rg = regles();
-        let id = k as i32;
-        let (m, e, c, l) = (&rg.jour_marche, &rg.ecoles, &rg.chauffage, &rg.eclairage);
-        let diff = self.options.difficulte;
-        let froid = self.chauffage_par_habitant();
-        let prix_bois = rg.prix.get("bois").copied().unwrap_or(2.0);
-        let (mut gain, mut chauffage) = (0.0, 0.0);
-        for vi in 0..self.villes.len() {
-            if self.villes[vi].proprio != id {
-                continue;
-            }
-            let eclaire = self.villes[vi].eclairage;
-            let allume = self.peut_eclairer(vi).is_ok() && self.royaumes[k].or >= if eclaire { l.entretien } else { 150.0 };
-            self.villes[vi].eclairage = allume;
-            if allume {
-                gain -= l.entretien;
-            }
-            let x = self.vie_ville(vi);
-            let (vid, niveau) = (self.villes[vi].id, self.villes[vi].niveau);
-            let (mut nb_bat, mut ateliers, mut logement) = (0.0, 0.0, 8.0 + niveau as f64 * 6.0);
-            for b in self.batiments.iter().filter(|b| b.proprio == id && b.ville == Some(vid) && b.fini()) {
-                let d = rg.bat(&b.cle).unwrap();
-                nb_bat += 1.0;
-                ateliers += (d.cat == "artisanat") as u8 as f64;
-                logement += d.logement as f64;
-            }
-            if x.marche {
-                gain += x.halles as f64 * m.ia_or;
-            }
-            gain += x.ecoles as f64 * e.ia_or * if self.vacances() { e.ete } else { 1.0 };
-            // les ateliers rapportent 0,8 par mois chacun à l'ordinateur (ia::mois), la ville 12
-            gain += ateliers * 0.8 * diff * x.ateliers;
-            if x.ignorance {
-                gain -= e.ia_ignorance;
-            }
-            if x.delinquance {
-                gain -= (12.0 + nb_bat * 0.8) * diff * l.delinquance;
-            }
-            chauffage += logement * froid * prix_bois;
-        }
-        let r = &mut self.royaumes[k];
-        r.or = (r.or + gain).max(0.0);
-        if r.or >= chauffage {
-            r.or -= chauffage;
-        } else {
-            r.or = 0.0;
-            if let Some(a) = self.capitale(id).map(|ci| self.villes[ci].case).and_then(|cap| self.armees.iter_mut().find(|a| a.proprio == id && a.case == cap && a.chemin.is_empty())) {
-                let n = (a.effectif() as f64 * c.pertes).ceil() as u32;
-                for _ in 0..n.min(a.effectif().saturating_sub(1)) {
-                    let u = a.unites.iter().max_by_key(|x| *x.1).map(|x| x.0.clone()).unwrap();
-                    *a.unites.get_mut(&u).unwrap() -= 1;
-                }
-                a.unites.retain(|_, n| *n > 0);
-            }
-        }
-        gain - chauffage
-    }
 }
+
 
 #[cfg(test)]
 mod essais {
@@ -243,13 +181,13 @@ mod essais {
         assert!(p.joueur().famine && r.evenements.iter().any(|e| e.texte.starts_with("🧺 Marché déserté")));
         assert_eq!(detail(&p, "Marché déserté"), Some(-2.0));
         assert_eq!(p.joueur().revenus["marche"], 0.0, "pas d'impôts en plus");
-        // l'ordinateur : de l'or les jours de marché
+        // l'ordinateur vit le même jour de marché : sa halle lui rapporte des impôts en plus
         let mut q = partie(21, 1702, 0);
         poser(&mut q, "marche", 1);
-        let avec = q.vie_ia(1);
-        q.tour += 1;
-        let sans = q.vie_ia(1);
-        assert!((avec - sans - regles().jour_marche.ia_or).abs() < 1e-9, "{avec} {sans}");
+        q.fin_du_mois();
+        assert!(q.royaumes[1].revenus["marche"] > 0.0 && q.royaumes[1].detail_bonheur.iter().any(|x| x.0 == "Jour de marché"));
+        q.fin_du_mois();
+        assert_eq!(q.royaumes[1].revenus["marche"], 0.0);
     }
 
     #[test]
@@ -273,24 +211,25 @@ mod essais {
         q.villes[0].niveau = 3;
         q.royaumes[0].pop = 50;
         assert!(q.vie_ville(0).ignorance);
-        let ignorant = q.savoir_mois();
+        let ignorant = q.savoir_mois(0);
         q.fin_du_mois();
         assert_eq!(detail(&q, "Ignorance"), Some(-regles().ecoles.ignorance_bonheur));
         poser(&mut q, "ecole", 0);
         assert!(!q.vie_ville(0).ignorance);
-        assert!(q.savoir_mois() >= ignorant + regles().ecoles.ignorance_savoir, "l'école chasse l'ignorance");
+        assert!(q.savoir_mois(0) >= ignorant + regles().ecoles.ignorance_savoir, "l'école chasse l'ignorance");
         q.villes[0].niveau = 2;
         q.batiments.retain(|b| b.cle != "ecole");
         assert!(!q.vie_ville(0).ignorance, "un village n'en souffre pas");
-        // l'ordinateur : l'or de ses écoles (moitié l'été), et l'ignorance lui coûte
+        // l'ordinateur : le savoir de ses écoles (moitié l'été), et l'ignorance lui coûte
         let mut r = partie(22, 1760, 3);
         r.villes[1].niveau = 3;
-        let ignorante = r.vie_ia(1);
+        r.royaumes[1].pop = 50;
+        let ignorante = r.savoir_mois(1);
         poser(&mut r, "ecole", 1);
-        let instruite = r.vie_ia(1);
-        assert!(instruite > ignorante + regles().ecoles.ia_ignorance, "{ignorante} {instruite}");
+        let instruite = r.savoir_mois(1);
+        assert!(instruite >= ignorante + regles().ecoles.ignorance_savoir, "{ignorante} {instruite}");
         r.tour += 3;
-        assert!(r.vie_ia(1) < instruite, "vacances");
+        assert!(r.savoir_mois(1) < instruite, "vacances");
     }
 
     #[test]
@@ -326,19 +265,17 @@ mod essais {
         let mut p = partie(23, 1820, 0);
         p.royaumes[0].stock.insert("bois".into(), 50.0);
         p.royaumes[0].stock.insert("charbon".into(), 50.0);
-        assert_eq!(p.chauffer(40.0), Some(regles().chauffage.bonus));
+        assert_eq!(p.chauffer(0, 40.0), Some(regles().chauffage.bonus));
         assert_eq!(p.joueur().stock["bois"], 50.0);
         assert!(p.joueur().stock["charbon"] < 50.0);
-        // l'ordinateur paie son bois ; ruiné, sa garnison grelotte
+        // l'ordinateur brûle son propre bois ; sans bois, son peuple grelotte comme le nôtre
         let mut q = partie(23, 1703, 0);
-        q.royaumes[1].or = 500.0;
-        assert!(q.vie_ia(1) < 0.0 && q.royaumes[1].or < 500.0);
-        q.royaumes[1].or = 0.0;
-        let cap = q.villes[q.capitale(1).unwrap()].case;
-        let garnison = |q: &Partie| q.armees.iter().filter(|a| a.proprio == 1 && a.case == cap).map(|a| a.effectif()).sum::<u32>();
-        let avant = garnison(&q);
-        q.vie_ia(1);
-        assert!(garnison(&q) < avant, "le froid emporte des soldats");
+        q.royaumes[1].stock.insert("bois".into(), 100.0);
+        assert_eq!(q.chauffer(1, 40.0), Some(regles().chauffage.bonus));
+        assert!(q.royaumes[1].stock["bois"] < 100.0);
+        q.royaumes[1].stock.insert("bois".into(), 0.0);
+        q.fin_du_mois();
+        assert!(q.royaumes[1].detail_bonheur.iter().any(|x| x.0 == "Chauffage" && x.1 == regles().chauffage.malus), "{:?}", q.royaumes[1].detail_bonheur);
     }
 
     #[test]
@@ -384,17 +321,17 @@ mod essais {
         assert!(p.vie_ville(0).delinquance);
         p.fin_du_mois();
         assert!(p.joueur().revenus["delinquance"] > 0.0);
-        // l'ordinateur allume ses villes quand il le peut, et paie le veilleur
+        // l'ordinateur allume ses villes quand il le peut, et paie le veilleur dans son entretien
         let mut q = partie(24, 1760, 3);
         q.villes[rival].niveau = 3;
-        q.royaumes[1].or = 500.0;
+        q.royaumes[1].stock.insert("or".into(), 500.0);
         assert!(q.vie_ville(rival).delinquance);
-        q.vie_ia(1);
+        crate::ia::economie::eclairage(&mut q, 1);
         assert!(q.villes[rival].eclairage && !q.vie_ville(rival).delinquance, "le rival éclaire sa ville");
-        assert_eq!(q.royaumes[1].or, 500.0 - regles().eclairage.entretien - regles().ecoles.ia_ignorance, "il paie le veilleur (et souffre de l'ignorance, sans école)");
-        q.villes[rival].eclairage = false;
-        q.royaumes[1].or = 10.0;
-        q.vie_ia(1);
+        q.fin_du_mois();
+        assert_eq!(q.royaumes[1].revenus["eclairage"], regles().eclairage.entretien, "il paie le veilleur");
+        q.royaumes[1].stock.insert("or".into(), 10.0);
+        crate::ia::economie::eclairage(&mut q, 1);
         assert!(!q.villes[rival].eclairage && q.vie_ville(rival).delinquance, "trop pauvre : la délinquance");
     }
 }

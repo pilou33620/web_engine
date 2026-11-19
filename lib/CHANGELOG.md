@@ -3,6 +3,23 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.16.0 — 2026-11-19
+
+Plus de lumière, de vie et de règles visibles, et un réglage de qualité :
+- qualité (`scene.js`) : `qualite` (léger, normal, riche), `reglerQualite(n)`, `NIVEAUX_QUALITE`, `pres(x, z)` ; léger : sans ombres,
+  définition 1, un tiers des fumées, de la pluie, des feuilles, des poissons et des lucioles, pièces animées figées au loin ;
+  choisi par `?qualite=` dans l'adresse, sinon le dernier choix, sinon deviné (tactile, 4 cœurs ou 4 Go au plus : léger) ;
+- lumière : fin de journée plus chaude, soleil plus bas et ombres plus longues ; `foudreSur(x, y, z)` (meteo.js) : la foudre sur un point ;
+- `nuit.js` (socle) : étoiles, lune qui change de phase chaque nuit, lucioles les nuits d'été, reflet du soleil ou de la lune sur la mer,
+  lumières des villes dans les rivières ; `faune.js` (socle) : vols de migrateurs en V au printemps et à l'automne, bancs de poissons
+  près des côtes, un poisson qui saute ;
+- `chantiers.js` (moderne) : `chantierVivant(av, { w, d, haut, ancien })`, échafaudages qui montent avec les travaux, ouvriers, porteur,
+  grue (ou chèvre de levage) dont le mât s'élève ; monde.js s'en sert pour les chantiers de web_royaumes ;
+- `chroniques.js` (ancien) : `majChroniques(etat, rapport)`, incendies (flammes, fumée, braises), épidémie (croix sur les portes,
+  fumigations), famine (champs vides : `secher(3)`, file devant les greniers), feux d'artifice après une bataille gagnée (vie.js y fait
+  aussi la fête), gabares de commerce sur les rivières ;
+- plateau.js : `pointsRiviere()`, `casesBaties()`.
+
 ## 2.15.0 — 2026-11-19
 
 `rendu` est redécoupé en parties plus fines : un jeu n'installe que ce qu'il utilise (voir le tableau du README).

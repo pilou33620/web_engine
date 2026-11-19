@@ -29,8 +29,9 @@ button:focus-visible { outline: 3px solid var(--vert); outline-offset: 2px; }
 .argent.neg { color: var(--rouge); }
 
 main { position: relative; overflow: hidden; background: var(--fond); touch-action: none; min-width: 0; }
-#scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; }
-#scene.glisse { cursor: grabbing; }
+#carte { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+#carte.glisse { cursor: grabbing; }
+#eclair { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity .08s; }
 .flottant { position: absolute; z-index: 3; background: var(--fond); border: 2.5px solid var(--bord); border-radius: 16px; box-shadow: var(--ombre); }
 .temps { left: 12px; top: 12px; display: flex; gap: 3px; padding: 4px; }
 .temps button { min-width: 44px; min-height: 38px; padding: 0 6px; border: 0; border-radius: 11px; background: transparent; font: 800 13px var(--corps); cursor: pointer; display: grid; place-items: center; }

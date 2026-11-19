@@ -148,7 +148,7 @@
     {"cle": "engrais", "nom": "Révolution agricole", "annee": 1840, "cout": 320, "desc": "Fermes et champs +30 %."}
   ],
   "vision": {"ville": 2, "capitale": 3, "tour": 3, "armee": 1, "cavalerie": 2, "flotte": 2, "espion": 1, "depart": 4},
-  "marine": {"commerce_base": 10, "commerce_partenaire": 4, "commerce_distance": 0.25, "commerce_max": 35, "blocus_ia": 15, "pertes_vaincu": 0.6},
+  "marine": {"commerce_base": 10, "commerce_partenaire": 4, "commerce_distance": 0.25, "commerce_max": 35, "pertes_vaincu": 0.6},
   "espionnage": {
     "academie": 0.15, "defense": 0.003, "capture": 0.5, "relation": 15,
     "missions": [
@@ -172,9 +172,9 @@
       {"niveau": 3, "nom": "Fort à batteries", "icone": "💣", "rang": 3, "tech": "gribeauval", "cout": {"pierre": 150, "outils": 20, "or": 300}, "murs": 45, "defense": 1.75, "vision": 3, "entretien": 7, "duree": 6, "desc": "Casemates et batteries d'artillerie : la route ou la côte est verrouillée."}
     ]
   },
-  "siege": {"tranchees": 6, "artillerie": 0.5, "vauban_attaque": 1.5, "vauban_defense": 1.25, "gribeauval": 1.3, "fortif_ia": 0.5, "pillage_or": 30, "pillage_part": 0.3, "pillage_mois": 4, "vivres_base": 2, "vivres_grenier": 2, "usure_garnison": 0.05, "usure_assiegeant": 0.03, "faim": 0.15, "reddition_faim": 2},
-  "jour_marche": {"tous_les": 3, "impots": 0.05, "bonheur": 2, "bonheur_max": 6, "disette": -2, "ia_or": 5, "desc": "Tous les 3 mois (janvier, avril, juillet, octobre), chaque Halle du marché anime sa ville : +5 % d'impôts et +2 de bonheur. Pas de marché dans une ville assiégée ou bloquée ; en disette, le marché est déserté (−2 de bonheur)."},
-  "ecoles": {"ete": 0.5, "ateliers": 0.02, "ateliers_max": 0.1, "ignorance_rang": 3, "ignorance_savoir": 3, "ignorance_bonheur": 1, "ia_or": 2, "ia_ignorance": 6, "desc": "L'été (vacances et moissons), une école ne rapporte que la moitié de son savoir. Chaque école en activité augmente de 2 % la production des ateliers de sa ville (10 % au plus). Au Siècle des Lumières, un Bourg sans école souffre de l'ignorance : −3 savoir et −1 de bonheur par mois."},
+  "siege": {"tranchees": 6, "artillerie": 0.5, "vauban_attaque": 1.5, "vauban_defense": 1.25, "gribeauval": 1.3, "pillage_or": 30, "pillage_part": 0.3, "pillage_mois": 4, "vivres_base": 2, "vivres_grenier": 2, "usure_garnison": 0.05, "usure_assiegeant": 0.03, "faim": 0.15, "reddition_faim": 2},
+  "jour_marche": {"tous_les": 3, "impots": 0.05, "bonheur": 2, "bonheur_max": 6, "disette": -2, "desc": "Tous les 3 mois (janvier, avril, juillet, octobre), chaque Halle du marché anime sa ville : +5 % d'impôts et +2 de bonheur. Pas de marché dans une ville assiégée ou bloquée ; en disette, le marché est déserté (−2 de bonheur)."},
+  "ecoles": {"ete": 0.5, "ateliers": 0.02, "ateliers_max": 0.1, "ignorance_rang": 3, "ignorance_savoir": 3, "ignorance_bonheur": 1, "desc": "L'été (vacances et moissons), une école ne rapporte que la moitié de son savoir. Chaque école en activité augmente de 2 % la production des ateliers de sa ville (10 % au plus). Au Siècle des Lumières, un Bourg sans école souffre de l'ignorance : −3 savoir et −1 de bonheur par mois."},
   "chauffage": {"par_habitant": 0.05, "grand_froid": 1.5, "seuil_froid": 0, "charbon": 2, "malus": -5, "pertes": 0.02, "reserve": 2, "bonus": 1, "desc": "L'hiver (et par grand froid), les foyers brûlent 0,05 bois par habitant et par mois, ×1,5 sous la neige ou le gel. À l'ère industrielle, le charbon chauffe d'abord (1 charbon vaut 2 bois). Sans assez de combustible : −5 de bonheur et 2 % des habitants emportés ; avec deux mois de réserve, +1 de bonheur."},
   "eclairage": {"rang": 2, "entretien": 6, "incendie": 0.5, "bonheur": 1, "bonheur_max": 3, "delinquance_rang": 3, "delinquance": 0.05, "desc": "Avec l'Encyclopédie ou au Siècle des Lumières, un Village ou plus peut allumer des réverbères et payer un veilleur de nuit : 6 🪙 par mois, incendies deux fois moins fréquents, +1 de bonheur. Au Siècle des Lumières, un Bourg sans éclairage souffre de la délinquance : −5 % d'impôts."},
   "evenements_choix": [

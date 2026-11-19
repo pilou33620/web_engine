@@ -1,18 +1,19 @@
 // Royaumes des Rives : démarrage, écran d'accueil (réglage de la carte avec aperçu 3D), boucle des tours.
 import { api } from './api.js';
-import { renderer, cam, viser, surTap, surClicDroit, posCase, chaqueImage, scene, voisins } from '../graphismes/royaumes/scene.js';
-import * as plateau from '../graphismes/royaumes/plateau.js';
-import { initMonde, synchroniser, jouerMois, selectionnerArmee } from '../graphismes/royaumes/monde.js';
-import { majVie } from '../graphismes/royaumes/vie.js';
-import { majQuartiers } from '../graphismes/royaumes/quartiers.js';
-import { selectionnerFort } from '../graphismes/royaumes/forts.js';
-import { majBrouillard, jouerMoisBrouillard } from '../graphismes/royaumes/brouillard.js';
-import { majMarine, jouerMoisMarine } from '../graphismes/royaumes/marine.js';
-import { majEspions, jouerMoisEspions } from '../graphismes/royaumes/espions.js';
-import { appliquerMeteo } from '../graphismes/royaumes/meteo.js';
-import { majRoutes, effacerRoutes, niveauRoutes } from '../graphismes/royaumes/routes.js';
-import { toutEffacer, effet } from '../graphismes/royaumes/etiquettes.js';
+import { renderer, cam, viser, surTap, surClicDroit, posCase, chaqueImage, scene, voisins } from '../graphismes/rendu/scene.js';
+import * as plateau from '../graphismes/rendu/plateau.js';
+import { initMonde, synchroniser, jouerMois, selectionnerArmee } from '../graphismes/rendu/monde.js';
+import { majVie } from '../graphismes/rendu/vie.js';
+import { majQuartiers } from '../graphismes/rendu/quartiers.js';
+import { selectionnerFort } from '../graphismes/rendu/forts.js';
+import { majBrouillard, jouerMoisBrouillard } from '../graphismes/rendu/brouillard.js';
+import { majMarine, jouerMoisMarine } from '../graphismes/rendu/marine.js';
+import { majEspions, jouerMoisEspions } from '../graphismes/rendu/espions.js';
+import { appliquerMeteo } from '../graphismes/rendu/meteo.js';
+import { majRoutes, effacerRoutes, niveauRoutes } from '../graphismes/rendu/routes.js';
+import { toutEffacer, effet } from '../graphismes/rendu/etiquettes.js';
 import * as ui from './ui.js';
+import './bivouacs.js'; // armées au repos la nuit : le bivouac de web_engine 2.12
 
 const $ = s => document.querySelector(s);
 const J = { R: null, carte: null, etat: null, info: null, mode: null, ombres: true, occupe: false, versionCarte: -1 };
@@ -142,13 +143,18 @@ async function finTour() {
 
 async function propositions() {
   if (J.etat.fin && !J.etat.sans_victoire) return;
-  for (const p of (J.etat.propositions || []).slice()) {
+  // un refus peut amener une contre-proposition : on la présente à son tour
+  const vues = new Set();
+  let p;
+  while ((p = (J.etat.propositions || []).find(x => !vues.has(x.id)))) {
+    vues.add(p.id);
     const qui = p.de > 0 ? J.etat.royaumes.find(r => r.id === p.de) : null;
-    const titre = { echange: '⚖️ Proposition commerciale', alliance: '🤝 Proposition d\'alliance', paix: '🕊️ Proposition de paix', tribut: '💰 Ultimatum', marchand: '🧳 Un colporteur' }[p.genre] || 'Proposition';
+    const titre = p.manche ? '↩️ Contre-proposition' : { echange: '⚖️ Proposition commerciale', alliance: '🤝 Proposition d\'alliance', paix: '🕊️ Proposition de paix', tribut: '💰 Ultimatum', marchand: '🧳 Un colporteur', aide: '🆘 Un allié appelle à l\'aide' }[p.genre] || 'Proposition';
     const oui = await ui.modale(titre, `<p>${qui ? `<span class="pastille" style="--c:${qui.couleur}"></span>` : ''}${p.texte.replace(/[<>]/g, '')}</p>`, [
-      { l: p.genre === 'tribut' ? 'Payer' : 'Accepter', c: 'vert', v: true },
+      { l: p.genre === 'tribut' ? 'Payer' : p.genre === 'aide' ? '⚔️ Entrer en guerre' : 'Accepter', c: 'vert', v: true },
       { l: p.genre === 'tribut' ? 'Refuser' : 'Décliner', c: p.genre === 'tribut' ? 'rouge' : 'b2', v: false },
     ]);
+    if (!(J.etat.propositions || []).some(x => x.id === p.id)) continue; // déjà réglée depuis le panneau Diplomatie
     const r = await cmd({ action: 'repondre', proposition: p.id, accepte: oui });
     if (r.msg) ui.annonce(r.msg, r.ok ? 'bon' : 'guerre');
   }

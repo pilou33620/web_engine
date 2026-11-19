@@ -47,9 +47,13 @@ qui s'ouvre dans le navigateur, comme web_conquete.
 - **55 bâtiments** en 7 familles (habitat, ressources, artisanat, commerce, services, militaire, expansion),
   **10 unités** (milice, mousquetaires, grenadiers, fusiliers, chasseurs, dragons, hussards, cuirassiers, canons),
   chaînes de production, ouvriers, bonheur détaillé, impôts, rangs de ville (Hameau → Cité), colonies.
-- **Rivaux** au caractère belliqueux, marchand ou bâtisseur : relations, cadeaux, routes commerciales, marché
-  (achat et vente selon leurs surplus et leurs besoins), alliances, tributs, guerres, propositions et ultimatums.
-  Brigands en prime.
+- **Rivaux qui jouent avec les mêmes règles que vous** : stocks, production, ouvriers, population, bonheur, famine,
+  froid et recherche ; ils construisent selon leurs besoins et au bon endroit. Au combat, ils jugent les forces avant
+  d'attaquer, rassemblent leurs armées, défendent et secourent leurs villes, se replient, débarquent escortés et
+  bloquent les ports. Leurs souverains (conquérant, marchand, bâtisseur, prudent, opportuniste, fourbe) meurent ou
+  sont renversés ; les rivaux se font la guerre entre eux, s'allient, se prennent des villes et se liguent contre le
+  royaume trop puissant ; ils négocient (contre-propositions, paix contre une ville, demandes d'aide) et gardent
+  rancune. La difficulté les rend plus malins, pas plus riches. Brigands en prime.
 - **Brouillard de guerre** : terres inconnues sous la brume, terres connues mais hors de vue voilées (dernier état
   connu) ; la brume se lève au passage des armées, flottes, espions et forts.
 - **Marine** : flûtes, corvettes, frégates, vaisseaux de ligne et navires à vapeur, recrutés au port. Les armées ne
@@ -62,7 +66,10 @@ qui s'ouvre dans le navigateur, comme web_conquete.
 - **Retranchements et forts** : une armée se retranche en un mois, ou bâtit un fort améliorable (redoute, fort
   bastionné, fort à batteries) qui protège, voit loin et peut être pris.
 - **Événements à choix** tous les trois ou quatre mois (inventeur, philosophe, disette, déserteur…).
-- Les rivaux utilisent tout cela : flottes, espions, fortifications, forts, sièges et pillages.
+- Les rivaux utilisent tout cela : flottes, espions, fortifications, forts, sièges et pillages. Ils vivent la même
+  économie que vous (réserves, ouvriers, population, bonheur, famine, froid, recherche) et jouent avec les mêmes ordres ;
+  la difficulté règle la qualité de leurs décisions (erreurs, lenteur, prévoyance), sans leur donner de ressources
+  (seul le niveau Difficile garde +10 % de production).
 - **Victoires** : conquête, prospérité (Cité + Palais royal + 400 habitants), diplomatie (alliance avec tous),
   ou meilleur royaume en décembre 1850.
 
@@ -114,14 +121,16 @@ rust/royaumes/        le moteur et le serveur (Rust)
   src/partie.rs       état de la partie, territoire, construction, armées, chemins
   src/tour.rs         la fin du mois (économie, marches, batailles, événements, victoire)
   src/cite.rs         la vie des villes : jour de marché, écoles, chauffage, éclairage public
-  src/ia.rs           les royaumes de l'ordinateur
+  src/ia/             les royaumes de l'ordinateur : mod.rs (le mois, la difficulté), economie.rs (besoins et
+                      décisions économiques), militaire.rs (défense, campagnes, sièges, marine, espions, forts),
+                      diplomatie.rs (relations entre tous les royaumes, souverains, coalitions, guerres et paix)
   src/commandes.rs    les ordres du joueur (vérifiés par le moteur)
   src/marine.rs, espions.rs, sieges.rs, forts.rs, choix.rs   flottes, espionnage, sièges et fortifications,
                       retranchements et forts, événements à choix
   src/vue.rs          ce que reçoit l'interface
   src/serveur.rs      serveur HTTP (web_tools_commun), sauvegardes, options, mise à jour
 web/                  l'interface (index.html, css/, js/) ; images, icônes et rendu : graphismes/
-  graphismes/         la bibliothèque graphique commune web_engine (three.js r186 ; royaumes/ : plateau 3D, modèles, images, icônes,
+  graphismes/         la bibliothèque graphique commune web_engine (three.js r186 ; rendu/ : tous les rendus, plateau 3D, modèles, images, icônes,
                       routes, vie de la carte, météo, étiquettes, brouillard, marine, espions, remparts, sièges, forts).
                       NE PAS MODIFIER ICI : les graphismes se modifient dans web_engine (lib/), puis
                       `bash outils/maj-graphismes.sh` ; la CI vérifie que ce dossier est identique à web_engine
@@ -130,5 +139,6 @@ maquettes/            maquettes 3D validées avant intégration (rendu, armées,
 tests/navigateur.py   banc d'essai de l'interface dans Chrome (Playwright)
 ```
 
-Bancs d'essai : `cargo test -p royaumes` (dont une campagne de dix ans jouée par un robot et la relecture d'une
-sauvegarde). Interface : serveur lancé, puis `python3 tests/navigateur.py`.
+Bancs d'essai : `cargo test -p royaumes` (dont une campagne de dix ans jouée par un robot, dix ans de rivaux laissés
+seuls aux trois difficultés et la relecture d'une sauvegarde). Interface : serveur lancé, puis
+`python3 tests/navigateur.py`.

@@ -1,6 +1,6 @@
 "use strict";
 // ============================================================ panneaux
-const TITRES = { dechets: 'Gestion des déchets', eau: 'Gestion de l’eau', accueil: 'Région de Valmont', dispatch: 'Dispatch Desk', construire: 'Construire', reseau: 'Réseau', meteo: 'Météo et prévisions', economie: 'Économie', rd: 'Recherche et développement', journal: 'Journal', hex: 'Hexagone' };
+const TITRES = { dechets: 'Gestion des déchets', eau: 'Gestion de l’eau', accueil: 'Région de Valmont', dispatch: 'Dispatching électrique', construire: 'Construire', reseau: 'Réseau', meteo: 'Météo et prévisions', economie: 'Économie', rd: 'Recherche et développement', journal: 'Journal', hex: 'Hexagone' };
 function kpi(k, v, unite, part, couleur) { return `<div class="kpi"><span class="k">${k}</span><span class="v">${v} <small>${unite}</small></span><div class="jauge"><i style="width:${clamp(part, 0, 1) * 100}%;background:${couleur}"></i></div></div>`; }
 function etatFreq(f) { return f < 49 ? ['Critique · délestage', '#ff6b5a', 'critique'] : f < 49.5 || f > 50.5 ? ['Dégradé', '#ff9a4a', 'critique'] : f < 49.8 || f > 50.2 ? ['Alerte', '#ffc94d', 'alerte'] : ['Normal', '#7be08a', '']; }
 const OBJ = [
@@ -416,7 +416,11 @@ function graphes() {
     const xn = x0 + (H0.length - 1) * sx; c.setLineDash([4, 4]); c.beginPath();
     for (let k = 0; k <= 48; k++) c.lineTo(xn + k * sx, y0 - demande(S.min + k * 15).tot * 1.03 * sy); c.stroke();
     c.strokeStyle = '#ffc94d'; c.beginPath(); c.moveTo(xn, 6); c.lineTo(xn, y0); c.stroke(); c.setLineDash([]);
-    c.fillStyle = '#ffc94d'; c.fillText('maintenant', xn - 26, y0 + 14); c.fillStyle = '#a9b39a'; c.fillText('−24 h', x0, y0 + 14); c.fillText('prévision +12 h', w - 84, y0 + 14);
+    // les libellés de l'axe ne se chevauchent pas : « −24 h » et « prévision » s'effacent devant « maintenant »
+    const lm = c.measureText('maintenant').width, lp = c.measureText('prévision +12 h').width, xm = clamp(xn - lm / 2, x0, w - 8 - lm);
+    c.fillStyle = '#ffc94d'; c.fillText('maintenant', xm, y0 + 14); c.fillStyle = '#a9b39a';
+    if (xm > x0 + c.measureText('−24 h').width + 8) c.fillText('−24 h', x0, y0 + 14);
+    if (xm + lm + 8 < w - 8 - lp) c.fillText('prévision +12 h', w - 8 - lp, y0 + 14);
   }
   p = prep('g-freq');
   if (p) {

@@ -1,5 +1,6 @@
 {
-  "version": "1.0.0",
-  "commit": "cfa286341d266677922f2aa414be3310989afdd4",
+  "version": "2.15.0",
+  "commit": "125aa1568983242602e5a39ab0f6035e63bb699b",
+  "parties": "moderne socle three",
   "depot": "https://github.com/pilou33620/web_engine"
 }

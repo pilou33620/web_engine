@@ -2,24 +2,29 @@
 // en parallèle dans Chromium sans affichage, puis écrit banc-resultats.json et banc-rapport.md.
 // Usage : node banc/banc.js [url-de-la-page-du-jeu, par défaut ../index.html] [cartes=valmont,littoral,...] [diffs=facile,normal,difficile] [strats=passif,fossile,vert] [paralleles=4] [graine=1001] [sortie=banc]
 // Cartes : valmont, littoral, plaine, ile, industrie, marche, aleatoire. Prérequis : npm i playwright && npx playwright install chromium.
-// THREE_LOCAL=/chemin/vers/three/ sert three.js depuis le disque quand le CDN est inaccessible.
+// Sans URL, le banc sert lui-même le dépôt (le moteur graphique est en modules, refusés en file://).
 const { chromium } = require('playwright');
-const ARGS = process.env.THREE_LOCAL ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : [];
+const ARGS = ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'];  // WebGL logiciel : marche sans carte graphique
 const fs = require('fs');
 const path = require('path');
-const { pathToFileURL } = require('url');
+const http = require('http');
 const arg = (k, d) => (process.argv.find(a => a.startsWith(k + '=')) || '').split('=')[1] || d;
-const URL = process.argv[2] && !process.argv[2].includes('=') ? process.argv[2] : pathToFileURL(path.join(__dirname, '..', 'index.html')).href;
+const URL0 = process.argv[2] && !process.argv[2].includes('=') ? process.argv[2] : null;
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
+/** Sert le dépôt sur un port libre (seulement si aucune URL n'est donnée) et rend l'adresse de la page. */
+const servir = () => new Promise(ok => {
+  const racine = path.join(__dirname, '..'), srv = http.createServer((q, r) => { const f = path.join(racine, decodeURIComponent(q.url.split('?')[0])); if (!f.startsWith(racine)) { r.writeHead(403); r.end(); return; } fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); r.end(); return; } r.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' }); r.end(d); }); });
+  srv.listen(0, '127.0.0.1', () => { srv.unref(); ok(`http://127.0.0.1:${srv.address().port}/index.html`); });
+});
 const cartes = arg('cartes', 'valmont,littoral,plaine,ile,industrie,marche,aleatoire').split(','), diffs = arg('diffs', 'normal').split(','), strats = arg('strats', 'passif,fossile,vert').split(',');
 const N = +arg('paralleles', 4), sortie = arg('sortie', 'banc');
 (async () => {
+  const URL = URL0 || await servir();
   const b = await chromium.launch({ args: ARGS });
-  const V = process.env.THREE_LOCAL;
   const runs = []; for (const c of cartes) for (const d of diffs) for (const s of strats) runs.push([c, d, s, c === 'aleatoire' ? +arg('graine', 1001) : undefined]);
   const res = []; let i = 0; const t0 = Date.now();
   async function ouvrier(n) {
     const p = await b.newPage({ viewport: { width: 400, height: 300 } });
-    if (V) await p.route(/cdn.jsdelivr.net/, r => { const u = r.request().url(); const f = u.includes('/build/') ? V + 'build/' + u.split('/build/')[1] : V + 'addons/' + u.split('/examples/jsm/')[1]; r.fulfill({ path: f, contentType: 'application/javascript' }); });
     p.on('pageerror', e => console.log(`[${n}] ERREUR`, e.message));
     await p.goto(URL); await p.waitForFunction(() => window.GM && GM.bancPartie, null, { timeout: 60000 });
     while (i < runs.length) {

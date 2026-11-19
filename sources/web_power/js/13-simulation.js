@@ -59,7 +59,8 @@ function minuit(m) {
   S.hopPen = hopPen;
   if (S.crise) { const c = coutCrise() / 365; S.argent -= c; S.jour.opex += c; S.an.opex += c; }
   const d0 = date(m); if (d0.getUTCMonth() === 2 && d0.getUTCDate() === 1 && annee(m) >= (S.mandat?.fin ?? 1902)) elections(m);
-  const cible = 80 - hopPen - Math.min(70, S.an.coupure * .25 * exigence) - Math.max(0, S.tarif.res - 170) * .7 - Math.max(0, S.tarif.ter - 150) * .3 - Math.min(20, charbon * 3) - S.nimby + (S.an.bas / Math.max(1, S.an.e)) * 8 - eauPen - S.dec.pen;
+  // au début du siècle, un village sans courant fâche mais ne fait pas révoquer : la pénalité plafonne à 35 points avant 1935
+  const cible = 80 - hopPen - Math.min(70 * Math.max(.5, exigence), S.an.coupure * .25 * exigence) - Math.max(0, S.tarif.res - 170) * .7 - Math.max(0, S.tarif.ter - 150) * .3 - Math.min(20, charbon * 3) - S.nimby + (S.an.bas / Math.max(1, S.an.e)) * 8 - eauPen - S.dec.pen;
   S.eauPen = eauPen;
   S.sat = clamp(S.sat + (cible - S.sat) * .03, 0, 100); S.nimby *= .985;
   // recherche
@@ -97,10 +98,17 @@ function evenement(k) {
 function finEvt(k) { log({ tempete: 'Fin de la tempête : les éoliennes redémarrent.', froid: 'Fin de la vague de froid.', canicule: 'Fin de la canicule.', secheresse: 'Fin de la sécheresse : la rivière retrouve son débit.', gaz: 'Le prix du gaz redescend.', cyber: 'Supervision rétablie après la cyberattaque.' }[k] || '', 'bon'); }
 const NOM_EVT = { tempete: 'Tempête', froid: 'Grand froid', canicule: 'Canicule', secheresse: 'Sécheresse', gaz: 'Gaz cher', cyber: 'Cyberattaque' };
 
+// taux simplifiés de l'impôt sur les bénéfices en France : 1917, 1948, 1986, 1993, 2022
+const IMPOT = [[1917, .15], [1948, .5], [1986, .42], [1993, .333], [2022, .25]], DIVIDENDE = .5;
+const tauxImpot = a => [...IMPOT].reverse().find(([an]) => a >= an)?.[1] ?? 0;
 function nouvelAn(m) {
   const an = annee(m) - 1, a = S.an, e = Math.max(1, a.e);
-  const res = a.ventes + a.exp - a.comb - a.carbone - a.imp - a.opex - a.rd - a.prets - a.amendes;
-  const r = { an, co2: a.co2 / e, bas: a.bas / e * 100, ren: a.ren / e * 100, coupure: a.coupure, res, capex: a.capex, sat: S.sat, pointe: a.pointe, e: a.e, ...statsAnEau(a), ...statsAnDec(a) };
+  const brut = a.ventes + a.exp - a.comb - a.carbone - a.imp - a.opex - a.rd - a.prets - a.amendes;
+  // impôt sur les bénéfices, puis dividende à l'État actionnaire après 1946 : les investissements de l'année sont déduits, l'argent qui dort est prélevé
+  const base = Math.max(0, brut - a.capex), is = base * tauxImpot(an), impot = is + (an >= 1946 ? (base - is) * DIVIDENDE : 0), res = brut - impot;
+  S.argent -= impot;
+  if (impot > 0) log(`Bilan ${an} : ${nf(impot / 1e6, 1)} M€ d’impôt sur les bénéfices (${nf(tauxImpot(an) * 100)} %)${an >= 1946 ? ` et de dividende à l’État (${nf(DIVIDENDE * 100)} % du reste)` : ''}. Les investissements de l’année sont déduits.`);
+  const r = { an, co2: a.co2 / e, bas: a.bas / e * 100, ren: a.ren / e * 100, coupure: a.coupure, res, impot, capex: a.capex, sat: S.sat, pointe: a.pointe, e: a.e, ...statsAnEau(a), ...statsAnDec(a) };
   S.rapports.push(r); S.anPrec = { ...a }; S.an = nouveauCumul();
   const nv = an + 1;
   // les villes grandissent, de nouveaux villages apparaissent
@@ -153,7 +161,7 @@ function croissanceVille(v, r) {
   }
 }
 function ajouterQuartier(v, t, type, anim) {
-  retirerFerme(t); Object.assign(t, { ville: v, quartier: type, t: 'ville' }); t.top = Math.max(t.top, TERR.ville.h); v.tuiles.push(t); v.hab = habVille(v);
+  retirerFerme(t); Object.assign(t, { ville: v, quartier: type, t: 'ville' }); t.top = TERR.ville.h; v.tuiles.push(t); v.hab = habVille(v);
   dessinerQuartier(t, anim); dessinerFrontieres(); majAcceptation(); dessinerMini(); EAU_SALE = true;
   if (v.tuiles.length === 1 && !BANC_ON) dessinerRoutes(); else if (!BANC_ON) majAmbiance();
 }

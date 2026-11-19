@@ -8,6 +8,13 @@ pub struct Hasard {
     pub etat: u64,
 }
 
+/// Pour les champs ajoutés aux sauvegardes (`#[serde(default)]`) : la graine est fixée à la mise en place.
+impl Default for Hasard {
+    fn default() -> Self {
+        Hasard::new(0)
+    }
+}
+
 impl Hasard {
     pub fn new(graine: u64) -> Self {
         let mut h = Hasard { etat: graine ^ 0x9E37_79B9_7F4A_7C15 };

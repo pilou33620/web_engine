@@ -12,11 +12,11 @@ impl Partie {
         let r = &self.royaumes[id as usize];
         match si {
             "" => true,
-            "vivres_bas" => id == 0 && regles().vivres.iter().map(|v| r.stock.get(v).copied().unwrap_or(0.0)).sum::<f64>() < r.pop as f64 * 0.6,
+            "vivres_bas" => regles().vivres.iter().map(|v| r.stock.get(v).copied().unwrap_or(0.0)).sum::<f64>() < r.pop as f64 * 0.6,
             "guerre" if id == 0 => self.royaumes.iter().any(|x| !x.joueur && x.vivant && x.statut == "guerre"),
-            "guerre" => r.statut == "guerre",
+            "guerre" => !crate::ia::diplomatie::ennemis(self, id).is_empty(),
             "paix" if id == 0 => self.royaumes.iter().any(|x| !x.joueur && x.vivant && x.statut != "guerre"),
-            "paix" => r.statut != "guerre",
+            "paix" => crate::ia::diplomatie::ennemis(self, id).is_empty(),
             "port" => self.a_batiment(id, "port"),
             "eglise" => self.a_batiment(id, "eglise") || self.a_batiment(id, "cathedrale"),
             _ => false,
@@ -78,11 +78,11 @@ impl Partie {
         let i = self.choix.iter().position(|c| c.id == id).ok_or("événement inconnu")?;
         let d = regles().evenements_choix.iter().find(|x| x.cle == self.choix[i].cle).ok_or("événement inconnu")?;
         let o = d.options.get(option).ok_or("option inconnue")?;
-        if !self.peut_payer(&o.cout, 1.0) {
+        if !self.peut_payer(0, &o.cout) {
             return Err("Vous n'avez pas de quoi payer".into());
         }
         let c = self.choix.remove(i);
-        self.payer(&o.cout, 1.0);
+        self.payer(0, &o.cout);
         let echec = o.risque > 0.0 && self.hasard.p(o.risque);
         let mut recit = self.appliquer_effets(0, if echec { &o.echec } else { &o.effets }, c.royaume);
         if !echec {
@@ -105,14 +105,13 @@ impl Partie {
         Ok(texte)
     }
 
-    /// L'ordinateur choisit au hasard parmi ce qu'il peut payer (les ressources se paient en or).
+    /// L'ordinateur choisit au hasard parmi ce qu'il peut payer dans ses réserves.
     fn choix_ia(&mut self, k: usize, d: &DefChoix) {
-        let rg = regles();
-        let prix = |c: &Panier| -> f64 { c.iter().map(|(r, v)| if r == "or" { *v } else { v * rg.prix.get(r).copied().unwrap_or(1.0) }).sum() };
-        let possibles: Vec<usize> = (0..d.options.len()).filter(|&i| prix(&d.options[i].cout) <= self.royaumes[k].or).collect();
+        let id = k as i32;
+        let possibles: Vec<usize> = (0..d.options.len()).filter(|&i| self.peut_payer(id, &d.options[i].cout)).collect();
         let Some(&i) = self.hasard.choix(&possibles) else { return };
         let o = &d.options[i];
-        self.royaumes[k].or -= prix(&o.cout);
+        self.payer(id, &o.cout);
         let echec = o.risque > 0.0 && self.hasard.p(o.risque);
         self.appliquer_effets(k as i32, if echec { &o.echec } else { &o.effets }, None);
         if !echec {
@@ -125,12 +124,13 @@ impl Partie {
         }
     }
 
-    /// Applique des effets à `id` ; rend leur description. L'ordinateur, à l'économie résumée,
-    /// ne garde que l'or (les ressources gagnées valent la moitié de leur prix), les techs et les unités.
+    /// Applique des effets à `id` ; rend leur description. La relation est celle du joueur avec les rivaux :
+    /// un rival n'en tient pas compte.
     fn appliquer_effets(&mut self, id: i32, effets: &Panier, royaume: Option<usize>) -> Vec<String> {
         let rg = regles();
         let mut recit = Vec::new();
-        let s = self.stats(0);
+        let s = self.stats(id);
+        let k = id as usize;
         for (cle, &v) in effets {
             let signe = if v >= 0.0 { "+" } else { "" };
             match cle.as_str() {
@@ -157,29 +157,22 @@ impl Partie {
                         recit.push(format!("⛏️ gisement {g}"));
                     }
                 }
-                _ if id != 0 => {
-                    let r = &mut self.royaumes[id as usize];
-                    if cle == "or" {
-                        r.or = (r.or + v).max(0.0);
-                    } else if v > 0.0 && rg.prix.contains_key(cle) {
-                        r.or += v * rg.prix[cle] * 0.5;
-                    }
-                }
                 "bonheur" => {
-                    let j = &mut self.royaumes[0];
+                    let j = &mut self.royaumes[k];
                     j.bonheur = (j.bonheur + v).clamp(0.0, 100.0);
                     recit.push(format!("{signe}{v} bonheur"));
                 }
                 "savoir" => {
-                    let j = &mut self.royaumes[0];
+                    let j = &mut self.royaumes[k];
                     j.savoir = (j.savoir + v).max(0.0);
                     recit.push(format!("{signe}{v} savoir"));
                 }
                 "pop" => {
-                    let j = &mut self.royaumes[0];
+                    let j = &mut self.royaumes[k];
                     j.pop = (j.pop + v as i64).max(1);
                     recit.push(format!("{signe}{v} habitants"));
                 }
+                "relation" if id != 0 => {}
                 "relation" => {
                     for r in self.royaumes.iter_mut().filter(|r| !r.joueur && r.vivant && royaume.map_or(true, |k| k == r.id)) {
                         r.relation = (r.relation + v).clamp(-100.0, 100.0);
@@ -189,7 +182,7 @@ impl Partie {
                 }
                 r => {
                     let cap = self.capacite(&s, r);
-                    let x = self.royaumes[0].stock.entry(r.into()).or_insert(0.0);
+                    let x = self.royaumes[k].stock.entry(r.into()).or_insert(0.0);
                     *x = (*x + v).clamp(0.0, cap.max(*x));
                     recit.push(format!("{signe}{v} {}", rg.res_icone(r)));
                 }
