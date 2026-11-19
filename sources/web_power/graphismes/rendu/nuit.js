@@ -1,6 +1,7 @@
 // La nuit et l'eau qui brille, toutes automatiques (elles suivent climat, posé par meteo.js) :
 // étoiles et lune (qui change de phase d'une nuit à l'autre) ; lucioles les nuits d'été près des bois et des prés ;
-// reflet du soleil (le jour) ou de la lune (la nuit) sur la mer, face au regard ; lumières des villes dans les rivières la nuit.
+// reflet du soleil (le jour) ou de la lune (la nuit) sur la mer, face au regard ; lumières des villes dans les rivières la nuit ;
+// taches de lumière au sol sous les lanternes et devant les phares (lueur()) ; halo orangé au-dessus des grandes villes.
 import { THREE, scene, chaqueImage, hache, cam, camera, posCase, qualite } from './scene.js';
 import { carte, hauteur, hauteurEn, TERRE, pointsRiviere, casesBaties } from './plateau.js';
 import { climat } from './vie.js';
@@ -51,6 +52,27 @@ function poserLueurs() {
     if (!pres) continue;
     pts.forEach(([x, z], k) => { if (k % 2 === 0 && lueurs.length < NV) lueurs.push({ x, z, y: hauteur(i) + 0.016, ph: hache(i, k, 95) * 6, s: 0.05 + hache(i, k, 96) * 0.05 }); });
   }
+}
+
+// ------------------------------------------------------------------ taches de lumière au sol : demandées à chaque image par lueur()
+const NG = 400, M_LUEUR = additif(0xffc870, 0.5); M_LUEUR.map = TACHE;
+const LUEURS = inst(plat(), M_LUEUR, NG);
+let aPoser = [];
+/** Une tache de lumière au sol cette image-ci (repère du plateau) : sous une lanterne allumée, devant les phares d'une voiture.
+ *  r : son rayon ; allongement : étirée vers cap (radians, 0 = +x), pour un faisceau de phares. */
+export function lueur(x, y, z, r = 0.1, allongement = 1, cap = 0) { if (aPoser.length < NG) aPoser.push(x, y, z, r, allongement, cap); }
+
+// ------------------------------------------------------------------ halo orangé au-dessus des grandes villes, la nuit
+const M_HALO = new THREE.SpriteMaterial({ map: TACHE, color: 0xff9a40, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+let halos = [], sigHalos = '';
+function poserHalos() {  // le centre des amas de cases bâties (au moins 6 cases bâties à moins de deux cases)
+  for (const h of halos) scene.remove(h.s); halos = [];
+  const B = [...(casesBaties() || [])].map(i => posCase(i)), pris = [];
+  for (const a of B) {
+    const n = B.filter(b => (b.x - a.x) ** 2 + (b.z - a.z) ** 2 < 4).length;
+    if (n >= 6 && !pris.some(p => (p.x - a.x) ** 2 + (p.z - a.z) ** 2 < 9)) pris.push({ ...a, n });
+  }
+  for (const p of pris) { const s = new THREE.Sprite(M_HALO); s.position.set(p.x, 0.9, p.z); s.scale.setScalar(1.2 + Math.min(4, p.n * 0.25)); s.renderOrder = 4; scene.add(s); halos.push({ s }); }
 }
 
 // ------------------------------------------------------------------ lucioles : les nuits d'été, près des bois et des prés
@@ -108,6 +130,17 @@ chaqueImage((dt, t) => {
     VILLES.setMatrixAt(nv++, _m.compose(_p.set(l.x, l.y, l.z), _q.identity(), _s.set(s * 0.6, 1, s * 1.8)));
   }
   M_VILLE.opacity = 0.6 * nuit; VILLES.count = nv; VILLES.instanceMatrix.needsUpdate = true;
+  // taches de lumière demandées depuis l'image précédente
+  let ng = 0;
+  for (let k = 0; k < aPoser.length && nuit > 0.2; k += 6) {
+    const [x, y, z, r, al, cap] = aPoser.slice(k, k + 6);
+    LUEURS.setMatrixAt(ng++, _m.compose(_p.set(x, y, z), _q.setFromAxisAngle(_v.set(0, 1, 0), cap), _s.set(r * al, 1, r)));
+  }
+  aPoser = []; M_LUEUR.opacity = 0.55 * nuit; LUEURS.count = ng; LUEURS.instanceMatrix.needsUpdate = true;
+  // halos des grandes villes
+  const sigH = casesBaties()?.size || 0;
+  if (sigH !== sigHalos) { sigHalos = sigH; poserHalos(); }
+  M_HALO.opacity = 0.35 * nuit * (1 - couvert * 0.4);
   // lucioles
   let nl = 0;
   if (climat.saison === 2 && nuit > 0.5 && !climat.pluie) for (let k = 0; k < NL * Math.min(1, qualite.part); k++) {

@@ -4,9 +4,9 @@
 // (dessiner les chemins de terre avec MAT_TERRE, les routes pavées ou goudronnées avec MAT_PAVE, puis flaques()).
 // Aussi : la crue des rivières après une forte pluie (eau trouble qui recouvre les berges), l'eau sale (climat.eauSale,
 // posé par le jeu), l'arc-en-ciel juste après l'averse (climat.apresPluie), et les traces de boue des armées (trace()).
-import { THREE, scene, chaqueImage, hache } from './scene.js';
+import { THREE, scene, chaqueImage, hache, pres, qualite } from './scene.js';
 import { MAT, toon } from './toon.js';
-import { climat } from './vie.js';
+import { climat, bouffee } from './vie.js';
 import { MAT_SOL, MAT_BERGE, teinterRivieres } from './plateau.js';
 
 /** L'humidité des routes, de 0 (sèches) à 1 (détrempées). */
@@ -83,5 +83,10 @@ chaqueImage((dt, t) => {
     }
     mesh.count = n; mesh.instanceMatrix.needsUpdate = true;
     ronds.count = nr; ronds.instanceMatrix.needsUpdate = true;
+  }
+  // poussière : routes sèches, vent fort ou sécheresse, hors de l'hiver ; une bouffée de temps en temps près du regard
+  if (h < 0.05 && !pluie && (climat.vent > 0.7 || climat.sec) && climat.saison !== 0 && FLAQUES.length && Math.random() < dt * 4 * qualite.part) {
+    const F = FLAQUES[Math.random() * FLAQUES.length | 0], q = F.pts[Math.random() * F.pts.length | 0];
+    if (q) { _p.set(q[0], q[1], q[2]).applyMatrix4(F.mesh.matrixWorld); if (pres(_p.x, _p.z)) bouffee(_p.x, _p.y + 0.01, _p.z, 'poussiere', 0.5); }
   }
 });

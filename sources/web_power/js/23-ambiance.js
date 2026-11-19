@@ -46,6 +46,12 @@ function dessinerRoutes() {
   if (LT.g.length) fige(LT, ROUTES, B.MAT_TERRE);
   if (LP.g.length) fige(LP, ROUTES, B.MAT_PAVE);
   B.flaques(ROUTES, eau, .45);
+  // le chemin de fer entre les deux premières villes, sur sa voie à côté de la route : vapeur, puis électrique après 1950
+  const an = annee(S.min), pv = VILLES.length >= 2 && an >= 1905 ? cheminRoute(VILLES[0].centre, VILLES[1].centre) : null;
+  if (pv && pv.length >= 3) {
+    const pts = pv.map((t, i) => { const a = pv[Math.max(0, i - 1)], b = pv[Math.min(pv.length - 1, i + 1)], dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz) || 1; return [t.x - dz / l * 3.2, Math.max(t.top, 0) + .2, t.z + dx / l * 3.2]; });
+    MOTEUR.poserVoie(ROUTES, pts, { ech: 10, electrique: an >= 1950, wagons: an >= 1950 ? 4 : 3 });
+  }
   majAmbiance();
 }
 function vehicules(ronde) {  // répartit routes et rondes de quartier entre les véhicules de l'époque
@@ -144,7 +150,7 @@ function animAmbiance(dt) {
   const poser = (c, x, y, z, ry) => {
     // le trafic suit l'heure : pointes du matin et du soir, calme la nuit (les bennes gardent leur tournée)
     const s = c.genre === 'char' ? 1.6 : 1.7, cache = !c.vis || (c.t && !c.t.ville) || (!c.benne && ((c.idx * .618) % 1) > trafic); poseI(A.m['v_' + c.genre], c.idx, x, y, z, ry, s, cache);
-    if (nuit && !cache && PA) { PA.set([x + Math.cos(ry) * 1.5 * s, y + .9, z - Math.sin(ry) * 1.5 * s], np * 3); np++; }
+    if (nuit && !cache && PA) { PA.set([x + Math.cos(ry) * 1.5 * s, y + .9, z - Math.sin(ry) * 1.5 * s], np * 3); np++; const g = versMoteur(x + Math.cos(ry) * 3.2 * s, y + .05, z - Math.sin(ry) * 3.2 * s); MOTEUR.lueur(g.x, g.y, g.z, .07, 2.4, ry); }  // le faisceau des phares au sol
   };
   for (const c of VEHIC) {
     const tot = c.long.at(-1); c.s = ((c.s + dt * VIT_VEH[c.genre] * c.v * c.sens / tot) % 1 + 1) % 1; const d = c.s * tot;
@@ -155,6 +161,7 @@ function animAmbiance(dt) {
   for (const c of A.ronde) { const t = c.t, a = tAmb * c.v * VIT_VEH[c.genre] / 11 + c.ph; poser(c, t.x + Math.cos(a) * 7.6, t.top + .25, t.z + Math.sin(a) * 7.6, -a - Math.PI / 2); }
   for (const k of Object.keys(VEH_GEO)) A.m['v_' + k].instanceMatrix.needsUpdate = true;
   if (PA) { PH.needsUpdate = true; PHARES.geometry.setDrawRange(0, np); } PHARES.visible = np > 0;
+  if ((A.tSill = (A.tSill || 0) - dt) <= 0) { A.tSill = .3; A.bateaux.forEach(b => { const a = tAmb * b.v + b.ph, g = versMoteur(b.t.x + Math.cos(a) * b.r, MER_Y, b.t.z + Math.sin(a) * b.r); MOTEUR.sillage(g.x, g.y, g.z, .035); }); }  // leur sillage
   A.bateaux.forEach((b, j) => { const a = tAmb * b.v + b.ph; poseI(A.m.bat, j, b.t.x + Math.cos(a) * b.r, MER_Y - .15 + Math.sin(tAmb * 1.3 + j) * .12, b.t.z + Math.sin(a) * b.r, -a, 2.2); }); A.m.bat.instanceMatrix.needsUpdate = true;
   A.oiseaux.forEach((o, j) => { const g = o.g, L = OX * 2.2, x = ((tAmb * (6 + g) + g * 170) % L) - L / 2, ang = .4 + g * 1.3, row = o.k - 2;
     // vol en V : quelques battements, puis un plané ; les deux ailes battent en miroir autour du corps
@@ -163,7 +170,7 @@ function animAmbiance(dt) {
     for (const [m, roulis] of [[A.m.ois, 0], [A.m.aileA, -bat], [A.m.aileB, Math.PI + bat]]) { EU.set(roulis, -ang, 0, 'YXZ'); QA.setFromEuler(EU); MD.compose(PO, QA, SC); m.setMatrixAt(j, MD); }
   });
   EU.order = 'XYZ'; for (const m of [A.m.ois, A.m.aileA, A.m.aileB]) m.instanceMatrix.needsUpdate = true;
-  A.vaches.forEach((c, j) => { const t = c.t, a = c.a + Math.sin(tAmb * .2 + c.ph) * .8; poseI(A.m.vache, j, t.x + c.x + Math.sin(tAmb * .15 + c.ph) * .8, t.top, t.z + c.z, a, 1.7, !!(t.occ || t.ville) || fant); }); A.m.vache.instanceMatrix.needsUpdate = true;
+  A.vaches.forEach((c, j) => { const t = c.t, a = c.a + Math.sin(tAmb * .2 + c.ph) * .8; poseI(A.m.vache, j, t.x + c.x + Math.sin(tAmb * .15 + c.ph) * .8, t.top, t.z + c.z, a, 1.7, !!(t.occ || t.ville) || fant || MOTEUR.climat.pluie); });  // à l'étable sous la pluie A.m.vache.instanceMatrix.needsUpdate = true;
   // faune : va-et-vient le long de la lisière, avec des haltes pour brouter ; le renard trotte, les marcassins suivent la laie
   A.faune.forEach(c => {
     const p = tAmb * c.v + c.ph, u = Math.sin(p - .6 * Math.sin(p)) * 5, sens = Math.cos(p - .6 * Math.sin(p)) >= 0 ? 1 : -1;

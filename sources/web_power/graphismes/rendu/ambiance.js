@@ -2,7 +2,7 @@
 // brume du matin sur l'eau (rivières, lacs, rivages) à l'aube ; feuilles qui tombent près des forêts en automne ;
 // givre sur les toits quand il gèle sans neige au sol (d'après les toits relevés par modeles.js ; monde.js donne ses bâtiments par toitsDe()).
 import { THREE, scene, chaqueImage, hache, cam, posCase, voisins, qualite } from './scene.js';
-import { carte, hauteur, solEn, TERRE } from './plateau.js';
+import { carte, hauteur, solEn, TERRE, casesBaties } from './plateau.js';
 import { cyl } from './toon.js';
 import { climat } from './vie.js';
 
@@ -48,6 +48,22 @@ function chute(f) {  // une feuille repart du haut d'un arbre d'une case boisée
   f.vivante = false;
 }
 for (let k = 0; k < NF; k++) { feuilles.push({ vivante: false, c: ROUSSES[k % ROUSSES.length] }); FEUILLES.setColorAt(k, _c.setHex(ROUSSES[k % ROUSSES.length])); }
+
+// ------------------------------------------------------------------ herbes hautes des prés proches du regard, qui ondulent au vent
+const NH = 420, M_HERBE = new THREE.MeshToonMaterial({ color: 0xa8d060 });
+const HERBES = inst(new THREE.ConeGeometry(0.012, 0.095, 3).translate(0, 0.0475, 0), M_HERBE, NH), herbes = [];
+let herbesX = 1e9, herbesZ = 1e9;
+function semerHerbes(C) {  // autour du regard, sur les prés et plaines sans bâti ni forêt (case de terrain 4)
+  herbes.length = 0; herbesX = cam.x; herbesZ = cam.z;
+  const B = casesBaties() || new Set(), R = 6;
+  for (let k = 0; k < NH * 4 && herbes.length < NH; k++) {
+    const x = cam.x + (hache(k, 1, 130) - 0.5) * 2 * R, z = cam.z + (hache(k, 2, 131) - 0.5) * 2 * R;
+    let i = -1, best = 1e9; for (const n of autour) { const q = posCase(n), d = (q.x - x) ** 2 + (q.z - z) ** 2; if (d < best) { best = d; i = n; } }
+    if (i < 0 || C.terrain[i] !== 4 || C.foret?.[i] || B.has(i)) continue;
+    herbes.push({ x, z, y: hauteur(i), ph: hache(k, 3, 132) * 6, s: 0.7 + hache(k, 4, 133) * 0.7 });
+  }
+}
+let autour = [];  // la case du regard et ses voisines sur 4 rangs : on y cherche la case de chaque brin
 
 // ------------------------------------------------------------------ givre sur les toits
 const PRISME = cyl(1, 1, 1, 3).rotateX(Math.PI / 2).rotateZ(Math.PI).scale(1 / Math.sqrt(3), 1 / 1.5, 1).translate(0, 1 / 6, 0);
@@ -99,6 +115,24 @@ chaqueImage((dt, t) => {
       FEUILLES.setColorAt(n++, _c.setHex(f.c));
     });
     FEUILLES.count = n; FEUILLES.instanceMatrix.needsUpdate = true; if (FEUILLES.instanceColor) FEUILLES.instanceColor.needsUpdate = true;
+  }
+  // herbes : refaites quand le regard s'éloigne ; couchées par le vent, absentes sous la neige
+  if (Math.hypot(cam.x - herbesX, cam.z - herbesZ) > 2.5) {
+    let i = -1, best = 1e9; for (let n = 0; n < C.terrain.length; n++) { const q = posCase(n), d = (q.x - cam.x) ** 2 + (q.z - cam.z) ** 2; if (d < best) { best = d; i = n; } }
+    autour = [i]; for (let r = 0; r < 4; r++) for (const n of [...autour]) for (const v of voisins(n)) if (!autour.includes(v)) autour.push(v);
+    semerHerbes(C);
+  }
+  const herbe = climat.saison !== 0 && !climat.neigeSol && cam.d < 22;
+  HERBES.visible = herbe;
+  if (herbe) {
+    const v = Math.min(1.4, climat.vent || 0.3), dx = Math.cos(climat.dir || 0), dz = Math.sin(climat.dir || 0);
+    M_HERBE.color.setHex(climat.sec ? 0xc8b860 : climat.saison === 3 ? 0xb0a850 : 0xa8d060);  // plus clair que le pré, pour se voir
+    const n = Math.round(herbes.length * Math.min(1, qualite.part));
+    for (let k = 0; k < n; k++) {
+      const h = herbes[k], pli = (0.15 + 0.35 * v) * (0.6 + 0.4 * Math.sin(t * (1.5 + v * 2) + h.ph + h.x * 3));
+      HERBES.setMatrixAt(k, _m.compose(_p.set(h.x, h.y, h.z), _q.setFromEuler(_e.set(dz * pli, 0, -dx * pli)), _s.set(h.s, h.s, h.s)));
+    }
+    HERBES.count = n; HERBES.instanceMatrix.needsUpdate = true;
   }
   // givre : il gèle, sans neige au sol ; les toits se refont de temps en temps (bâtiments construits ou détruits)
   const givre = climat.gel > 0.05 && !climat.neigeSol ? Math.min(1, climat.gel * 1.5) : 0;

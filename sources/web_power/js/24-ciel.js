@@ -42,6 +42,19 @@ function majDebords() {
     g.userData.debordGrp = fige(L, g); pieces(g.userData.debordGrp, ex);
   }
 }
+// les grèves des éboueurs : un piquet devant le garage des bennes, le centre de tri, l'incinérateur et la décharge
+const GREVISTES = new Set(['garage', 'tri', 'incin', 'decharge']);
+function majGreves() {
+  const greve = (S.dec?.greve || 0) > S.min;
+  for (const u of UNITES) {
+    if (!GREVISTES.has(u.type) || u.fin || !u.grp) continue;
+    const g = u.grp; if (!!g.userData.piquet === greve) continue;
+    jeter(g.userData.piquet); g.userData.piquet = null;
+    if (!greve) continue;
+    const L = lot(), ex = { pieces: [] }; MODERNES.semer(u.t); MOTEUR.piquetGreve()(L, ex);
+    g.userData.piquet = fige(L, g); pieces(g.userData.piquet, ex);
+  }
+}
 function animCiel(dt, kt) {
   const w = meteo(S.min), mo = date(S.min).getUTCMonth(), g = genreMeteo(w, S.min), pluieK = pluieDe(w, S.min);
   MOTEUR.forcerHeure(cycleMoteur(S.min));
@@ -61,7 +74,7 @@ function animCiel(dt, kt) {
   const mwCharbon = UNITES.reduce((a, u) => a + (CHARBON.has(u.type) && actifU(u) ? u.p || 0 : 0), 0);
   MOTEUR.climat.pollution += (clamp(mwCharbon / 400, 0, .85) - MOTEUR.climat.pollution) * Math.min(1, dt * .3);
   MOTEUR.climat.eauSale = clamp((1 - (S.eau?.conf ?? 1)) * 1.5, 0, 1);
-  if ((debordTic -= dt) < 0) { debordTic = 1; majDebords(); for (const u of UNITES) if (u.fin && u.grue && u.grue.userData.palier !== Math.round(avancement(u) * 5)) poserChantier(u); }
+  if ((debordTic -= dt) < 0) { debordTic = 1; majDebords(); majGreves(); for (const u of UNITES) if (u.fin && u.grue && u.grue.userData.palier !== Math.round(avancement(u) * 5)) poserChantier(u); }
   // la foudre frappe les lignes pendant la tempête (un pylône au hasard)
   if (g === 'tempete' && LIGNES.length && (foudreTic -= dt) < 0) {
     foudreTic = 3 + Math.random() * 5;

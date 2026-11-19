@@ -76,6 +76,7 @@ function poserChantier(u) {
   jeter(u.grue); const av = avancement(u), L = lot(), ex = { pieces: [] };
   MOTEUR.chantierVivant(av, { w: 9, d: 8 })(L, ex);
   u.grue = fige(L); u.grue.position.set(u.t.x, u.t.top, u.t.z); u.grue.userData.palier = Math.round(av * 5); pieces(u.grue, ex);
+  if (u.grp) u.grp.scale.y = Math.max(.12, u.grue.userData.palier / 5);  // le bâtiment monte étage par étage sous l'échafaudage
 }
 function retirerFerme(t) { if (t.grpF) { jeter(t.grpF); t.grpF = null; } t.ferme = null; }
 function terminer(u) {

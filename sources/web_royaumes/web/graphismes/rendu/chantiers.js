@@ -50,3 +50,19 @@ export function chantierVivant(av = 0, { w = 7, d = 6, haut = 5, ancien = false 
     }
   };
 }
+
+/** Un piquet de grève devant une installation (unités de 10 par case) : grévistes et leurs pancartes, une banderole tendue
+ *  entre deux d'entre eux, un brasero dont la flamme danse ; les grévistes piétinent sur place. Dessin (L, ex). */
+export function piquetGreve() {
+  return (L, ex) => {
+    put(L, boite(3.2, 0.9, 0.05), 0xf2efe6, 0, 1.5, 6.6, 0, 0.03);  // banderole
+    put(L, boite(0.9, 0.18, 0.06), 0xd9573b, -0.7, 1.75, 6.57, 0, 0); put(L, boite(1.1, 0.18, 0.06), 0xd9573b, 0.7, 1.5, 6.57, 0, 0);
+    for (const x of [-1.6, 1.6]) put(L, boite(0.08, 2, 0.08), BOIS, x, 1, 6.6, 0, 0.02);
+    [-2.6, -1.6, 1.6, 2.6, 3.4].forEach((x, k) => piece(L, ex, P => {
+      ouvrier(P, false);
+      if (k !== 1 && k !== 2) { put(P, boite(0.06, 1.4, 0.06), BOIS, 0.3, 1.5, 0.15, 0, 0.02); put(P, boite(0.7, 0.5, 0.05), [0xf2c94c, 0xffffff, 0xd9573b][k % 3], 0.3, 2.3, 0.15, 0, 0.03); }
+    }, x, 0, 6.9 + (k % 2) * 0.5, 'glisse', 'x', 0.12, 1.2, k));
+    put(L, cyl(0.35, 0.3, 0.6, 8), 0x3a3a3a, -3.8, 0.3, 7.6, 0, 0.03);  // brasero
+    piece(L, ex, P => put(P, cyl(0.02, 0.28, 0.6, 6), 0xff8a2a, 0, 0.3, 0, 0, 0), -3.8, 0.6, 7.6, 'pulse', 'y', 0.25, 9);
+  };
+}

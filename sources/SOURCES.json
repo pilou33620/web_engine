@@ -1,14 +1,14 @@
 {
  "depots": {
   "web_royaumes": {
-   "commit": "39f6a742eadb1ca2754a9484778b18fd7ce5776d",
+   "commit": "5db64d34d4b80f1060b178688f7722fa8cd5a80e",
    "date": "2026-11-19",
-   "message": "Graphismes : bibliothèque web_engine 2.16.0 ; chroniques du royaume et réglage de qualité"
+   "message": "Graphismes : bibliothèque web_engine 2.17.0 (saisons, vent, nuit, eau, journée, commerce, ponton du pêcheur)"
   },
   "web_power": {
-   "commit": "c92ea34c2893468c6165a7de1d80c45ecfd055a9",
+   "commit": "e7689be345481841bdbb53f37d33433772a2a938",
    "date": "2026-11-19",
-   "message": "Graphismes : bibliothèque web_engine 2.16.0 ; coupures, foudre, trafic, chantiers et qualité"
+   "message": "Graphismes : bibliothèque web_engine 2.17.0 ; train, phares, grèves, construction par étages"
   }
  },
  "maquettes": [

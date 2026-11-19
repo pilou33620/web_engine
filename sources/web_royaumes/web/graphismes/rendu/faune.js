@@ -1,5 +1,6 @@
 // Bêtes du ciel et de l'eau, automatiques : oiseaux migrateurs en V au printemps (vers le nord) et à l'automne (vers le sud),
-// qui traversent le regard de temps en temps ; bancs de poissons qui tournent près des côtes, et un poisson qui saute parfois.
+// qui traversent le regard de temps en temps ; bancs de poissons qui tournent près des côtes, et un poisson qui saute parfois ;
+// envol(x, y, z) : des oiseaux dérangés qui s'échappent des arbres (une armée qui passe, monde.js).
 import { THREE, scene, chaqueImage, hache, cam, posCase, voisins, qualite } from './scene.js';
 import { carte, TERRE } from './plateau.js';
 import { climat } from './vie.js';
@@ -13,6 +14,11 @@ const AILE = new THREE.BoxGeometry(0.16, 0.012, 0.04);
 const NO = 15, M_OISEAU = new THREE.MeshBasicMaterial({ color: 0x2b2b30 });
 const AILES_G = inst(AILE.clone().translate(-0.08, 0, 0), M_OISEAU, NO), AILES_D = inst(AILE.clone().translate(0.08, 0, 0), M_OISEAU, NO);
 let vol = null, attente = 8;
+const NEV = 72, ENV_G = inst(AILE.clone().translate(-0.06, 0, 0).scale(0.7, 1, 0.7), M_OISEAU, NEV), ENV_D = inst(AILE.clone().translate(0.06, 0, 0).scale(0.7, 1, 0.7), M_OISEAU, NEV), envols = [];
+/** Une volée d'oiseaux dérangés s'élève de ce point (repère du plateau) et s'éparpille. */
+export function envol(x, y, z) {
+  for (let k = 0; k < 7 && envols.length < NEV; k++) { const a = Math.random() * Math.PI * 2; envols.push({ x, y: y + 0.15, z, vx: Math.cos(a) * 0.5, vz: Math.sin(a) * 0.5, vy: 0.6 + Math.random() * 0.4, t: 0, ph: Math.random() * 6 }); }
+}
 function nouveauVol() {
   const vers = climat.saison === 1 ? -1 : 1, R = Math.max(8, cam.d * 0.9);  // printemps : vers le nord (−z) ; automne : vers le sud
   const x0 = cam.x + (Math.random() - 0.5) * R * 0.8;
@@ -52,6 +58,16 @@ chaqueImage((dt, t) => {
     if (vol.fin <= 0) vol = null;
   }
   AILES_G.count = AILES_D.count = no; AILES_G.instanceMatrix.needsUpdate = AILES_D.instanceMatrix.needsUpdate = true;
+  let ne = 0;
+  for (let i = envols.length - 1; i >= 0; i--) {
+    const o = envols[i]; o.t += dt; if (o.t > 3.5) { envols.splice(i, 1); continue; }
+    o.x += o.vx * dt; o.z += o.vz * dt; o.y += o.vy * dt; o.vy *= 0.985;
+    const cap = Math.atan2(o.vx, o.vz), b = Math.sin(t * 14 + o.ph) * 0.6;
+    _p.set(o.x, o.y, o.z);
+    ENV_G.setMatrixAt(ne, _m.compose(_p, _q.setFromEuler(_e.set(0, cap, b)), _s.set(1, 1, 1)));
+    ENV_D.setMatrixAt(ne++, _m.compose(_p, _q.setFromEuler(_e.set(0, cap, -b)), _s.set(1, 1, 1)));
+  }
+  ENV_G.count = ENV_D.count = ne; ENV_G.instanceMatrix.needsUpdate = ENV_D.instanceMatrix.needsUpdate = true;
   // poissons : les bancs des côtes proches du regard, renouvelés quand on s'éloigne
   const R = Math.max(5, cam.d * 0.6), proches = cotes.filter(i => { const q = posCase(i); return Math.abs(q.x - cam.x) < R && Math.abs(q.z - cam.z) < R; });
   bancs = bancs.filter(b => proches.includes(b.i));

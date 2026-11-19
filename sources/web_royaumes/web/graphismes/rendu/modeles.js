@@ -437,7 +437,9 @@ const BATR = {
     for (const o of [-0.35, 0.35]) put(L, boite(0.08, 0.06, 5.6), 0x8a8f96, -1.5 + o, 0.3, 4, 0, 0); for (let z = 1.6; z < 6.8; z += 0.6) put(L, boite(1, 0.06, 0.2), 0x5b3a1e, -1.5, 0.26, z, 0, 0);
     put(L, cone(1.6, 1.4, 7), MINERAI[CLE] ?? 0x6a5a4a, 3, 0.7, 3, 0, 0.12); maison(L, ex, 3.6, -2.6, 0.4, 0.85, E);
   },
-  pecheur(L, ex, E) { solQ(L, 0xd9cfa0); maison(L, ex, -2.6, -1.5, 0.3, 1, E); for (const [x, z] of [[-3.6, 3], [-2.6, 3.6]]) put(L, cyl(0.5, 0.5, 1.1, 10), 0x8a5a2b, x, 0.55, z, 0, 0.12); put(L, boite(5.6, 0.3, 1.4), 0x8b5a2b, 3.6, 0.3, 0.4, 0, 0.1); for (const x of [1.4, 3.6, 5.8]) put(L, boite(0.25, 1.4, 0.25), 0x5b3a1e, x, -0.2, 1.2, 0, 0); for (const x of [0.4, 2.4]) put(L, boite(0.12, 1.8, 0.12), 0x8b5a2b, x, 0.9, -3, 0, 0); put(L, boite(2.2, 1.2, 0.05), 0xd9d2bc, 1.4, 1.2, -3, 0, 0); },
+  pecheur(L, ex, E) { solQ(L, 0xd9cfa0); maison(L, ex, -2.6, -1.5, 0.3, 1, E); for (const [x, z] of [[-3.6, 3], [-2.6, 3.6]]) put(L, cyl(0.5, 0.5, 1.1, 10), 0x8a5a2b, x, 0.55, z, 0, 0.12); // le ponton part vers l'eau (le serveur tourne la cabane vers sa case d'eau, à +x) et dépasse le rivage (bord de case à 8,7) ; pieux dans l'eau, barque au bout
+    put(L, boite(10, 0.3, 1.4), 0x8b5a2b, 5.4, 0.3, 0.4, 0, 0.1); for (const x of [1.4, 4.4, 7.4, 10]) for (const z of [-0.2, 1]) put(L, boite(0.25, 2.4, 0.25), 0x5b3a1e, x, -0.8, z, 0, 0);
+    put(L, boite(2.6, 0.4, 0.9), 0x6b4a2b, 9.2, -1.2, 1.9, 0.15, 0.05); put(L, boite(0.6, 0.06, 0.06), 0xd9d2bc, 9.6, -1.4, 1.2, 0.6, 0); for (const x of [0.4, 2.4]) put(L, boite(0.12, 1.8, 0.12), 0x8b5a2b, x, 0.9, -3, 0, 0); put(L, boite(2.2, 1.2, 0.05), 0xd9d2bc, 1.4, 1.2, -3, 0, 0); },
   bucheron(L, ex, E) {
     solQ(L, 0xb3c27a); maison(L, ex, -2.4, -2.4, 0.3, 1, E);
     for (let i = 0; i < 5; i++) { const b = cyl(0.45, 0.45, 3.4, 8); b.rotateZ(Math.PI / 2); put(L, b, 0xa0703f, 3 + (i % 2) * 0.2, 0.45 + (i >> 1) * 0.8, 1.6 + (i % 2) * 0.9, 0.3, 0.12); }

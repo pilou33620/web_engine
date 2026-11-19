@@ -16,6 +16,8 @@ const ECH = 0.04, ECH_BAT = 0.1, DALLE = 0.025, MER = -0.15;
 const JOUR = () => climat.heure !== 'nuit';
 const PLUIE = () => climat.pluie;
 const dehors = () => JOUR() && !PLUIE();
+// le marché se tient le matin : on remballe dans l'après-midi (le jour du cycle dure 300 s, meteo.js)
+const MATIN = () => climat.phase === 'aube' || (climat.phase === 'jour' && (climat.p || 0) < 170);
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _p = new THREE.Vector3(), _v = new THREE.Vector3(), _c = new THREE.Color(), _e = new THREE.Euler();
 const tache = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), d = g.createRadialGradient(32, 32, 0, 32, 32, 32); d.addColorStop(0, 'rgba(255,255,255,1)'); d.addColorStop(0.35, 'rgba(255,255,255,.6)'); d.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = d; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
 
@@ -337,7 +339,7 @@ function reconstruire(etat, C, fetes, train) {
     const k = posCase(b.case), q = posCase(e), f = b.cle === 'port' ? 0.75 : 0.62, x = k.x + (q.x - k.x) * f, z = k.z + (q.z - k.z) * f, cap = -Math.atan2(q.z - k.z, q.x - k.x) + Math.PI / 2, ph = hache(b.id, 4) * 6;
     ajoute(A(b.cle === 'port' ? 'bateau' : 'barque', b.cle === 'port' ? 0.05 : 0.035), (t, dt, o) => {
       o.position.set(x + Math.sin(t * 0.2 + ph) * 0.04, MER - 0.01 + Math.sin(t * 1.3) * 0.006, z + Math.cos(t * 0.17 + ph) * 0.04); o.rotation.set(Math.sin(t * 1.1) * 0.05 * (1 + climat.vent), cap + Math.sin(t * 0.1 + ph) * 0.3, 0);
-    }, () => JOUR() && climat.genre !== 'tempete' && climat.genre !== 'orage' && climat.gel < 0.5);
+    }, () => JOUR() && !PLUIE() && climat.genre !== 'tempete' && climat.genre !== 'orage' && climat.gel < 0.5);  // le bétail rentre aussi sous la pluie
   }
 
   // ---- un vol d'oiseaux en V qui traverse le regard
@@ -368,6 +370,12 @@ function reconstruire(etat, C, fetes, train) {
       const q = c(b, cote); champ(nom, s, q.x, q.z, y, pc.an, { ...ex, ph: ph(b * 3 + cote) });
     }
     for (let n = 0; n < 3; n++) { const q = c(n - 1, 1); champ('corbeau', [3, 0], q.x, q.z, y, pc.an, { geste: 'sautille', v: 0.6, L: 0.3, ph: n * 2.3 + i }); }
+    // le soir, les paysans rentrent au village le plus proche (pendant le crépuscule, 30 s)
+    const q0 = pc.centres[0], v0 = etat.villes.map(v => posCase(v.case)).sort((A, B) => (A.x - q0.x) ** 2 + (A.z - q0.z) ** 2 - ((B.x - q0.x) ** 2 + (B.z - q0.z) ** 2))[0];
+    if (v0 && climat.saison !== 0) for (let n = 0; n < 2; n++) ajoute(A(n ? 'semeur' : 'faucheur'), (t, dt, o) => {
+      const u = Math.min(1, (climat.p || 0) / 28), x = q0.x + (v0.x - q0.x) * u + n * 0.04, z = q0.z + (v0.z - q0.z) * u;
+      o.position.set(x, P.solEn(x, z) + 0.03 + Math.abs(Math.sin(t * 7 + n)) * 0.006, z); o.rotation.y = Math.atan2(v0.x - q0.x, v0.z - q0.z);
+    }, () => climat.phase === 'crepuscule' && !PLUIE());
     // blés qui ondulent : 4 × 3 épis par parcelle
     const ca = Math.cos(pc.an), sa = Math.sin(pc.an), W = pc.W || 0.46, D = pc.D || 0.24;
     for (const q of pc.centres) for (let a = 0; a < 4; a++) for (let b = 0; b < 3; b++) {
@@ -404,8 +412,8 @@ function reconstruire(etat, C, fetes, train) {
       } break;
       case 'marche': { // un marché proche du regard : quartiers.js a ses marchands et ses clients
         const loin = () => !PROCHES.has(b.id);
-        for (const [sx, sz] of [[-3.2, -2.6], [3, -2.8], [-3, 3], [3.2, 2.8]]) fixe('marchand', sx * 1.28, sz * 1.28, capB(R, -sx, -sz), 1.5, () => JOUR() && loin());
-        ['cliente', 'client', 'cliente2', 'client'].forEach((nom, i) => ronde(nom, ECH, 0, 0, 2.1, 0.12, i * 1.6, { arret: true }, () => dehors() && loin()));
+        for (const [sx, sz] of [[-3.2, -2.6], [3, -2.8], [-3, 3], [3.2, 2.8]]) fixe('marchand', sx * 1.28, sz * 1.28, capB(R, -sx, -sz), 1.5, () => MATIN() && loin());
+        ['cliente', 'client', 'cliente2', 'client'].forEach((nom, i) => ronde(nom, ECH, 0, 0, 2.1, 0.12, i * 1.6, { arret: true }, () => MATIN() && !PLUIE() && loin()));
         break;
       }
       case 'hotel': {
@@ -478,7 +486,7 @@ function reconstruire(etat, C, fetes, train) {
       const q = t * (lent ? 0.15 : 0.5) + ph, an = q + Math.sin(q * 0.7) * 2;
       o.position.set(p.x + Math.cos(an) * r * 0.5, y, p.z + Math.sin(an) * r * 0.5);
       o.rotation.set(0, -an - Math.PI / 2, Math.sin(t * (lent ? 0.8 : 5) + ph) > 0.4 ? -0.5 : 0);
-    }, JOUR);
+    }, dehors);  // poules et moutons à l'abri la nuit et sous la pluie
   }
 
   // ---- la rivière la plus proche de la capitale : lavandières et linge, patineurs quand elle gèle
