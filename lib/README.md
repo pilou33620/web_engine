@@ -24,7 +24,7 @@ La bibliothèque graphique commune des jeux. Elle vit dans `web_engine/lib/`, et
 | `animations.js` | la vie des bâtiments anciens hors partie : `animationsAncien(cle, epoque, boites, couleur)`, une recette par bâtiment (artisans, porteurs, passants, charrettes, bêtes, soldats, wagonnets, train) posée dans ses espaces libres ; `bivouacAncien(palier, couleur)`, l'armée au repos ; animés par `modele()` et `animer()` |
 | `antiques.js` | l'Antiquité : bâtiments gaulois (bois, torchis, chaume) et romains, armées gauloises et romaines (`ANT`), leur catalogue (`ANTIQUES`) ; assemblés et animés par `modele()` et `animer()` de `modernes.js` |
 | `monde.js`, `vie.js`, `quartiers.js` | ce qui vit sur le plateau : bâtiments posés, fumées, drapeaux, habitants, bêtes, bateaux, vie des quartiers |
-| `meteo.js`, `routes.js`, `boue.js`, `etiquettes.js` | le temps et l'heure du jour ; les routes ; la pluie sur les routes (boue, pavé mouillé, flaques, utilisable par un jeu qui trace ses routes lui-même) ; les bannières et étiquettes HTML |
+| `meteo.js`, `routes.js`, `boue.js`, `ambiance.js`, `etiquettes.js` | le temps et l'heure du jour ; les routes ; la pluie (routes boueuses et mouillées, flaques, crue, eau sale, traces de boue des armées) ; brume du matin, feuilles d'automne, givre sur les toits ; les bannières et étiquettes HTML. Les effets suivent `climat` (vie.js) : un jeu peut y poser `pollution` et `eauSale` |
 | `remparts.js`, `forts.js`, `sieges.js`, `marine.js`, `espions.js`, `brouillard.js`, `guerre_commun.js` | la guerre : remparts, forts, sièges, flottes, espions, brouillard de guerre |
 
 ### Mise en route

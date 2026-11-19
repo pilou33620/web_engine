@@ -3,6 +3,20 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.14.0 — 2026-11-19
+
+Le temps et les effets de jeu se voient. Tout passe par `climat` (vie.js) : meteo.js le remplit d'après la météo du jeu,
+un jeu peut aussi poser lui-même `climat.pollution` et `climat.eauSale` (0 à 1).
+- effets de jeu de web_royaumes (son serveur envoie `secheresse`, `pluie` et `tir` dans `etat.meteo`) :
+  champs jaunis pendant une canicule, grillés et plus courts pendant une sécheresse, herbe qui pâlit (`plateau.secher()`, `climat.sec`) ;
+  traces de boue derrière les armées qui marchent sous la pluie (`boue.trace()`) ; poudre mouillée (`climat.poudre`) :
+  des coups ratent dans les salves d'exercice et les combats, une goutte au-dessus de la mêlée ;
+- plus de météo : crue des rivières après une forte pluie, eau trouble qui recouvre les berges (`boue.crue`, `MAT_BERGE`) ;
+  arc-en-ciel plus fréquent, et juste après chaque averse (`climat.apresPluie`) ; nouveau `ambiance.js` : brume du matin sur l'eau à l'aube,
+  feuilles qui tombent près des forêts en automne, givre sur les toits quand il gèle sans neige (monde.js s'inscrit par `toitsDe()`) ;
+- pollution (web_power) : `climat.pollution` jaunit la lumière et voile le lointain, `climat.eauSale` teinte les rivières en vert brun
+  (`plateau.teinterRivieres()`) ; `debordDecharge(n)` (modernes.js) : tas d'ordures et sacs qui passent la clôture d'une décharge pleine.
+
 ## 2.13.0 — 2026-11-19
 
 Les routes vivent avec la météo, dans `rendu/boue.js` (nouveau) :
