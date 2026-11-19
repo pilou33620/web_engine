@@ -28,6 +28,11 @@
    "titre": "Bâtiments modernes"
   },
   {
+   "source": "web_engine",
+   "chemin": "maquettes/web_engine/carte-complete.html",
+   "titre": "Carte complète"
+  },
+  {
    "source": "web_power",
    "chemin": "maquettes/web_power/dechets.html",
    "titre": "Maquette Déchets"

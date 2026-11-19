@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carte complète</title>
+<link rel="stylesheet" href="../../lib/rendu/rendu.css">
+<link rel="stylesheet" href="../../galerie/visionneuse.css">
+<style>
+  #etiquettes span { font-size: 11px; background: rgba(20, 26, 19, .72); }
+  #etiquettes span.titre { font-size: 14px; font-weight: 600; background: rgba(20, 26, 19, .88); }
+  .note { position: fixed; top: 54px; left: 8px; right: 8px; margin: 0; padding: 6px 10px; font-size: 13px; background: rgba(20, 26, 19, .7); border-radius: 8px; }
+</style>
+</head>
+<body>
+<canvas id="carte" aria-label="Tous les nouveaux rendus sur une seule carte : Gaulois, Romains, armées et bâtiments modernes"></canvas>
+<div id="etiquettes"></div>
+<div id="eclair"></div>
+<form class="barre" id="choix">
+  <b>Carte complète</b>
+  <label>Époque <select name="epoque">
+    <option value="tout">Toutes</option><option value="antiquite">Antiquité</option><option value="gaulois">Gaulois</option>
+    <option value="romains">Romains</option><option value="modernes">Moderne (1900 → 2035)</option>
+  </select></label>
+  <label>Heure <select name="heure"><option value="jour">Jour</option><option value="aube">Aube</option><option value="crepuscule">Crépuscule</option><option value="nuit">Nuit</option><option value="">Cycle</option></select></label>
+  <label><input type="checkbox" name="noms" checked> Noms</label>
+</form>
+<p class="note">Tous les nouveaux rendus de la bibliothèque sur une seule carte : bâtiments et armées gaulois et romains (lib/rendu/antiques.js), bâtiments modernes (lib/rendu/modernes.js), chacun avec ses animations. Zoomer pour lire les noms.</p>
+<p class="aide">Glisser : déplacer · clic droit ou Maj : tourner · molette : zoom</p>
+<script type="module">
+import { THREE, scene, cam, camera, apresCamera } from '../../lib/rendu/scene.js';
+import { lot, put, fige, cyl, boite, jeter } from '../../lib/rendu/toon.js';
+import { appliquerMeteo, forcerHeure } from '../../lib/rendu/meteo.js';
+import { BAT, QBAT, bFerme, modele, animer, INSTALLATIONS, QUARTIERS } from '../../lib/rendu/modernes.js';
+import { ANT, ANTIQUES } from '../../lib/rendu/antiques.js';
+
+// ------------------------------------------------------------------ tout le catalogue, de l'Antiquité à 2035, rangé par famille
+const ERE = { 'Gaulois': 'gaulois', 'Armée gauloise': 'gaulois', 'Romains': 'romains', 'Armée romaine': 'romains' };
+const liste = [
+  ...ANTIQUES.map(b => ({ ...b, ere: ERE[b.groupe], dessin: ANT[b.cle] })),
+  ...QUARTIERS.map(q => ({ nom: q.nom, groupe: 'Villes', dessin: QBAT[q.cle] })),
+  { nom: 'Ferme céréalière', groupe: 'Fermes', dessin: (L, ex) => bFerme(L, false, ex) },
+  { nom: 'Ferme d’élevage', groupe: 'Fermes', dessin: (L, ex) => bFerme(L, true, ex) },
+  ...INSTALLATIONS.map(t => ({ cle: t.cle, nom: `${t.nom} (${t.an}${t.fin ? '–' + t.fin : ''})`, groupe: t.groupe, dessin: BAT[t.cle] })),
+].map(b => ({ ere: 'modernes', ...b }));
+const GARDER = { tout: () => true, antiquite: b => b.ere !== 'modernes', gaulois: b => b.ere === 'gaulois', romains: b => b.ere === 'romains', modernes: b => b.ere === 'modernes' };
+const MER = ['offshore'], RIVIERE = ['fil', 'barrage', 'prise'];
+const COLS = 8, PAS = 2.3, R = 1, SOL = 0x7fb04f, EAU = 0x4f8fc0;
+
+// ------------------------------------------------------------------ la carte : une rangée (ou plus) par famille ; refaite à chaque époque choisie
+const carte = new THREE.Group(), etiq = document.getElementById('etiquettes'), f = document.getElementById('choix');
+let poses = [], ligne = 0;
+scene.add(carte);
+function construire() {
+  for (const o of [...carte.children]) jeter(o);  // un modèle retiré de la scène sort aussi des animations
+  etiq.textContent = ''; poses = []; ligne = 0;
+  for (const [groupe, bs] of Map.groupBy(liste.filter(GARDER[f.epoque.value]), b => b.groupe)) {
+    const el = document.createElement('span'); el.className = 'titre'; el.textContent = groupe; etiq.append(el);
+    poses.push({ el, p: new THREE.Vector3(-PAS * 0.9, 0, ligne * PAS), titre: true });
+    bs.forEach((b, k) => {
+      const x = (k % COLS) * PAS + (ligne % 2) * PAS / 2, z = (ligne + (k / COLS | 0)) * PAS;  // rangées décalées, comme un plateau hexagonal
+      const T = lot();
+      put(T, cyl(R * 0.965, R, 0.16, 6), MER.includes(b.cle) ? EAU : SOL, 0, -0.08, 0, 0, 0);
+      if (RIVIERE.includes(b.cle)) put(T, boite(0.35, 0.02, 1.75), EAU, 0, 0.005, 0, 0, 0);
+      fige(T, carte).position.set(x, 0, z);
+      const m = b.cle === 'grue' ? modele(BAT.poste, k, { chantier: true }) : modele(b.dessin, k + 1);  // le chantier : un poste en travaux, comme carte-test
+      m.groupe.position.set(x, b.cle === 'barrage' ? -0.1 : 0, z);
+      carte.add(m.groupe); animer(m);
+      const n = document.createElement('span'); n.textContent = b.nom; etiq.append(n);
+      poses.push({ el: n, p: new THREE.Vector3(x, 0, z + 0.85) });
+      b.x = x; b.z = z;
+    });
+    ligne += Math.ceil(bs.length / COLS);
+  }
+  Object.assign(cam, { l: COLS * PAS + 2, h: ligne * PAS + 2, x: (COLS - 1) * PAS / 2, z: (ligne - 1) * PAS / 2, cible: 26, d: 26, lacet: 0, auto: false });
+}
+
+// ------------------------------------------------------------------ étiquettes, heure, époque, caméra
+apresCamera(() => {
+  const v = new THREE.Vector3(), noms = f.noms.checked;
+  for (const { el, p, titre } of poses) {
+    v.copy(p).project(camera);
+    el.hidden = v.z > 1 || (!titre && (!noms || cam.d > 18));  // les noms des bâtiments seulement de près, pour rester lisible
+    el.style.transform = `translate(${(v.x + 1) / 2 * innerWidth}px, ${(1 - v.y) / 2 * innerHeight}px) translate(-50%, -50%)`;
+  }
+});
+appliquerMeteo({ genre: 'soleil', temperature: 20, pluie: 0, vent: 0.5, neige_sol: 0 }, 2);
+const heure = () => forcerHeure(f.heure.value || null);
+f.heure.addEventListener('change', heure); heure();
+f.epoque.addEventListener('change', construire);
+construire();
+// #cle (ex. #legion, #nucleaire) : gros plan sur ce modèle
+const vu = liste.find(b => b.cle && '#' + b.cle === location.hash);
+if (vu) Object.assign(cam, { x: vu.x, z: vu.z, cible: 5, d: 5 });
+</script>
+</body>
+</html>
