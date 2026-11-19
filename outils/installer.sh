@@ -23,7 +23,7 @@ declare -A FICHIERS=(
   [socle]="$R/scene.js $R/toon.js $R/plateau.js $R/meteo.js $R/vie.js $R/boue.js $R/ambiance.js $R/nuit.js $R/faune.js $R/eau.js $R/routes.js $R/brouillard.js $R/etiquettes.js $R/rendu.css"
   [moderne]="$R/modernes.js $R/chantiers.js $R/rail.js $R/crises.js"
   [antique]="$R/antiques.js"
-  [ancien]="$R/modeles.js $R/monde.js $R/quartiers.js $R/animations.js $R/chroniques.js $R/img $R/icons"
+  [ancien]="$R/modeles.js $R/monde.js $R/quartiers.js $R/animations.js $R/chroniques.js $R/traces.js $R/img $R/icons"
   [guerre]="$R/guerre_commun.js $R/remparts.js $R/forts.js $R/sieges.js $R/marine.js $R/espions.js"
   [rendu]=""
 )
