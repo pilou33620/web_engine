@@ -3,6 +3,19 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.8.0 — 2026-11-19
+
+Plus de Gaulois et de Romains, et plus de vie, dans `rendu/antiques.js` :
+- nouveaux bâtiments : marché gaulois, cervoiserie (sanglier à la broche, buveurs), port de pêche (barque, pêcheur à la ligne, poisson qui saute) ;
+  marché romain (macellum : tholos, balance, porteur d'amphores), boulangerie (pistrinum : meule tournée par un âne, four, boulanger), théâtre (acteurs masqués) ;
+- clin d'œil rare au marché gaulois : quelques secondes toutes les 45 s, une bagarre au poisson dans un nuage de poussière ;
+- chaque bâtiment existant gagne des animations : un paysan monte un sac au grenier par l'échelle et redescend sans, chariot qui passe la porte de
+  l'oppidum, bûcheron, meule à bras, chaudron du chef, chien de berger, soufflet de la forge, porteurs, pèlerin, messager à cheval ; servante de la domus,
+  porteur d'amphore, offrandes au temple, orateur du forum, nageur et serviteur des thermes, spectateurs qui bondissent, chariot sous l'aqueduc,
+  vendangeur, canards du moulin, légionnaires à l'exercice et sentinelle du camp ;
+- `trajet()` : quelqu'un qui suit un chemin en boucle et ne porte sa charge que sur certains tronçons ;
+- `modernes.js` : deux mouvements de plus pour `piece()`, `'chemin'` (trajet en boucle) et `'rare'` (scène qui n'apparaît que de temps en temps).
+
 ## 2.7.0 — 2026-11-18
 
 L'Antiquité entre dans la bibliothèque : `rendu/antiques.js`, dans les conventions de `modernes.js`, assemblé et animé par `modele()` et `animer()` :
