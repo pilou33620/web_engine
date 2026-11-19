@@ -3,6 +3,17 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.12.0 — 2026-11-19
+
+Les armées au repos et au travail :
+- `animations.js` : `bivouacAncien(palier, couleur)`, l'armée de web_royaumes hors des rangs, à l'uniforme de son palier : tentes, faisceaux de fusils,
+  feu de camp, cuisinier à la marmite, joueurs de cartes autour d'un tambour, dormeurs, sentinelle, chevaux au piquet, canon parqué ;
+- `antiques.js` (armées gauloise et romaine) : bivouac gaulois (sanglier à la broche, buveurs, lutteurs, dormeurs), bivouac romain (tentes de cuir,
+  joueurs de dés, marmite, aigle, sentinelle) ; retranchements en travaux (terrassiers, porteurs de terre, de rondins et de pieux, bûcheron,
+  chef ou centurion qui surveille) ; positions défensives terminées : cercle de chariots gaulois, camp retranché romain (agger, palissade, tours,
+  porte, lilia, sentinelles) ;
+- carte complète : un bivouac par palier dans chaque époque, et une vue « Armées au repos et retranchements ».
+
 ## 2.11.0 — 2026-11-19
 
 Tous les bâtiments de toutes les époques sont animés :

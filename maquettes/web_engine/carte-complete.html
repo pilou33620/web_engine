@@ -23,6 +23,7 @@
     <option value="romains">Romains</option>
     <option value="ancien">1700 · Ancien Régime</option><option value="lumieres">1750 · Siècle des Lumières</option><option value="empire">1789 · Révolution et Empire</option><option value="industrie">1816 · Révolution industrielle</option>
     <option value="modernes">Moderne (1900 → 2035)</option>
+    <option value="repos">Armées au repos et retranchements</option>
   </select></label>
   <label>Heure <select name="heure"><option value="jour">Jour</option><option value="aube">Aube</option><option value="crepuscule">Crépuscule</option><option value="nuit">Nuit</option><option value="">Cycle</option></select></label>
   <label><input type="checkbox" name="noms" checked> Noms</label>
@@ -38,7 +39,7 @@ import { ANT, ANTIQUES } from '../../lib/rendu/antiques.js';
 import { maillageBatiment, maillageArmee, PALIERS } from '../../lib/rendu/modeles.js';
 import { animerPose, oublierPose } from '../../lib/rendu/monde.js';
 import { viderFumees, climat } from '../../lib/rendu/vie.js';
-import { animationsAncien } from '../../lib/rendu/animations.js';
+import { animationsAncien, bivouacAncien } from '../../lib/rendu/animations.js';
 
 const R = await (await fetch('../../sources/web_royaumes/rust/royaumes/data/regles.json')).json();
 
@@ -51,13 +52,15 @@ const liste = [
   ...R.epoques.flatMap(e => [
     ...R.batiments.map(b => ({ ere: e.cle, groupe: `${e.debut} · ${e.nom}`, nom: b.cle === 'hotel' ? `${b.nom} niv. 5` : b.nom, royaumes: { cle: b.cle, epoque: e.cle, niveau: 5 }, ancre: `${e.cle}-${b.cle}` })),
     ...PALIERS_DE[e.cle].map(p => ({ ere: e.cle, groupe: `Armées · ${e.nom}`, nom: `${PALIERS[p].date} : ${PALIERS[p].nom}`, palier: p })),
+    ...PALIERS_DE[e.cle].map(p => ({ ere: e.cle, groupe: `Armées · ${e.nom}`, nom: `${PALIERS[p].date} : au repos (bivouac)`, bivouac: p, repos: true, ancre: `bivouac-${p}` })),
   ]),
   ...QUARTIERS.map(q => ({ nom: q.nom, groupe: 'Villes', dessin: QBAT[q.cle] })),
   { nom: 'Ferme céréalière', groupe: 'Fermes', dessin: (L, ex) => bFerme(L, false, ex) },
   { nom: 'Ferme d’élevage', groupe: 'Fermes', dessin: (L, ex) => bFerme(L, true, ex) },
   ...INSTALLATIONS.map(t => ({ cle: t.cle, nom: `${t.nom} (${t.an}${t.fin ? '–' + t.fin : ''})`, groupe: t.groupe, dessin: BAT[t.cle] })),
 ].map(b => ({ ere: 'modernes', ...b }));
-const GARDER = { tout: () => true, antiquite: b => b.ere === 'gaulois' || b.ere === 'romains' };
+const REPOS = new Set(['bivouacG', 'retranchementG', 'defenseG', 'bivouacR', 'retranchementR', 'defenseR']);
+const GARDER = { tout: () => true, antiquite: b => b.ere === 'gaulois' || b.ere === 'romains', repos: b => b.repos || REPOS.has(b.cle) };
 for (const e of ['gaulois', 'romains', 'ancien', 'lumieres', 'empire', 'industrie', 'modernes']) GARDER[e] = b => b.ere === e;
 const MER = ['offshore'], RIVIERE = ['fil', 'barrage', 'prise'];
 const COLS = 8, PAS = 2.3, SOL = 0x7fb04f, EAU = 0x4f8fc0, COULEUR = '#3b6fd1';
@@ -86,6 +89,8 @@ function construire() {
         const id = `vitrine-${b.royaumes.epoque}-${b.royaumes.cle}`; animerPose(id, mesh, anim, COULEUR); poses_anim.push(id);
         const vie = modele(animationsAncien(b.royaumes.cle, b.royaumes.epoque, boites, COULEUR), k + 1);  // ses habitants, artisans, bêtes, charrettes…
         vie.groupe.position.set(x, 0, z); carte.add(vie.groupe); animer(vie);
+      } else if (b.bivouac !== undefined) {  // armée de web_royaumes au repos : son bivouac
+        const m = modele(bivouacAncien(b.bivouac, COULEUR), k + 1); m.groupe.position.set(x, 0, z); carte.add(m.groupe); animer(m);
       } else if (b.palier !== undefined) {  // armée de web_royaumes : l'icône du palier, qui marche sur sa case
         const mesh = maillageArmee(COULEUR, b.palier); mesh.position.set(x, 0, z); mesh.userData.cache = true; carte.add(mesh); armees.push({ mesh, z, ph: k });
       } else {
