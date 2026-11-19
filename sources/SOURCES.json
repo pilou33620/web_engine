@@ -1,9 +1,9 @@
 {
  "depots": {
   "web_royaumes": {
-   "commit": "999ccb768163e80fa9497ca9599eafba4ee21621",
+   "commit": "abb82913fe65eb0411cc21f9a88798d719a2dd51",
    "date": "2026-11-19",
-   "message": "Désert, toundra et routes comptent dans le jeu ; routes par époque ; portée des armées visible"
+   "message": "IA : les chemins contournent le désert et la toundra l'hiver sans ravitaillement ; plus d'exception pour l'ordinateur"
   },
   "web_power": {
    "commit": "5f6edc3ea98242c2883ae762d21f9d8af88c9c07",

@@ -235,7 +235,7 @@ impl Terre {
                 if !p.praticable(v) {
                     continue;
                 }
-                let nd = d + p.cout_case(v);
+                let nd = d + p.cout_case(v) + p.danger_climat(v);
                 if nd < dist[v] - 1e-9 {
                     dist[v] = nd;
                     source[v] = source[c];

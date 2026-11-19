@@ -187,8 +187,7 @@ impl Partie {
                 _ => continue,
             };
             // chez elle, ou près de ses routes, une armée est ravitaillée
-            // shortcut: l'ordinateur ne sait pas encore éviter désert et toundra, ses armées y sont épargnées ; à lever quand ia/militaire.rs en tiendra compte
-            if proprio != 0 || self.carte.cases[case].proprio == proprio || self.villes.iter().any(|v| v.case == case) || self.ravitaillee(proprio, case) {
+            if self.carte.cases[case].proprio == proprio || self.villes.iter().any(|v| v.case == case) || self.ravitaillee(proprio, case) {
                 continue;
             }
             let mut perdus = 0;

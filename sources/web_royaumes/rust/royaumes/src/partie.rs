@@ -1233,6 +1233,22 @@ impl Partie {
         base * f
     }
 
+    /// Surcoût de tracé d'une case où une armée souffrirait (désert ; toundra l'hiver) faute de ravitaillement : hors de tout
+    /// royaume ou en terre étrangère, sans route sur la case ni à côté. Les chemins (joueur et ordinateur) la contournent
+    /// quand un détour raisonnable existe ; la marche elle-même ne coûte pas plus.
+    pub fn danger_climat(&self, case: usize) -> f64 {
+        let k = &self.carte.cases[case];
+        let rude = match k.biome.as_deref() {
+            Some("desert") => true,
+            Some("toundra") => self.hiver(),
+            _ => false,
+        };
+        if !rude || k.route > 0 || self.carte.voisins(case).iter().any(|&v| self.carte.cases[v].route > 0) {
+            return 0.0;
+        }
+        if k.proprio >= 0 && self.villes.iter().any(|v| v.case == case) { 0.0 } else { 3.0 }
+    }
+
     pub fn hiver(&self) -> bool {
         crate::meteo::saison(crate::meteo::mois(self.tour)) == 0
     }
@@ -1433,7 +1449,7 @@ impl Partie {
                 if !passe(n) {
                     continue;
                 }
-                let ng = gc + self.cout_case(n);
+                let ng = gc + self.cout_case(n) + self.danger_climat(n);
                 if g.get(&n).map_or(true, |&x| ng < x - 1e-9) {
                     g.insert(n, ng);
                     venu.insert(n, cur);
@@ -1538,6 +1554,10 @@ mod essais {
         assert_eq!(p.cout_pour(0, i), 1.0);
         p.carte.cases[i].biome = Some("desert".into());
         assert_eq!(p.cout_pour(0, i), 1.5, "le désert ralentit");
+        for v in p.carte.voisins(i) { p.carte.cases[v].route = 0; }
+        assert!(p.danger_climat(i) > 0.0, "un désert sans route est contourné");
+        p.carte.cases[p.carte.voisins(i)[0]].route = 1;
+        assert_eq!(p.danger_climat(i), 0.0, "près d'une route, on y passe");
         p.carte.cases[i].biome = None;
         let couts: Vec<f64> = (1..=5).map(|n| { p.carte.cases[i].route = n; p.cout_pour(-1, i) }).collect();
         assert!(couts.windows(2).all(|w| w[1] < w[0]), "chaque époque de route va plus vite : {couts:?}");

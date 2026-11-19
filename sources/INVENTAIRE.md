@@ -2,7 +2,7 @@
 
 Généré par `outils/synchroniser.sh` : ne pas modifier à la main.
 
-## web_royaumes — `999ccb7` (2026-11-19)
+## web_royaumes — `abb8291` (2026-11-19)
 
 | Fichier | Taille | Rôle (en-tête du fichier) |
 |---|---:|---|
