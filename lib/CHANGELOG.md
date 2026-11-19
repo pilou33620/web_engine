@@ -3,6 +3,12 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.18.0 — 2026-11-19
+
+Nouvelle cabane de pêcheur (`modeles.js`, maquette `maquettes/web_engine/pecheur-propositions.html`, mélange des propositions P1 et P3) :
+cabane sur pilotis au bord de l'eau avec son échelle, jetée en L qui dépasse le rivage et ses deux barques, étal de la criée sous
+un auvent rayé et ses caisses de poissons, filet tendu, séchoir à poissons, casiers et tonneau ; toit et porte relevés (givre, épidémie).
+
 ## 2.17.0 — 2026-11-19
 
 Saisons, vent, lumière de nuit, eau, journée des habitants, animaux, trains, commerce et grèves :

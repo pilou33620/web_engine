@@ -18,9 +18,9 @@
 <div id="eclair"></div>
 <form class="barre" id="choix">
   <b>Cabane de pêcheur : propositions</b>
-  <label>Époque (cabane actuelle) <select name="epoque"><option value="ancien">1700</option><option value="lumieres">1750</option><option value="empire">1789</option><option value="industrie">1816</option></select></label>
+  <label>Époque (cabane retenue) <select name="epoque"><option value="ancien">1700</option><option value="lumieres">1750</option><option value="empire">1789</option><option value="industrie">1816</option></select></label>
 </form>
-<p class="note">À choisir : la cabane actuelle (bibliothèque 2.17.0) et trois propositions, sur une case de rivage (l'eau à droite, côté +x : le serveur tourne la cabane vers sa case d'eau).</p>
+<p class="note">Validée le 19/11/2026 : un mélange de P1 et P3 (lib 2.18.0, colonne « Retenue ») ; sur une case de rivage, l'eau à droite (côté +x : le serveur tourne la cabane vers sa case d'eau).</p>
 <p class="aide">Glisser : déplacer · clic droit ou Maj : tourner · molette : zoom</p>
 <script type="module">
 // Les propositions sont écrites dans les conventions des bâtiments de modeles.js (unités du modèle, une case de rayon 10,
@@ -61,7 +61,7 @@ const ponton = (L, x0, x1, z, larg = 1.4) => {  // plancher sur pilotis, qui dé
 const fumee = (L, x, y, z) => { put(L, boite(0.5, 1.4, 0.5), PIERRE, x, y + 0.7, z, 0, 0.05); };
 
 const PROPOSITIONS = [
-  { nom: 'Actuelle', txt: 'la cabane de la bibliothèque 2.17.0 : maison, tonneaux, ponton', actuelle: true },
+  { nom: 'Retenue (bibliothèque)', txt: 'mélange de P1 et P3, tel que dessiné par modeles.js : cabane sur pilotis, jetée en L et ses deux barques, criée, filets et séchoir', actuelle: true },
   { nom: 'P1 · Cabane sur pilotis', txt: 'la cabane posée sur pilotis au bord de l’eau, son ponton et sa barque ; filets et séchoir à poissons sur la grève', dessin(L) {
     for (const [x, z] of [[2.6, -1.6], [6, -1.6], [2.6, 1.8], [6, 1.8]]) put(L, boite(0.35, 2.6, 0.35), BOIS_F, x, 0, z, 0, 0);  // pilotis
     put(L, boite(4.6, 0.3, 4.4), PLANCHE, 4.3, 1.3, 0.1, 0, 0.08);  // plancher
