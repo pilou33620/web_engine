@@ -1,14 +1,14 @@
 {
  "depots": {
   "web_royaumes": {
-   "commit": "b46183c280973368f156f2b2d7b96fa65084ff06",
+   "commit": "39f6a742eadb1ca2754a9484778b18fd7ce5776d",
    "date": "2026-11-19",
-   "message": "Graphismes : bibliothèque web_engine 2.15.0, parties ancien et guerre (avec leurs dépendances : tout)"
+   "message": "Graphismes : bibliothèque web_engine 2.16.0 ; chroniques du royaume et réglage de qualité"
   },
   "web_power": {
-   "commit": "bb6ef44ed4c89ba3e91c19de332dfe087362b3e2",
+   "commit": "c92ea34c2893468c6165a7de1d80c45ecfd055a9",
    "date": "2026-11-19",
-   "message": "Graphismes : bibliothèque web_engine 2.15.0, partie moderne seulement (avec socle et three)"
+   "message": "Graphismes : bibliothèque web_engine 2.16.0 ; coupures, foudre, trafic, chantiers et qualité"
   }
  },
  "maquettes": [

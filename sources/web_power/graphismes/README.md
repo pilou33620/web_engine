@@ -13,10 +13,10 @@ La bibliothèque graphique commune des jeux. Elle vit dans `web_engine/lib/`, et
 | Partie | Contenu | A besoin de |
 |---|---|---|
 | `three` | `three/` : three.js r186 (`three.module.js`, `three.core.js`) et `addons/utils/BufferGeometryUtils.js` : une bibliothèque tierce, pas un rendu | — |
-| `socle` | `rendu/` : `scene`, `toon`, `plateau`, `meteo`, `vie`, `boue`, `ambiance`, `routes`, `brouillard`, `etiquettes`, `rendu.css` | `three` |
-| `moderne` | `rendu/modernes.js` | `socle` |
+| `socle` | `rendu/` : `scene` (et le réglage de qualité), `toon`, `plateau`, `meteo`, `vie`, `boue`, `ambiance`, `nuit`, `faune`, `routes`, `brouillard`, `etiquettes`, `rendu.css` | `three` |
+| `moderne` | `rendu/modernes.js`, `rendu/chantiers.js` | `socle` |
 | `antique` | `rendu/antiques.js` | `moderne` |
-| `ancien` | `rendu/` : `modeles`, `monde`, `quartiers`, `animations`, `img/` (illustrations des événements, SVG), `icons/` (icônes de l'application, PNG) | `socle`, `moderne`, `antique`, `guerre` |
+| `ancien` | `rendu/` : `modeles`, `monde`, `quartiers`, `animations`, `chroniques`, `img/` (illustrations des événements, SVG), `icons/` (icônes de l'application, PNG) | `socle`, `moderne`, `antique`, `guerre` |
 | `guerre` | `rendu/` : `guerre_commun`, `remparts`, `forts`, `sieges`, `marine`, `espions` | `ancien` |
 | `rendu` | tout (les jeux d'avant la 2.15.0) | toutes |
 
@@ -34,7 +34,7 @@ que chaque import d'un fichier installé trouve son fichier, et échoue sinon.
 | `animations.js` | la vie des bâtiments anciens hors partie : `animationsAncien(cle, epoque, boites, couleur)`, une recette par bâtiment (artisans, porteurs, passants, charrettes, bêtes, soldats, wagonnets, train) posée dans ses espaces libres ; `bivouacAncien(palier, couleur)`, l'armée au repos ; animés par `modele()` et `animer()` |
 | `antiques.js` | l'Antiquité : bâtiments gaulois (bois, torchis, chaume) et romains, armées gauloises et romaines (`ANT`), leur catalogue (`ANTIQUES`) ; assemblés et animés par `modele()` et `animer()` de `modernes.js` |
 | `monde.js`, `vie.js`, `quartiers.js` | ce qui vit sur le plateau : bâtiments posés, fumées, drapeaux, habitants, bêtes, bateaux, vie des quartiers |
-| `meteo.js`, `routes.js`, `boue.js`, `ambiance.js`, `etiquettes.js` | le temps et l'heure du jour ; les routes ; la pluie (routes boueuses et mouillées, flaques, crue, eau sale, traces de boue des armées) ; brume du matin, feuilles d'automne, givre sur les toits ; les bannières et étiquettes HTML. Les effets suivent `climat` (vie.js) : un jeu peut y poser `pollution` et `eauSale` |
+| `meteo.js`, `routes.js`, `boue.js`, `ambiance.js`, `nuit.js`, `faune.js`, `etiquettes.js` | le temps et l'heure du jour ; les routes ; la pluie (routes boueuses et mouillées, flaques, crue, eau sale, traces de boue des armées) ; brume du matin, feuilles d'automne, givre sur les toits ; les bannières et étiquettes HTML. Les effets suivent `climat` (vie.js) : un jeu peut y poser `pollution` et `eauSale` |
 | `remparts.js`, `forts.js`, `sieges.js`, `marine.js`, `espions.js`, `brouillard.js`, `guerre_commun.js` | la guerre : remparts, forts, sièges, flottes, espions, brouillard de guerre |
 
 ### Mise en route

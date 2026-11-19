@@ -37,9 +37,24 @@ export function voisins(i) { const v = []; for (let d = 0; d < 6; d++) { const n
 // ------------------------------------------------------------------ moteur de rendu
 export const canvas = document.getElementById('carte');
 export const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+// ------------------------------------------------------------------ réglage de qualité
+// léger (Raspberry Pi, tablettes) : pas d'ombres, définition 1, un tiers des particules, animations seulement près du regard ;
+// normal ; riche (ordinateur puissant). Choisi par ?qualite=leger dans l'adresse, sinon le dernier choix (localStorage),
+// sinon deviné : léger sur un appareil tactile, à 4 cœurs ou moins, ou à 4 Go de mémoire ou moins.
+const NIVEAUX = {
+  leger: { pr: 1, ombres: false, carte: 1024, part: 0.35, loin: 14 },
+  normal: { pr: 1.5, ombres: true, carte: 2048, part: 1, loin: 35 },
+  riche: { pr: 2, ombres: true, carte: 4096, part: 1.5, loin: 90 },
+};
+const lire = () => { try { return new URLSearchParams(location.search).get('qualite') || localStorage.getItem('web_engine.qualite'); } catch { return null; } };
+const devine = () => (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4 || !!globalThis.matchMedia?.('(pointer: coarse)').matches ? 'leger' : 'normal';
+const n0 = NIVEAUX[lire()] ? lire() : devine();
+/** Le réglage en cours : niveau ('leger', 'normal', 'riche'), pr (définition), ombres, carte (taille de la carte d'ombres),
+ *  part (facteur des particules), loin (distance au-delà de laquelle les petites animations s'arrêtent). */
+export const qualite = { niveau: n0, ...NIVEAUX[n0] };
+export const NIVEAUX_QUALITE = Object.keys(NIVEAUX);
 
 export const scene = new THREE.Scene();
 export const CIEL = new THREE.Color(0x1b211a); // le fond vert très sombre de web_power
@@ -50,11 +65,25 @@ export const camera = new THREE.PerspectiveCamera(36, 1, 0.3, 600);
 export const hemi = new THREE.HemisphereLight(0xeef7ff, 0x7d8466, 1.5);
 scene.add(hemi);
 export const soleil = new THREE.DirectionalLight(0xfff0d4, 2.6);
-soleil.castShadow = true;
-soleil.shadow.mapSize.set(2048, 2048);
 soleil.shadow.bias = -0.0005;
 soleil.shadow.normalBias = 0.03;
 scene.add(soleil, soleil.target);
+function appliquerQualite() {
+  renderer.setPixelRatio(Math.min(devicePixelRatio, qualite.pr));
+  renderer.shadowMap.enabled = soleil.castShadow = qualite.ombres;
+  soleil.shadow.mapSize.set(qualite.carte, qualite.carte); soleil.shadow.map?.dispose(); soleil.shadow.map = null;
+  scene.traverse(o => { if (o.material) for (const m of [].concat(o.material)) m.needsUpdate = true; });  // les ombres changent les shaders
+}
+appliquerQualite();
+/** Change la qualité ('leger', 'normal', 'riche') et la retient pour la prochaine fois. */
+export function reglerQualite(n) {
+  if (!NIVEAUX[n]) return;
+  Object.assign(qualite, { niveau: n }, NIVEAUX[n]);
+  try { localStorage.setItem('web_engine.qualite', n); } catch { /* stockage indisponible : le choix vaut pour cette visite */ }
+  appliquerQualite();
+}
+/** Le point est-il assez près du regard pour animer les petits détails ? (réglage de qualité) */
+export const pres = (x, z) => Math.abs(x - cam.x) < qualite.loin && Math.abs(z - cam.z) < qualite.loin;
 
 // réglages modifiés par la météo et la saison
 export const lumiere = { soleil: 2.6, hemi: 1.5, couleurSoleil: new THREE.Color(0xfff0d4), couleurHemi: new THREE.Color(0xeef7ff), ciel: CIEL.clone(), brume: 1, hauteurSoleil: 1 };

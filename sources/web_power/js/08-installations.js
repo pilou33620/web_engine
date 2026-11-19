@@ -67,9 +67,15 @@ function creerUnite(t, type, { immediat = false, nom = null, fin = 0 } = {}) {
 function dessinerUnite(u, anim) {
   jeter(u.grp); jeter(u.grue);
   ROTORS.splice(0, ROTORS.length, ...ROTORS.filter(r => r.u !== u)); FUMEES.splice(0, FUMEES.length, ...FUMEES.filter(f => f.u !== u));
-  if (u.fin) { u.grp = modele(u.t, u.type, CHANT); const L = lot(); BAT.grue(L); u.grue = fige(L); u.grue.position.set(u.t.x, u.t.top, u.t.z); if (anim) pop(u.grue); }
+  if (u.fin) { u.grp = modele(u.t, u.type, CHANT); poserChantier(u); if (anim) pop(u.grue); }
   else { u.grp = modele(u.t, u.type, MAT, u); u.grue = null; if (anim) pop(u.grp); }
   stylerU(u);
+}
+// le chantier vivant de la bibliothèque : échafaudages, ouvriers, grue dont le mât monte avec l'avancement (refait par paliers, 24-ciel.js)
+function poserChantier(u) {
+  jeter(u.grue); const av = avancement(u), L = lot(), ex = { pieces: [] };
+  MOTEUR.chantierVivant(av, { w: 9, d: 8 })(L, ex);
+  u.grue = fige(L); u.grue.position.set(u.t.x, u.t.top, u.t.z); u.grue.userData.palier = Math.round(av * 5); pieces(u.grue, ex);
 }
 function retirerFerme(t) { if (t.grpF) { jeter(t.grpF); t.grpF = null; } t.ferme = null; }
 function terminer(u) {

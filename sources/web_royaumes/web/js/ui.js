@@ -1,7 +1,7 @@
 // L'interface : barre du haut, panneaux (construire, diplomatie, armées, royaume, menu), fiche d'une case
 // (ville, bâtiment, armées, flottes, espions, fort, siège), récapitulatif du mois, événements à choix, annonces.
 import { echapper as e } from '../graphismes/rendu/etiquettes.js';
-import { voisins } from '../graphismes/rendu/scene.js';
+import { voisins, qualite } from '../graphismes/rendu/scene.js';
 
 const $ = s => document.querySelector(s);
 let J = null, A = null;
@@ -584,7 +584,7 @@ function vueMenu() {
     <button class="btn" data-a="menu" data-v="sauver">💾 Sauvegarder la partie</button>
     <button class="btn b2" data-a="menu" data-v="charger">📂 Charger une partie</button>
     <button class="btn b2" data-a="menu" data-v="nouvelle">🗺️ Nouvelle partie (régler la carte)</button>
-    <button class="btn b2" data-a="menu" data-v="ombres">🌗 Ombres : ${J.ombres ? 'oui' : 'non'}</button>
+    <button class="btn b2" data-a="menu" data-v="qualite">🎨 Qualité graphique : ${{ leger: 'légère (tablette, Raspberry Pi)', normal: 'normale', riche: 'riche' }[qualite.niveau]}</button>
     <button class="btn b2" data-a="menu" data-v="aide">❓ Comment jouer</button>
     <button class="btn b2" data-a="menu" data-v="reseau">📱 Jouer depuis un autre appareil</button></div>
     <p class="mini" style="margin-top:10px">Clavier : ZQSD / flèches = déplacer · E / R = tourner · Entrée = fin du mois · Échap = annuler. Version ${e(J.info?.version || '')}. ${e(J.info?.maj || '')}</p>`;

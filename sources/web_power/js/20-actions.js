@@ -59,6 +59,7 @@ document.addEventListener('click', ev => {
     if (!vu) { S.pause = true; S.pauseModale = true; tuto('elec', 0); }  // première partie sur cet appareil : le tuto s'ouvre, partie en pause
   }
   else if (act === 'carte') { carteChoisie = id; menu(); }
+  else if (act === 'qualite') { MOTEUR.reglerQualite(b.dataset.q); menu(); }
   else if (act === 'graine') { graineAlea = 1 + Math.floor(Math.random() * 99998); carteChoisie = 'aleatoire'; menu(); }
   else if (act === 'tuto') { const [k, n] = id.split(':'); tuto(k, +n); }
   else if (act === 'banc') menuBanc();
@@ -96,6 +97,8 @@ function menu() {
     <button type="button" class="btn secondaire" data-act="tuto-partie">Partie tutoriel guidée · les trois réseaux pas à pas</button>
     <button type="button" class="btn secondaire petit" data-act="tuto" data-id="elec:0">Tutoriel en fiches · électricité, eau, déchets, territoire</button>
     <button type="button" class="btn secondaire petit" data-act="banc">Banc d’équilibrage</button>
+    <div class="section">Qualité graphique</div>
+    <div style="display:flex;gap:8px">${[['leger', 'Légère (tablette, Raspberry Pi)'], ['normal', 'Normale'], ['riche', 'Riche']].map(([q, n]) => `<button type="button" class="btn secondaire petit${MOTEUR.qualite.niveau === q ? ' actif' : ''}" style="flex:1" data-act="qualite" data-q="${q}">${n}</button>`).join('')}</div>
     <div style="display:flex;gap:8px">${S.enJeu || sv ? '<button type="button" class="btn secondaire petit" style="flex:1" data-act="exporter">Exporter la partie</button>' : ''}<button type="button" class="btn secondaire petit" style="flex:1" data-act="importer">Importer une partie</button></div>
     <p class="verrou">La partie est enregistrée automatiquement dans ce navigateur chaque jour de jeu. Exportez-la dans un fichier pour en garder plusieurs ou la reprendre sur un autre appareil.</p>`);
 }

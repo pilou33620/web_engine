@@ -9,6 +9,8 @@ import { etiquette, balayer, banniere, effet, deplacer, masquer } from './etique
 import { bouffee, climat, MONDE } from './vie.js';
 import { trace, humidite } from './boue.js';
 import { toitsDe } from './ambiance.js';
+import { modele, animer } from './modernes.js';
+import { chantierVivant } from './chantiers.js';
 import { majRemparts } from './remparts.js';
 import { preparerSieges, majSieges, jouerSieges, campArmee, casesOuvrages } from './sieges.js';
 import { majForts } from './forts.js';
@@ -111,7 +113,7 @@ export function synchroniser(etat) {
     const cle = `${b.cle}|${couleurs[b.proprio]}|${etat.epoque.cle}|${etat.saison}|${etat.meteo.neige_sol > 0.3 ? 1 : 0}|${niveau}|${b.reste > 0 ? b.reste : 0}|${b.proprio}|${arret ? 1 : 0}${ruine ? 1 : 0}`;
     const ex = batis.get(b.id);
     if (ex && ex.cle === cle) continue;
-    if (ex) { groupe.remove(ex.mesh); if (ex.chantier) groupe.remove(ex.chantier); viderParts(b.id); }
+    if (ex) { groupe.remove(ex.mesh); if (ex.chantier) { groupe.remove(ex.chantier); ex.chantier.clear(); } viderParts(b.id); }  // clear : les ouvriers du chantier cessent d'être animés
     const { mesh, anim, boites, rel } = maillageBatiment({ cle: b.cle, couleur: couleurs[b.proprio], epoque: etat.epoque.cle, saison: etat.saison, neige: etat.meteo.neige_sol, niveau, ruine });
     const { x, z } = posCase(b.case), y = dessus(b.case);
     mesh.position.set(x, y, z);
@@ -123,7 +125,9 @@ export function synchroniser(etat) {
       chantier = maillageChantier();
       chantier.position.set(x, y, z);
       chantier.rotation.y = b.face || 0;
-      groupe.add(chantier);
+      // le chantier vit : échafaudages à la hauteur des travaux, ouvriers, chèvre de levage (déjà à l'échelle 0,1 du chantier)
+      const vie = modele(chantierVivant(fait, { w: 4, d: 3.5, haut: 2.2, ancien: true }), b.id); vie.groupe.scale.setScalar(1); chantier.add(vie.groupe);
+      groupe.add(chantier); animer(vie);
     }
     groupe.add(mesh);
     mesh.updateMatrixWorld();
@@ -133,7 +137,7 @@ export function synchroniser(etat) {
   }
   for (const [id, ex] of batis) {
     if (vus.has(id)) continue;
-    groupe.remove(ex.mesh); if (ex.chantier) groupe.remove(ex.chantier);
+    groupe.remove(ex.mesh); if (ex.chantier) { groupe.remove(ex.chantier); ex.chantier.clear(); }
     viderParts(id);
     batis.delete(id);
   }

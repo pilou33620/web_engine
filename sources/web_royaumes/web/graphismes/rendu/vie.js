@@ -2,7 +2,7 @@
 // travaux des champs, métiers des bâtiments, fêtes, armées (exercice, tambour, bivouac), train, fenêtres et lanternes la nuit.
 // Tout est décor : rien ici ne touche aux règles. Les personnages sont de petits modèles en boîtes (unités de web_power,
 // réduits par ECH), regroupés par modèle en InstancedMesh ; ils ne sont reconstruits que quand l'état change (majVie).
-import { THREE, scene, posCase, chaqueImage, hache, cam, voisins } from './scene.js';
+import { THREE, scene, posCase, chaqueImage, hache, cam, voisins, qualite } from './scene.js';
 import * as P from './plateau.js';
 // ce que monde.js (bâtiments et armées de web_royaumes) prête à la vie ; il s'y inscrit lui-même : sans lui (web_power), rien
 export const MONDE = {};
@@ -11,7 +11,7 @@ import { MAT, CONT, toon, put, fige, lot, fusion, boite, cyl, cone, sphere, jete
 /** Le temps qu'il fait et l'heure du jour (tenus à jour par meteo.js). */
 export const climat = { genre: 'soleil', froid: true, vent: 0.3, dir: 0, nuages: 3, gris: 0, oiseaux: true, pluie: false, neige: false, gel: 0, saison: 2, heure: 'jour', jour: 1, aube: 0, nuit: 0, arc: false,
   // effets posés par meteo.js (sec, poudre, pluieForte), boue.js (apresPluie) ou par le jeu (pollution, eauSale : web_power), de 0 à 1
-  sec: 0, poudre: 1, pluieForte: false, apresPluie: false, pollution: 0, eauSale: 0 };
+  sec: 0, poudre: 1, pluieForte: false, apresPluie: false, pollution: 0, eauSale: 0, famine: false };
 const ECH = 0.04, ECH_BAT = 0.1, DALLE = 0.025, MER = -0.15;
 const JOUR = () => climat.heure !== 'nuit';
 const PLUIE = () => climat.pluie;
@@ -29,6 +29,7 @@ const TEINTE = { blanche: new THREE.Color(0xf6f4ee), noire: new THREE.Color(0x55
 /** Efface toutes les fumées en cours (une vitrine qui change ce qu'elle montre). */
 export function viderFumees() { bouffees.length = 0; }
 export function bouffee(x, y, z, genre = 'blanche', k) {
+  if (qualite.part < 1 && genre !== 'poudre' && Math.random() > qualite.part) return;  // qualité légère : moins de fumées
   if (bouffees.length >= NFUM) bouffees.shift();
   bouffees.push({ x, y, z, age: 0, c: TEINTE[genre] || TEINTE.blanche, k: k ?? (genre === 'poudre' ? 2.6 : 1), vie: genre === 'poudre' ? 2.2 : 3 });
 }
@@ -227,6 +228,7 @@ function fetesDuMois(etat, rapport) {
     memo.statuts.set(r.id, r.statut);
   }
   if ((rapport?.evenements || []).some(e => /Paix signée|Alliance/.test(e.texte || ''))) feter(cap);
+  if ((rapport?.combats || []).some(c => c.vainqueur === 0 && (c.attaquant === 0 || c.defenseur === 0))) feter(cap);  // une bataille gagnée : la capitale fête la victoire
   const actives = new Set([...memo.fetes].filter(([, t]) => t >= etat.tour).map(([id]) => id));
   // la victoire, et chaque septembre (mois 8) la fête des vendanges dans toutes les villes du joueur
   if (etat.fin?.victoire || etat.mois === 8) for (const v of etat.villes) if (v.proprio === 0) actives.add(v.id);
@@ -633,7 +635,7 @@ function majParticules(t, dt) {
   etincelles.forEach((e, i) => ETINC.setMatrixAt(i, _m.makeTranslation(e.x, e.y, e.z)));
   ETINC.instanceMatrix.needsUpdate = true;
   // blés qui ondulent (printemps : courts et verts ; été : hauts et dorés)
-  const vb = (climat.saison === 1 || climat.saison === 2) && bles.length > 0;
+  const vb = (climat.saison === 1 || climat.saison === 2) && bles.length > 0 && !climat.famine;  // famine : les champs sont vides
   if (vb && (!BLE || BLE.instanceMatrix.count < bles.length)) { if (BLE) { scene.remove(BLE); BLE.dispose(); } BLE = new THREE.InstancedMesh(BLE_GEO, BLE_MAT, Math.ceil(bles.length * 1.3)); BLE.frustumCulled = false; BLE.castShadow = false; BLE.setColorAt(0, _c); scene.add(BLE); }
   if (BLE) BLE.visible = vb;
   if (vb) {

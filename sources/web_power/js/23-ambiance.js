@@ -137,11 +137,13 @@ function poseI(m, i, x, y, z, ry, s = 1, cache = false) { EU.set(0, ry, 0); QA.s
 let tAmb = 0;
 function animAmbiance(dt) {
   if (!AMB) return; if (DOUX) dt = 0; tAmb += dt;  // « réduire les animations » : chacun reste posé à sa place
-  const A = AMB, nuit = soleil(S.min).el < -.05, fant = vue !== 'carte';
+  const A = AMB, nuit = soleil(S.min).el < -.05, fant = vue !== 'carte', h = heure(S.min);
+  const trafic = clamp(.12 + .88 * Math.max(Math.exp(-((h - 8) ** 2) / 2.5), Math.exp(-((h - 18) ** 2) / 3.5), h > 9 && h < 17 ? .55 : 0), .12, 1);
   // véhicules de l'époque sur les routes, et petite ronde dans chaque quartier ; phares la nuit
   const PH = PHARES.geometry.attributes.position, PA = PH && PH.array; let np = 0;
   const poser = (c, x, y, z, ry) => {
-    const s = c.genre === 'char' ? 1.6 : 1.7, cache = !c.vis || (c.t && !c.t.ville); poseI(A.m['v_' + c.genre], c.idx, x, y, z, ry, s, cache);
+    // le trafic suit l'heure : pointes du matin et du soir, calme la nuit (les bennes gardent leur tournée)
+    const s = c.genre === 'char' ? 1.6 : 1.7, cache = !c.vis || (c.t && !c.t.ville) || (!c.benne && ((c.idx * .618) % 1) > trafic); poseI(A.m['v_' + c.genre], c.idx, x, y, z, ry, s, cache);
     if (nuit && !cache && PA) { PA.set([x + Math.cos(ry) * 1.5 * s, y + .9, z - Math.sin(ry) * 1.5 * s], np * 3); np++; }
   };
   for (const c of VEHIC) {

@@ -1,7 +1,7 @@
 // Petites touches du temps qui passe, toutes automatiques (elles suivent climat, posé par meteo.js) :
 // brume du matin sur l'eau (rivières, lacs, rivages) à l'aube ; feuilles qui tombent près des forêts en automne ;
 // givre sur les toits quand il gèle sans neige au sol (d'après les toits relevés par modeles.js ; monde.js donne ses bâtiments par toitsDe()).
-import { THREE, scene, chaqueImage, hache, cam, posCase, voisins } from './scene.js';
+import { THREE, scene, chaqueImage, hache, cam, posCase, voisins, qualite } from './scene.js';
 import { carte, hauteur, solEn, TERRE } from './plateau.js';
 import { cyl } from './toon.js';
 import { climat } from './vie.js';
@@ -88,7 +88,9 @@ chaqueImage((dt, t) => {
   FEUILLES.visible = !!automne;
   if (automne) {
     let n = 0; const vent = Math.min(1.4, climat.vent || 0.3);
+    const nmax = NF * Math.min(1, qualite.part);
     feuilles.forEach((f, k) => {
+      if (k >= nmax) return;
       if (!f.vivante || f.y <= f.sol) { if (Math.random() < dt * 3) chute(f); else f.vivante = false; }
       if (!f.vivante) return;
       f.y -= f.v * dt; f.x += (Math.sin(t * 2 + f.ph) * 0.06 + Math.cos(climat.dir || 0) * vent * 0.05) * dt; f.z += Math.sin(climat.dir || 0) * vent * 0.05 * dt;

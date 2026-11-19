@@ -1,6 +1,6 @@
 // Royaumes des Rives : démarrage, écran d'accueil (réglage de la carte avec aperçu 3D), boucle des tours.
 import { api } from './api.js';
-import { renderer, cam, viser, surTap, surClicDroit, posCase, chaqueImage, scene, voisins } from '../graphismes/rendu/scene.js';
+import { renderer, cam, viser, surTap, surClicDroit, posCase, chaqueImage, scene, voisins, qualite, reglerQualite, NIVEAUX_QUALITE } from '../graphismes/rendu/scene.js';
 import * as plateau from '../graphismes/rendu/plateau.js';
 import { initMonde, synchroniser, jouerMois, selectionnerArmee } from '../graphismes/rendu/monde.js';
 import { majVie } from '../graphismes/rendu/vie.js';
@@ -10,13 +10,14 @@ import { majBrouillard, jouerMoisBrouillard } from '../graphismes/rendu/brouilla
 import { majMarine, jouerMoisMarine } from '../graphismes/rendu/marine.js';
 import { majEspions, jouerMoisEspions } from '../graphismes/rendu/espions.js';
 import { appliquerMeteo } from '../graphismes/rendu/meteo.js';
+import { majChroniques } from '../graphismes/rendu/chroniques.js';
 import { majRoutes, effacerRoutes, niveauRoutes } from '../graphismes/rendu/routes.js';
 import { toutEffacer, effet } from '../graphismes/rendu/etiquettes.js';
 import * as ui from './ui.js';
 import './bivouacs.js'; // armées au repos la nuit : le bivouac de web_engine 2.12
 
 const $ = s => document.querySelector(s);
-const J = { R: null, carte: null, etat: null, info: null, mode: null, ombres: true, occupe: false, versionCarte: -1 };
+const J = { R: null, carte: null, etat: null, info: null, mode: null, occupe: false, versionCarte: -1 };
 window.__jeu = J; // pour les bancs d'essai
 
 chaqueImage(plateau.animer);
@@ -81,6 +82,7 @@ function appliquer(etat, rapport) {
   majVie(etat, rapport);
   majQuartiers(etat);
   appliquerMeteo(etat.meteo, etat.saison);
+  majChroniques(etat, rapport);  // incendies, épidémie, famine, feux d'artifice, bateaux (après la météo : la famine vide les champs)
   ui.majHUD();
 }
 async function lancer() {
@@ -360,7 +362,7 @@ async function menu(v) {
     if (r.ok) { ui.fermerFeuille(); await lancer(); } else ui.annonce('❌ ' + r.msg, 'guerre');
   }
   if (v === 'nouvelle') retourAccueil();
-  if (v === 'ombres') { J.ombres = !J.ombres; renderer.shadowMap.enabled = J.ombres; scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); ui.rafraichir(); }
+  if (v === 'qualite') { reglerQualite(NIVEAUX_QUALITE[(NIVEAUX_QUALITE.indexOf(qualite.niveau) + 1) % NIVEAUX_QUALITE.length]); ui.rafraichir(); }  // léger → normal → riche
   if (v === 'aide') ui.modale('❓ Comment jouer', `<p><b>Tour par tour</b> — un tour = un mois. Ordres pendant le mois, puis « Fin du mois » : chantiers, récoltes, marches et batailles se jouent.</p>
     <p><b>Saisons</b> — le blé pousse au printemps et se récolte l'été et l'automne ; rien l'hiver. Greniers et pêche aident à passer l'hiver ; le froid consomme du bois.</p>
     <p><b>Météo</b> — neige : armées ralenties de moitié ; pluie : boue et poudre mouillée ; canicule et sécheresse : mauvaises récoltes et incendies ; tempête : pas de pêche.</p>

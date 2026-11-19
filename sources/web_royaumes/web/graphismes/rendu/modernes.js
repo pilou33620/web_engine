@@ -4,7 +4,7 @@
 //
 //   import { BAT, QBAT, bFerme, modele, INSTALLATIONS, QUARTIERS, EPOQUES } from './modernes.js';
 //   const { groupe, fumees, rotors } = modele(BAT.nucleaire, 1);   // groupe à l'échelle du plateau (× 0,1)
-import { THREE, chaqueImage } from './scene.js';
+import { THREE, chaqueImage, pres } from './scene.js';
 import { lot, put, fige, boite, cyl, cone, sphere, degrade, CONT } from './toon.js';
 import { climat, bouffee } from './vie.js';
 
@@ -516,7 +516,8 @@ chaqueImage(dt => {
     for (const f of a.fum) if ((f.t -= dt) < 0) { f.t = f.genre === 'blanche' ? .55 : .7; bouffee(f.p.x, f.p.y, f.p.z, f.genre); }
     for (const r of rotors) r.rotation.z -= dt * 2 * (.5 + climat.vent * 1.5);
     if (lumieres) { lumieres.visible = nuit > .05; MLUM.opacity = nuit; }
-    for (const p of pieces) {
+    const loin = pieces.length && !pres(groupe.matrixWorld.elements[12], groupe.matrixWorld.elements[14]);  // qualité : au loin, les pièces se figent
+    if (!loin) for (const p of pieces) {
       const f = Math.sin(maintenant / 1000 * p.v + p.ph);
       if (p.a === 'tourne') p.o.rotation[p.axe] += dt * p.v;
       else if (p.a === 'oscille') p.o.rotation[p.axe] = f * p.amp;

@@ -17,12 +17,14 @@ function genreMeteo(w, m) {
 // fenêtres et réverbères la nuit : seules les villes alimentées s'allument
 const LUM = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({ map: TACHE, size: .5, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
 LUM.frustumCulled = false; LUM.visible = false; scene.add(LUM);
-let debordTic = 0, lumCle = '', lumTic = 0, neigeSol = 0, minPrec = null, cleMeteo = '', platTic = 0;
+let foudreTic = 2, debordTic = 0, lumCle = '', lumTic = 0, neigeSol = 0, minPrec = null, cleMeteo = '', platTic = 0;
+// une ville coupée par le délestage reste noire la nuit (une part des villes servies, toujours les mêmes d'abord)
+const coupee = v => S.delestage > 1 && hache(v.centre.q, v.centre.r, 61) < clamp(S.delestage / Math.max(1, S.demServie), .15, 1);
 function majLumieres() {
-  const cle = VILLES.map(v => v.nom + v.tuiles.length + v.servie).join();
+  const cle = VILLES.map(v => v.nom + v.tuiles.length + v.servie + coupee(v)).join();
   if (cle === lumCle) return; lumCle = cle;
   const pos = [], col = [];
-  for (const v of VILLES) if (v.servie) for (const t of v.tuiles) for (let k = 0; k < 5; k++) {
+  for (const v of VILLES) if (v.servie && !coupee(v)) for (const t of v.tuiles) for (let k = 0; k < 5; k++) {
     pos.push(t.x + (hache(t.q, t.r, 80 + k) - .5) * 14, t.top + 1.5 + hache(t.q, t.r, 90 + k) * 5, t.z + (hache(t.q, t.r, 100 + k) - .5) * 12);
     col.push(1, k % 3 ? .74 : .9, k % 3 ? .36 : .65);
   }
@@ -59,7 +61,13 @@ function animCiel(dt, kt) {
   const mwCharbon = UNITES.reduce((a, u) => a + (CHARBON.has(u.type) && actifU(u) ? u.p || 0 : 0), 0);
   MOTEUR.climat.pollution += (clamp(mwCharbon / 400, 0, .85) - MOTEUR.climat.pollution) * Math.min(1, dt * .3);
   MOTEUR.climat.eauSale = clamp((1 - (S.eau?.conf ?? 1)) * 1.5, 0, 1);
-  if ((debordTic -= dt) < 0) { debordTic = 1; majDebords(); }
+  if ((debordTic -= dt) < 0) { debordTic = 1; majDebords(); for (const u of UNITES) if (u.fin && u.grue && u.grue.userData.palier !== Math.round(avancement(u) * 5)) poserChantier(u); }
+  // la foudre frappe les lignes pendant la tempête (un pylône au hasard)
+  if (g === 'tempete' && LIGNES.length && (foudreTic -= dt) < 0) {
+    foudreTic = 3 + Math.random() * 5;
+    const l = LIGNES[Math.random() * LIGNES.length | 0], t = l.tuiles?.[Math.random() * (l.tuiles?.length || 0) | 0];
+    if (t && !t.brume) { const p = versMoteur(t.x, t.top + (l.kv >= 225 ? 7 : 4.5), t.z); MOTEUR.foudreSur(p.x, p.y, p.z); }
+  }
   if ((lumTic -= dt) < 0) { lumTic = .5; majLumieres(); }
   const nuit = MOTEUR.climat.nuit + MOTEUR.climat.aube * .5;
   LUM.material.opacity = clamp(nuit * 1.4, 0, 1); LUM.visible = LUM.material.opacity > .01;

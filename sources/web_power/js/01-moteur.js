@@ -7,7 +7,8 @@ import * as M from '../graphismes/rendu/scene.js';
 import * as plateau from '../graphismes/rendu/plateau.js';
 import * as toon from '../graphismes/rendu/toon.js';
 import * as modernes from '../graphismes/rendu/modernes.js';
-import { appliquerMeteo, forcerHeure } from '../graphismes/rendu/meteo.js';
+import { appliquerMeteo, forcerHeure, foudreSur } from '../graphismes/rendu/meteo.js';
+import { chantierVivant } from '../graphismes/rendu/chantiers.js';
 import { climat, bouffee } from '../graphismes/rendu/vie.js';
 import { majBrouillard, sansBrouillard } from '../graphismes/rendu/brouillard.js';
 import * as boue from '../graphismes/rendu/boue.js';
@@ -19,4 +20,4 @@ M.scene.add(MONDE);
 
 window.THREE = M.THREE;
 window.mergeGeometries = mergeGeometries;
-window.MOTEUR = { ...M, MONDE, plateau, toon, modernes, appliquerMeteo, forcerHeure, climat, bouffee, majBrouillard, sansBrouillard, boue };
+window.MOTEUR = { ...M, MONDE, plateau, toon, modernes, appliquerMeteo, forcerHeure, climat, bouffee, majBrouillard, sansBrouillard, boue, foudreSur, chantierVivant };
