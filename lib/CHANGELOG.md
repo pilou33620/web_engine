@@ -3,6 +3,16 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.15.0 — 2026-11-19
+
+`rendu` est redécoupé en parties plus fines : un jeu n'installe que ce qu'il utilise (voir le tableau du README).
+- parties : `three`, `socle` (scène, plateau, météo, vie commune, routes, boue, ambiance, brouillard, étiquettes), `moderne`, `antique`,
+  `ancien` (bâtiments et armées de 1700 à 1816, monde, quartiers, animations, images, icônes), `guerre` ; `rendu` reste « tout » ;
+- les fichiers restent dans `rendu/` : aucun chemin d'import ne change, rien à adapter dans les jeux sauf leur ligne `PARTIES` ;
+- le socle ne charge plus `monde.js` : `vie.js` exporte `MONDE`, où `monde.js` s'inscrit (`estArrete`, `listeArmees`, `parts`, `vent`) ;
+  `rayon()` passe dans `scene.js` (`guerre_commun.js` le réexporte) pour que le brouillard se passe de la guerre ;
+- l'installateur vérifie que chaque import relatif d'un module installé trouve son fichier.
+
 ## 2.14.0 — 2026-11-19
 
 Le temps et les effets de jeu se voient. Tout passe par `climat` (vie.js) : meteo.js le remplit d'après la météo du jeu,

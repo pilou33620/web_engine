@@ -12,8 +12,18 @@ La bibliothèque graphique commune des jeux. Elle vit dans `web_engine/lib/`, et
 
 | Partie | Contenu | A besoin de |
 |---|---|---|
-| `rendu/` | tous les rendus, en modules ES (détail ci-dessous) ; `rendu.css` ; `img/` (illustrations des événements, SVG), `icons/` (icônes de l'application, PNG) | `three` |
-| `three/` | three.js r186 (`three.module.js`, `three.core.js`) et `addons/utils/BufferGeometryUtils.js` : une bibliothèque tierce, pas un rendu | — |
+| `three` | `three/` : three.js r186 (`three.module.js`, `three.core.js`) et `addons/utils/BufferGeometryUtils.js` : une bibliothèque tierce, pas un rendu | — |
+| `socle` | `rendu/` : `scene`, `toon`, `plateau`, `meteo`, `vie`, `boue`, `ambiance`, `routes`, `brouillard`, `etiquettes`, `rendu.css` | `three` |
+| `moderne` | `rendu/modernes.js` | `socle` |
+| `antique` | `rendu/antiques.js` | `moderne` |
+| `ancien` | `rendu/` : `modeles`, `monde`, `quartiers`, `animations`, `img/` (illustrations des événements, SVG), `icons/` (icônes de l'application, PNG) | `socle`, `moderne`, `antique`, `guerre` |
+| `guerre` | `rendu/` : `guerre_commun`, `remparts`, `forts`, `sieges`, `marine`, `espions` | `ancien` |
+| `rendu` | tout (les jeux d'avant la 2.15.0) | toutes |
+
+Depuis la 2.15.0, **les parties sont des listes de fichiers de `rendu/`** (dans `outils/installer.sh`) : un jeu qui prend moins de parties a moins
+de fichiers, mais les chemins d'import ne changent pas (`graphismes/rendu/…`). Le socle ne dépend ni de `monde.js` ni de la guerre :
+`monde.js` s'inscrit lui-même auprès de `vie.js` (`MONDE`) et de `ambiance.js` (`toitsDe`) quand il est chargé. L'installateur vérifie
+que chaque import d'un fichier installé trouve son fichier, et échoue sinon.
 
 | Module de `rendu/` | Rôle |
 |---|---|
@@ -61,8 +71,8 @@ const en1960 = INSTALLATIONS.filter(t => t.an <= 1960 && !(t.fin && t.fin < 1960
 
 | Jeu | Dossier | `PARTIES` |
 |---|---|---|
-| web_royaumes | `web/graphismes/` | `rendu` (servi par le serveur Rust) |
-| web_power | `graphismes/` | `rendu` (le moteur unique depuis la 2.3.0 : le jeu dessine dans un groupe à son échelle, voir son `js/01-moteur.js`) |
+| web_royaumes | `web/graphismes/` | `ancien guerre` (donc tout ; servi par le serveur Rust) |
+| web_power | `graphismes/` | `moderne` (avec `socle` et `three` ; le moteur unique depuis la 2.3.0 : le jeu dessine dans un groupe à son échelle, voir son `js/01-moteur.js`) |
 
 ## Utiliser la bibliothèque dans un jeu
 
