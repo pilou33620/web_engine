@@ -38,9 +38,9 @@ PARTIES=$(printf '%s\n' "${!PRISES[@]}" | sort | tr '\n' ' ' | sed 's/ $//')
 VERSION=$(python3 -c "import json; print(json.load(open('lib/package.json'))['version'])")
 COMMIT=$(git rev-parse HEAD 2>/dev/null || echo inconnu)
 if [ -n "$(git status --porcelain lib 2>/dev/null)" ]; then COMMIT="$COMMIT-modifie"; echo "attention : lib/ a des modifications non commitées" >&2; fi
-rm -rf "$DEST" && mkdir -p "$DEST/$R"
+rm -rf "$DEST" && mkdir -p "$DEST"
 cp lib/README.md lib/CHANGELOG.md lib/package.json "$DEST/"
-for p in $PARTIES; do for f in ${FICHIERS[$p]}; do cp -r "lib/$f" "$DEST/$f"; done; done
+for p in $PARTIES; do for f in ${FICHIERS[$p]}; do mkdir -p "$(dirname "$DEST/$f")"; cp -r "lib/$f" "$DEST/$f"; done; done
 # contrôle : chaque import relatif d'un module installé doit trouver son fichier (sinon une partie oublie une dépendance)
 manque=0
 for js in "$DEST/$R"/*.js; do
