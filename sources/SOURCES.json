@@ -19,6 +19,11 @@
   },
   {
    "source": "web_engine",
+   "chemin": "maquettes/web_engine/armees-propositions.html",
+   "titre": "Armées : propositions"
+  },
+  {
+   "source": "web_engine",
    "chemin": "maquettes/web_engine/batiments-antiques.html",
    "titre": "Gaulois et Romains"
   },
