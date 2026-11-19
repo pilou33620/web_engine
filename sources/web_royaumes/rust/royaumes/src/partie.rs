@@ -350,6 +350,11 @@ pub struct Stats {
     pub entretien_flotte: f64,
 }
 
+/// Gain de temps des routes, par niveau : aucune, chemin de terre, pavée, royale (Lumières), impériale (Empire), empierrée (macadam, industrie).
+pub const ROUTES: [f64; 6] = [1.0, 0.8, 0.65, 0.5, 0.4, 0.32];
+/// Nom des niveaux de route et l'année où chacun devient possible.
+pub const NIVEAUX_ROUTES: [(&str, u32); 6] = [("", 0), ("Chemins de terre", 0), ("Routes pavées", 0), ("Routes royales", 1720), ("Routes impériales", 1789), ("Routes empierrées (macadam)", 1816)];
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Partie {
     pub version: u32,
@@ -463,6 +468,12 @@ impl Partie {
         }
         // chaque départ a du bois et de la pierre à portée
         for &s in &departs {
+            // un royaume ne naît ni au désert ni dans la toundra : ses terres proches redeviennent tempérées
+            for x in carte.rayon(s, 2) {
+                if matches!(carte.cases[x].biome.as_deref(), Some("desert" | "toundra")) {
+                    carte.cases[x].biome = None;
+                }
+            }
             carte.cases[s].foret = false;
             carte.cases[s].arbres = 0;
             carte.cases[s].bois = 0.0;
@@ -887,7 +898,8 @@ impl Partie {
         if !self.carte.voisins(case).iter().any(|&v| self.carte.cases[v].proprio == id) {
             return Err("La case doit toucher votre royaume".into());
         }
-        let prix = self.prix_terre(id);
+        // le désert ne vaut pas grand-chose : moitié prix
+        let prix = self.prix_terre(id) * if k.biome.as_deref() == Some("desert") { 0.5 } else { 1.0 };
         let cout: Panier = [("or".to_string(), prix)].into();
         if !self.peut_payer(id, &cout) {
             return Err(format!("Il faut {prix} 🪙"));
@@ -1187,9 +1199,17 @@ impl Partie {
         k.terre() && k.t != Terrain::Montagne
     }
 
+    /// Coût d'une case pour le tracé des chemins (les routes y comptent pleinement, quel que soit leur royaume).
     pub fn cout_case(&self, case: usize) -> f64 {
+        self.cout_pour(self.carte.cases[case].proprio, case)
+    }
+
+    /// Coût d'une case pour une armée de `id` : terrain, biome (désert ; toundra l'hiver ou sous la neige), route et météo.
+    /// Une route fait gagner du temps, d'autant plus qu'elle est récente (ROUTES, un niveau par époque) ; un chemin de terre
+    /// sous la pluie s'embourbe ; en terre étrangère, ponts gardés et routes coupées : la moitié du gain seulement.
+    pub fn cout_pour(&self, id: i32, case: usize) -> f64 {
         let k = &self.carte.cases[case];
-        let base = if !k.terre() {
+        let mut base = if !k.terre() {
             1.0
         } else if k.t == Terrain::Colline {
             2.0
@@ -1198,8 +1218,58 @@ impl Partie {
         } else {
             1.0
         };
-        // une route fait gagner du temps, d'autant plus qu'elle est bonne
-        base * [1.0, 0.8, 0.65, 0.5][(k.route as usize).min(3)]
+        match k.biome.as_deref() {
+            Some("desert") => base *= 1.5,
+            Some("toundra") if self.hiver() || self.meteo.neige_sol > 0.3 => base *= 1.5,
+            _ => {}
+        }
+        let mut f = ROUTES[(k.route as usize).min(5)];
+        if k.route == 1 && self.meteo.pluie > 0.4 {
+            f = 1.1;
+        }
+        if k.proprio >= 0 && k.proprio != id && f < 1.0 {
+            f = 1.0 - (1.0 - f) / 2.0;
+        }
+        base * f
+    }
+
+    pub fn hiver(&self) -> bool {
+        crate::meteo::saison(crate::meteo::mois(self.tour)) == 0
+    }
+
+    /// La case est sur une route de `id`, ou la touche : ses armées y sont ravitaillées (ni soif ni froid).
+    pub fn ravitaillee(&self, id: i32, case: usize) -> bool {
+        let mut pres = self.carte.voisins(case);
+        pres.push(case);
+        self.routes.iter().any(|r| r[2] as i32 == id && (pres.contains(&r[0]) || pres.contains(&r[1])))
+    }
+
+    /// Les cases que l'armée `a` peut atteindre ce mois-ci (ses points de marche, routes, terrain et météo compris).
+    pub fn portee(&self, a: &Armee) -> Vec<usize> {
+        let pts = self.vitesse(a) * self.meteo.effets(self.tour).mouvement;
+        let n = self.carte.cases.len();
+        let mut dist = vec![f64::INFINITY; n];
+        let mut tas = BinaryHeap::new();
+        dist[a.case] = 0.0;
+        tas.push(Reverse((0u64, a.case)));
+        while let Some(Reverse((d, c))) = tas.pop() {
+            let d = d as f64 / 1000.0;
+            if d > dist[c] + 1e-6 {
+                continue;
+            }
+            for v in self.carte.voisins(c) {
+                // comme la marche : on entre dans une case tant qu'il reste des points (le dernier pas peut déborder)
+                if !self.praticable(v) || d >= pts - 0.05 {
+                    continue;
+                }
+                let nd = d + self.cout_pour(a.proprio, v);
+                if nd < dist[v] - 1e-9 {
+                    dist[v] = nd;
+                    tas.push(Reverse(((nd * 1000.0) as u64, v)));
+                }
+            }
+        }
+        (0..n).filter(|&i| i != a.case && dist[i].is_finite()).collect()
     }
 
     // ------------------------------------------------------------------ routes
@@ -1207,7 +1277,7 @@ impl Partie {
         if id < 0 || id == BRIGANDS {
             return 1;
         }
-        self.royaumes.get(id as usize).map(|r| r.niveau_routes.clamp(1, 3) as u8).unwrap_or(1)
+        self.royaumes.get(id as usize).map(|r| r.niveau_routes.clamp(1, 5) as u8).unwrap_or(1)
     }
 
     pub fn segments_routes(&self, id: i32) -> usize {
@@ -1217,10 +1287,11 @@ impl Partie {
     /// Ce que coûte à `id` le passage de ses routes au niveau `cible`.
     pub fn cout_routes(&self, id: i32, cible: u8) -> Panier {
         let n = self.segments_routes(id).max(4) as f64;
-        if cible <= 2 {
-            Panier::from([("pierre".to_string(), n * 2.0), ("or".to_string(), 100.0)])
-        } else {
-            Panier::from([("pierre".to_string(), n * 3.0), ("outils".to_string(), (n * 0.3).ceil()), ("or".to_string(), 300.0)])
+        match cible {
+            0..=2 => Panier::from([("pierre".to_string(), n * 2.0), ("or".to_string(), 100.0)]),
+            3 => Panier::from([("pierre".to_string(), n * 3.0), ("outils".to_string(), (n * 0.3).ceil()), ("or".to_string(), 300.0)]),
+            4 => Panier::from([("pierre".to_string(), n * 4.0), ("outils".to_string(), (n * 0.5).ceil()), ("or".to_string(), 500.0)]),
+            _ => Panier::from([("pierre".to_string(), n * 4.0), ("outils".to_string(), (n * 0.6).ceil()), ("fer".to_string(), (n * 0.4).ceil()), ("or".to_string(), 800.0)]),
         }
     }
 
@@ -1377,7 +1448,7 @@ impl Partie {
     /// Mois nécessaires pour parcourir `chemin` (estimation affichée au joueur).
     pub fn mois_trajet(&self, a: &Armee, chemin: &[usize]) -> u32 {
         let pts = self.vitesse(a) * self.meteo.effets(self.tour).mouvement;
-        let cout: f64 = chemin.iter().map(|&c| self.cout_case(c)).sum();
+        let cout: f64 = chemin.iter().map(|&c| self.cout_pour(a.proprio, c)).sum();
         (cout / pts.max(0.5)).ceil().max(1.0) as u32
     }
 
@@ -1453,6 +1524,33 @@ mod essais {
                 }
             }
         }
+    }
+
+    #[test]
+    fn biomes_et_routes_comptent() {
+        let mut p = Partie::nouvelle(Options { graine: 99, ..Options::default() });
+        p.meteo.pluie = 0.0;
+        p.meteo.neige_sol = 0.0;
+        // une plaine libre, sans forêt ni route : on y essaie terrain, biome et niveaux de route
+        let i = (0..p.carte.cases.len()).find(|&i| { let k = &p.carte.cases[i]; k.t == Terrain::Plaine && !k.foret && k.proprio == -1 }).unwrap();
+        p.carte.cases[i].biome = None;
+        p.carte.cases[i].route = 0;
+        assert_eq!(p.cout_pour(0, i), 1.0);
+        p.carte.cases[i].biome = Some("desert".into());
+        assert_eq!(p.cout_pour(0, i), 1.5, "le désert ralentit");
+        p.carte.cases[i].biome = None;
+        let couts: Vec<f64> = (1..=5).map(|n| { p.carte.cases[i].route = n; p.cout_pour(-1, i) }).collect();
+        assert!(couts.windows(2).all(|w| w[1] < w[0]), "chaque époque de route va plus vite : {couts:?}");
+        p.carte.cases[i].route = 1;
+        p.meteo.pluie = 0.8;
+        assert!(p.cout_pour(-1, i) > 1.0, "un chemin de terre s'embourbe sous la pluie");
+        p.carte.cases[i].route = 3;
+        let libre = p.cout_pour(0, i);
+        p.carte.cases[i].proprio = 1;
+        assert!(p.cout_pour(0, i) > libre && p.cout_pour(1, i) < p.cout_pour(0, i), "en terre étrangère, la moitié du gain");
+        // les routes impériales attendent 1789
+        p.royaumes[0].niveau_routes = 3;
+        assert!(p.ameliorer_routes(0).unwrap_err().contains("1789"));
     }
 
     #[test]

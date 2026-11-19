@@ -241,10 +241,15 @@ function annulerMode() {
   $('#bandeau-mode').style.display = 'none';
   document.body.classList.remove('mode');
 }
+/** Les cases qu'une de nos armées peut atteindre ce mois-ci (serveur : routes, terrain, biomes et météo comptés), en bleu clair. */
+function montrerPortee(id) {
+  if (J.mode) return;
+  plateau.surbrillance(J.etat.armees.find(a => a.id === id && a.proprio === 0)?.portee || [], 0x8fd0ff);
+}
 function choisirArmee(id) {
   const a = J.etat.armees.find(x => x.id === id);
   if (!a) return;
-  selectionnerArmee(id); J.armeeSel = id;
+  selectionnerArmee(id); J.armeeSel = id; montrerPortee(id);
   plateau.selection(a.case, 0xffd34d);
   plateau.trace(a.chemin);
   ui.ouvrirFeuille('⚔️ Armée', () => ui.vueArmee(id));
@@ -270,7 +275,7 @@ function inspecter(i) {
   annulerMode();
   // notre armée sur la case est sélectionnée : un clic droit ailleurs l'y envoie
   J.armeeSel = J.etat.armees.find(a => a.case === i && a.proprio === 0)?.id ?? null;
-  selectionnerArmee(J.armeeSel);
+  selectionnerArmee(J.armeeSel); montrerPortee(J.armeeSel);
   plateau.trace([]);
   plateau.selection(i);
   viserCase(i);
@@ -332,7 +337,7 @@ surTap(async i => {
   }
   // notre armée sur la case est sélectionnée : un clic droit ailleurs l'y envoie
   J.armeeSel = J.etat.armees.find(a => a.case === i && a.proprio === 0)?.id ?? null;
-  selectionnerArmee(J.armeeSel);
+  selectionnerArmee(J.armeeSel); montrerPortee(J.armeeSel);
   plateau.trace([]);
   plateau.selection(i);
   // une seule de vos unités, seule sur la case : sa fiche directement ; sinon la fiche de la case liste tout

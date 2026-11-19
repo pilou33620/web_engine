@@ -691,11 +691,11 @@ fn commerce(p: &mut Partie, k: usize, b: &Bilan) {
     }
 }
 
-/// Les routes : pavées puis royales quand le trésor déborde.
+/// Les routes : pavées, royales, impériales puis empierrées quand le trésor déborde.
 fn routes(p: &mut Partie, k: usize) {
     let id = k as i32;
     let cible = p.niveau_routes(id) + 1;
-    if cible <= 3 && p.peut_payer(id, &p.cout_routes(id, cible)) {
+    if cible <= 5 && p.peut_payer(id, &p.cout_routes(id, cible)) {
         let _ = p.ameliorer_routes(id);
     }
 }

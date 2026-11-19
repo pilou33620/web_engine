@@ -6,12 +6,13 @@
 // 4e élément de chaque route, de 0 à 1) s'élargissent, et un chemin de terre très passant devient pavé.
 import { THREE, scene, posCase, hache } from './scene.js';
 import { carte, hauteur, ruban, TERRE, bordEntre, casesBaties } from './plateau.js';
-import { lot, put, fige, jeter, boite, cyl, sphere } from './toon.js';
+import { lot, put, fige, jeter, boite, cyl, cone, sphere } from './toon.js';
 import { MAT_TERRE, MAT_PAVE, flaques } from './boue.js';
 
 const groupe = new THREE.Group();
 scene.add(groupe);
-const COULEUR = { 1: 0xc9a874, 2: 0xb9b2a2, 3: 0x8a867e }, LARGE = { 1: 0.07, 2: 0.075, 3: 0.085 }, EP = 0.022;
+// 1 chemin de terre, 2 pavée, 3 royale (Lumières), 4 impériale (Empire), 5 empierrée au macadam (révolution industrielle)
+const COULEUR = { 1: 0xc9a874, 2: 0xb9b2a2, 3: 0x8a867e, 4: 0xd8cdb4, 5: 0x5f5d5a }, LARGE = { 1: 0.07, 2: 0.075, 3: 0.085, 4: 0.1, 5: 0.095 }, EP = 0.022;
 let signature = '', niveauJoueur = 1, dernieres = [];
 
 /** Le niveau des routes du joueur (etat.joueur.routes.niveau) : sert aux routes que le moteur envoie sans niveau. */
@@ -78,15 +79,21 @@ export function majRoutes(routes) {
       put(L, boite(0.5, 0.03, 0.2), niv === 1 ? 0x8b5a2b : 0xb9b3a6, c[0], y0 + 0.02, c[1], cap, EP);
       for (const s of [-1, 1]) put(L, boite(0.5, 0.05, 0.025), niv === 1 ? 0x6b4423 : 0x8a8478, c[0] - dz / l * s * 0.1, y0 + 0.055, c[1] + dx / l * s * 0.1, cap, 0.008);
     }
-    if (niv === 3) for (const b of bords) {
-      // route royale : arbres d'alignement des deux côtés
-      if (hache(i, b.v, 3) > 0.6) continue;
+    if (niv === 3 || niv === 4) for (const b of bords) {
+      // routes royale et impériale : arbres d'alignement des deux côtés (l'impériale, plus serrés : des peupliers)
+      if (hache(i, b.v, 3) > (niv === 4 ? 0.85 : 0.6)) continue;
       const dx = b.M[0] - c[0], dz = b.M[1] - c[1], l = Math.hypot(dx, dz) || 1, y = hauteur(i);
       for (const s of [-1, 1]) {
         const x = c[0] + dx * 0.55 - dz / l * s * 0.2, z = c[1] + dz * 0.55 + dx / l * s * 0.2;
         put(L, cyl(0.018, 0.024, 0.12, 5), 0x6b4a2a, x, y + 0.06, z, 0, EP * 0.5);
-        put(L, sphere(0.07, 0), 0x4c8f3a, x, y + 0.16, z, 0, EP);
+        if (niv === 4) put(L, cone(0.04, 0.2, 6), 0x3f7f34, x, y + 0.2, z, 0, EP); else put(L, sphere(0.07, 0), 0x4c8f3a, x, y + 0.16, z, 0, EP);
       }
+    }
+    if (niv === 5) for (const b of bords) {
+      // route empierrée : bornes kilométriques blanches au bord
+      if (hache(i, b.v, 4) > 0.5) continue;
+      const dx = b.M[0] - c[0], dz = b.M[1] - c[1], l = Math.hypot(dx, dz) || 1, y = hauteur(i);
+      put(L, boite(0.022, 0.035, 0.016), 0xf2efe6, c[0] + dx * 0.5 - dz / l * 0.07, y + 0.0175, c[1] + dz * 0.5 + dx / l * 0.07, 0, 0.004);
     }
   }
   fige(L, groupe); fige(LT, groupe, MAT_TERRE); fige(LP, groupe, MAT_PAVE);

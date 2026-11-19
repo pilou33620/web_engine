@@ -2,7 +2,7 @@
 
 Généré par `outils/synchroniser.sh` : ne pas modifier à la main.
 
-## web_royaumes — `6b93ff1` (2026-11-19)
+## web_royaumes — `999ccb7` (2026-11-19)
 
 | Fichier | Taille | Rôle (en-tête du fichier) |
 |---|---:|---|
@@ -78,11 +78,11 @@ Généré par `outils/synchroniser.sh` : ne pas modifier à la main.
 | `web/index.html` | 6 ko |  |
 | `web/js/api.js` | 1 ko | Les appels au serveur Rust (le moteur décide de tout ; la page affiche et envoie les ordres). |
 | `web/js/bivouacs.js` | 3 ko | Les armées au repos (la nuit, ou hors des villes depuis un tour) : le bivouac de la bibliothèque (bivouacAncien, web_engine 2.12) à la place du bivouac simple de vie.js. |
-| `web/js/main.js` | 23 ko | Royaumes des Rives : démarrage, écran d'accueil (réglage de la carte avec aperçu 3D), boucle des tours. |
-| `web/js/ui.js` | 68 ko | L'interface : barre du haut, panneaux (construire, diplomatie, armées, royaume, menu), fiche d'une case |
+| `web/js/main.js` | 24 ko | Royaumes des Rives : démarrage, écran d'accueil (réglage de la carte avec aperçu 3D), boucle des tours. |
+| `web/js/ui.js` | 69 ko | L'interface : barre du haut, panneaux (construire, diplomatie, armées, royaume, menu), fiche d'une case |
 | `web/manifest.webmanifest` | 0 ko |  |
 
-## web_power — `1868d80` (2026-11-19)
+## web_power — `5f6edc3` (2026-11-19)
 
 | Fichier | Taille | Rôle (en-tête du fichier) |
 |---|---:|---|

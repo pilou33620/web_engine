@@ -489,10 +489,14 @@ impl Partie {
     /// Les routes de `id` passent au niveau suivant ; rend ce niveau.
     pub fn ameliorer_routes(&mut self, id: i32) -> Result<u8, String> {
         let n = self.niveau_routes(id);
-        if n >= 3 {
-            return Err("Vos routes sont déjà des routes royales".into());
+        if n >= 5 {
+            return Err("Vos routes sont déjà empierrées".into());
         }
         let cible = n + 1;
+        let (nom, annee) = crate::partie::NIVEAUX_ROUTES[cible as usize];
+        if self.annee() < annee as i32 {
+            return Err(format!("{nom} : pas avant {annee}"));
+        }
         if cible == 2 && self.niveau_capitale(id) < 2 {
             return Err("Il faut une capitale au rang Village".into());
         }

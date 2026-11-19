@@ -3,6 +3,11 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.22.0 — 2026-11-19
+
+Deux niveaux de route de plus (`routes.js`), un par époque : 4, routes impériales (Empire : larges, claires, bordées de
+peupliers) ; 5, routes empierrées au macadam (révolution industrielle : grises, bornes kilométriques).
+
 ## 2.21.0 — 2026-11-19
 
 Biomes donnés par le jeu : si la carte passée à `construire()` porte `biome` (une valeur par case : 'marais', 'desert',

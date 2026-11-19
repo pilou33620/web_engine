@@ -107,6 +107,7 @@ impl Partie {
         self.brigands(&mut rapport);
         self.navigation(&eff, &mut rapport);
         self.marches(&eff, &mut rapport);
+        self.climat_armees(&mut rapport);
         self.espions_mois(&eff, &mut rapport);
         self.sieges_mois(&eff, &mut rapport);
         self.blocus_mois(&mut rapport);
@@ -174,6 +175,40 @@ impl Partie {
         self.evt(rapport, format!("🏴 Une bande de brigands ({n}) sort des bois et marche sur {nom} !"), "guerre", Some(depart));
     }
 
+    /// Fin du mois : une armée dans le désert (soif), ou dans la toundra l'hiver (froid), hors de son royaume et loin de ses routes,
+    /// perd environ 3 % de ses soldats (un régiment de temps en temps quand elle en a peu).
+    fn climat_armees(&mut self, rapport: &mut Rapport) {
+        let hiver = self.hiver();
+        for i in 0..self.armees.len() {
+            let (case, proprio) = (self.armees[i].case, self.armees[i].proprio);
+            let mal = match self.carte.cases[case].biome.as_deref() {
+                Some("desert") => "la soif",
+                Some("toundra") if hiver => "le froid",
+                _ => continue,
+            };
+            // chez elle, ou près de ses routes, une armée est ravitaillée
+            // shortcut: l'ordinateur ne sait pas encore éviter désert et toundra, ses armées y sont épargnées ; à lever quand ia/militaire.rs en tiendra compte
+            if proprio != 0 || self.carte.cases[case].proprio == proprio || self.villes.iter().any(|v| v.case == case) || self.ravitaillee(proprio, case) {
+                continue;
+            }
+            let mut perdus = 0;
+            let cles: Vec<String> = self.armees[i].unites.keys().cloned().collect();
+            for u in cles {
+                let n = self.armees[i].unites[&u];
+                // sans tirer au hasard (le hasard de la partie reste le même) : 3 % arrondis, un mois sur l'autre selon le tour
+                let p = (n * 3 + (self.tour * 37 + i as u32 * 13) % 100) / 100;
+                let p = p.min(n);
+                perdus += p;
+                *self.armees[i].unites.get_mut(&u).unwrap() -= p;
+            }
+            self.armees[i].unites.retain(|_, n| *n > 0);
+            if perdus > 0 && proprio == 0 {
+                self.evt(rapport, format!("🥵 {mal} : votre armée perd {perdus} régiment{} (hors de vos terres, sans route pour la ravitailler)", if perdus > 1 { "s" } else { "" }).replace("🥵 le froid", "🥶 Le froid").replace("🥵 la soif", "🥵 La soif"), "guerre", Some(case));
+            }
+        }
+        self.armees.retain(|a| a.unites.values().any(|&n| n > 0));
+    }
+
     fn marches(&mut self, eff: &Effets, rapport: &mut Rapport) {
         let mut points: BTreeMap<u32, f64> = BTreeMap::new();
         for a in &self.armees {
@@ -200,7 +235,7 @@ impl Partie {
                     continue;
                 }
                 let suiv = self.armees[i].chemin[0];
-                points.insert(id, pts - self.cout_case(suiv));
+                points.insert(id, pts - self.cout_pour(self.armees[i].proprio, suiv));
                 self.armees[i].chemin.remove(0);
                 self.armees[i].case = suiv;
                 self.armees[i].retranche = None;
@@ -696,12 +731,24 @@ impl Partie {
                 if b.cle == "ferme" && kc.fertile {
                     f *= 1.5;
                 }
+                // désert : cultures pauvres, grillées par la canicule ; toundra : saison courte, rien dès l'automne
+                match kc.biome.as_deref() {
+                    Some("desert") => f *= if self.meteo.genre == "canicule" { 0.2 } else { 0.4 },
+                    Some("toundra") => f *= if saison == 3 { 0.0 } else { 0.5 },
+                    _ => {}
+                }
             }
             if b.cle == "pecheur" || b.cle == "port" {
                 f *= eff.peche * if carto { 1.2 } else { 1.0 };
                 if self.carte.voisins(b.case).iter().any(|&v| self.carte.cases[v].poissons) {
                     f *= 1.5;
                 }
+            }
+            if b.cle == "carriere" && kc.biome.as_deref() == Some("desert") {
+                f *= 1.2; // la pierre à nu
+            }
+            if b.cle == "bucheron" && kc.biome.as_deref() == Some("toundra") {
+                f *= 1.3; // les grandes forêts de sapins
             }
             if b.cle == "carriere" && (kc.gisement.as_deref() == Some("pierre") || self.carte.voisins(b.case).iter().any(|&v| self.carte.cases[v].gisement.as_deref() == Some("pierre"))) {
                 f *= 1.4;

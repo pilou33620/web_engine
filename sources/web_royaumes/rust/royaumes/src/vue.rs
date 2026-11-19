@@ -101,13 +101,19 @@ pub fn etat(p: &Partie) -> Value {
     rapport.mouvements.retain(|m| m.proprio == 0 || m.trajet.iter().any(|&c| vu(c)));
     rapport.combats.retain(|c| c.attaquant == 0 || c.defenseur == 0 || vu(c.case));
     let nr = p.niveau_routes(0);
-    let nom_routes = ["", "Chemins de terre", "Routes pavées", "Routes royales"][nr as usize];
+    let nom_routes = crate::partie::NIVEAUX_ROUTES[nr as usize].0;
+    let suivant = crate::partie::NIVEAUX_ROUTES.get(nr as usize + 1);
     let routes_joueur = json!({
         "niveau": nr,
         "nom": nom_routes,
         "segments": p.segments_routes(0),
-        "cout": if nr < 3 { json!(p.cout_routes(0, nr + 1)) } else { Value::Null },
-        "verrou": if nr == 1 && p.niveau_capitale(0) < 2 { json!("Capitale au rang Village") } else if nr == 2 && !j.a("routes") { json!("Technologie « Routes royales et canaux »") } else { Value::Null },
+        "max": 5,
+        "suivant": suivant.map(|s| s.0),
+        // le gain de temps des armées sur ces routes (1 − coefficient), en %
+        "gain": ((1.0 - crate::partie::ROUTES[nr as usize]) * 100.0).round(),
+        "cout": if nr < 5 { json!(p.cout_routes(0, nr + 1)) } else { Value::Null },
+        "verrou": if nr == 1 && p.niveau_capitale(0) < 2 { json!("Capitale au rang Village") } else if nr == 2 && !j.a("routes") { json!("Technologie « Routes royales et canaux »") }
+            else if let Some((nom, an)) = suivant.filter(|s| p.annee() < s.1 as i32) { json!(format!("{nom} : pas avant {an}")) } else { Value::Null },
     });
     let villes: Vec<Value> = p.villes.iter().enumerate().filter(|(_, v)| v.proprio == 0 || connu(v.case)).map(|(i, v)| {
         // le niveau suivant, pour le joueur : son coût, et ce qui le bloque (travaux, rang, technologie)
@@ -213,6 +219,8 @@ pub fn etat(p: &Partie) -> Value {
             "chemin": if a.proprio == 0 { json!(a.chemin) } else { json!(a.chemin.iter().take_while(|&&c| vu(c)).collect::<Vec<_>>()) },
             "effectif": a.effectif() as i64 * HOMMES, "att": p.attaque(a, false, 1.0), "def": p.defense(a),
             "mois": if a.chemin.is_empty() { 0 } else { p.mois_trajet(a, &a.chemin) },
+            // les cases atteignables ce mois-ci (armées du joueur) : surlignées quand on la sélectionne
+            "portee": if a.proprio == 0 { json!(p.portee(a)) } else { Value::Null },
             "assiege": p.assiege(a.proprio, a.case),
             // null, "en_cours" (un mois de travaux) ou "pret" (défense ×retranchement.defense)
             "retranche": match a.retranche { None => Value::Null, Some(0) => json!("pret"), Some(_) => json!("en_cours") },

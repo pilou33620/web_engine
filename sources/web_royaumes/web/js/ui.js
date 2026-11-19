@@ -220,6 +220,12 @@ function vueConstruire() {
 }
 
 // --- fiche d'une case
+// les biomes du générateur (carte.rs) et ce qu'ils changent (partie.rs, tour.rs)
+const BIOMES = {
+  desert: '🏜️ Désert : cultures ×0,4 (×0,2 en canicule), marche ×1,5, soif des armées hors de leurs terres et loin de leurs routes, carrière ×1,2, terre moitié prix',
+  toundra: '🥶 Toundra : cultures ×0,5 et rien dès l\'automne, marche ×1,5 l\'hiver, froid des armées l\'hiver hors de leurs terres et loin de leurs routes, bûcheron ×1,3',
+  marais: '🌾 Marais : pas de culture fertile',
+};
 const NOM_T = ['🌊 Océan', '🌊 Haut-fond', '💧 Lac', '🏖️ Plage', '🌿 Plaine', '⛰️ Colline', '🏔️ Montagne'];
 const connue = i => !!J.etat.explore?.[i];
 const ligne = (k, v) => `<div class="ligne"><span class="k">${k}</span><span class="v">${v}</span></div>`;
@@ -243,7 +249,7 @@ export function vueCase(i) {
   if (!connue(i)) return `<div class="boite"><div class="mini">Aucun de vos sujets n'a encore exploré ces terres : on n'en sait rien et l'on ne peut rien y bâtir. Envoyez-y une armée, un navire ou un espion pour les découvrir.</div></div>`;
   const o = surCase(i), b = o.batiment, pr = E.cases.proprio[i];
   let h = E.visible?.[i] ? '' : `<div class="mini brume">👁️ Hors de vue : dernier état connu.</div>`;
-  h += `<div class="boite">${ligne('Terrain', `${NOM_T[C.terrain[i]]}${C.riviere[i] ? ' · rivière' : ''}${C.fertile[i] ? ' · fertile' : ''}`)}`;
+  h += `<div class="boite">${ligne('Terrain', `${NOM_T[C.terrain[i]]}${C.riviere[i] ? ' · rivière' : ''}${C.fertile[i] ? ' · fertile' : ''}`)}${C.biome?.[i] ? ligne('Biome', BIOMES[C.biome[i]] || C.biome[i]) : ''}`;
   if (C.gisement[i]) h += ligne('Gisement', { pierre: '🪨 Pierre', fer: '⛏️ Fer', or: '💰 Or', charbon: '⚫ Charbon' }[C.gisement[i]]);
   if (C.poissons[i]) h += ligne('Ressource', '🐟 Banc de poissons');
   if (E.cases.foret[i]) h += ligne('Bois sur pied', `🪵 ${E.cases.bois[i]}`);
@@ -572,7 +578,7 @@ function vueRoyaume() {
     h += `<div class="boite"><h4>${j.bonheur >= 60 ? '😊' : j.bonheur >= 35 ? '😐' : '😠'} Bonheur ${Math.round(j.bonheur)} %</h4>${(j.detail_bonheur || []).map(([k, v]) => `<div class="ligne"><span class="k">${e(k)}</span><span class="v" style="color:${v > 0 ? '#8f8' : v < 0 ? '#f98' : '#ccc'}">${v > 0 ? '+' : ''}${Math.round(v)}</span></div>`).join('') || '<div class="mini">Calculé à la fin du premier mois.</div>'}</div>`;
     h += `<div class="boite"><h4>🪙 Finances du mois</h4><div class="ligne"><span class="k">Impôts</span><span class="v">+${(rv.impots || 0).toFixed(0)}</span></div><div class="ligne"><span class="k">Routes commerciales</span><span class="v">+${(rv.commerce || 0).toFixed(0)}</span></div><div class="ligne"><span class="k">Commerce maritime</span><span class="v">+${(rv.commerce_mer || 0).toFixed(0)}</span></div><div class="ligne"><span class="k">Entretien</span><span class="v">−${(rv.entretien || 0).toFixed(0)}</span></div><div class="ligne"><span class="k">dont marine et espions · forts</span><span class="v">−${(j.entretien_flotte || 0).toFixed(0)} · −${(j.entretien_forts || 0).toFixed(0)}</span></div>${vieOr(j).length ? `<div class="ligne"><span class="k">Vie des villes</span><span class="v">${vieOr(j).join(' · ')}</span></div>` : ''}<div class="ligne"><span class="k">Taux d'imposition</span><span class="v btns" style="margin:0">${[['bas', 'Bas'], ['normal', 'Normal'], ['eleve', 'Élevé']].map(([k, n]) => `<button class="onglet ${j.impots === k ? 'on' : ''}" data-a="impots" data-v="${k}">${n}</button>`).join('')}</span></div></div>`;
     const rt = j.routes;
-    h += `<div class="boite"><h4>🛤️ ${e(rt.nom)} (niveau ${rt.niveau}/3)</h4><div class="mini">${rt.segments} tronçons tracés tout seuls entre vos bâtiments et vos villes. ${['', 'Sentiers de terre battue.', 'Pavées : production +5 %, marches plus rapides.', 'Routes royales bordées d\'arbres : production +10 %, marches deux fois plus rapides.'][rt.niveau]}</div>${rt.cout ? `<div class="couts">${couts(rt.cout)}</div><div class="btns"><button class="btn" data-a="routes" ${rt.verrou || !peutPayer(rt.cout) ? 'disabled' : ''}>${rt.verrou ? '🔒 ' + e(rt.verrou) : rt.niveau === 1 ? 'Paver les routes' : 'Passer aux routes royales'}</button></div>` : ''}</div>`;
+    h += `<div class="boite"><h4>🛤️ ${e(rt.nom)} (niveau ${rt.niveau}/${rt.max})</h4><div class="mini">${rt.segments} tronçons tracés tout seuls entre vos bâtiments et vos villes. ${['', 'Sentiers de terre battue, qui s\'embourbent sous la pluie.', 'Pavées.', 'Routes royales bordées d\'arbres (Lumières).', 'Routes impériales, larges et droites (Empire).', 'Routes empierrées au macadam (révolution industrielle).'][rt.niveau]} Armées ${rt.gain} % plus rapides sur vos routes (moitié moins en terre étrangère), production +${(rt.niveau - 1) * 5} %. Une armée près de ses routes est ravitaillée : ni soif au désert, ni froid dans la toundra l'hiver.</div>${rt.cout ? `<div class="couts">${couts(rt.cout)}</div><div class="btns"><button class="btn" data-a="routes" ${rt.verrou || !peutPayer(rt.cout) ? 'disabled' : ''}>${rt.verrou ? '🔒 ' + e(rt.verrou) : 'Passer aux ' + e(rt.suivant.toLowerCase())}</button></div>` : ''}</div>`;
   } else if (ongletRoyaume === 'sciences') {
     const cours = j.recherche ? tech(j.recherche) : null;
     h += `<div class="boite"><div class="ligne"><span class="k">Savoir accumulé</span><span class="v">💡 ${Math.floor(j.savoir)} (+${j.savoir_mois.toFixed(1)}/mois)</span></div>${cours ? `<div class="mini">Recherche : <b>${e(cours.nom)}</b> — ${Math.floor(j.savoir)}/${cours.cout}</div><div class="jauge"><i style="width:${Math.min(100, j.savoir / cours.cout * 100)}%"></i></div>` : '<div class="mini">Choisissez une technologie : le savoir vient de la population, des écoles et des académies.</div>'}</div>`;
