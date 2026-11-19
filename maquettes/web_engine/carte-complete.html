@@ -13,59 +13,83 @@
 </style>
 </head>
 <body>
-<canvas id="carte" aria-label="Tous les nouveaux rendus sur une seule carte : Gaulois, Romains, armées et bâtiments modernes"></canvas>
+<canvas id="carte" aria-label="Tous les rendus sur une seule carte : Gaulois, Romains, époques de 1700 à 1816, bâtiments modernes, et les armées"></canvas>
 <div id="etiquettes"></div>
 <div id="eclair"></div>
 <form class="barre" id="choix">
   <b>Carte complète</b>
   <label>Époque <select name="epoque">
     <option value="tout">Toutes</option><option value="antiquite">Antiquité</option><option value="gaulois">Gaulois</option>
-    <option value="romains">Romains</option><option value="modernes">Moderne (1900 → 2035)</option>
+    <option value="romains">Romains</option>
+    <option value="ancien">1700 · Ancien Régime</option><option value="lumieres">1750 · Siècle des Lumières</option><option value="empire">1789 · Révolution et Empire</option><option value="industrie">1816 · Révolution industrielle</option>
+    <option value="modernes">Moderne (1900 → 2035)</option>
   </select></label>
   <label>Heure <select name="heure"><option value="jour">Jour</option><option value="aube">Aube</option><option value="crepuscule">Crépuscule</option><option value="nuit">Nuit</option><option value="">Cycle</option></select></label>
   <label><input type="checkbox" name="noms" checked> Noms</label>
 </form>
-<p class="note">Tous les nouveaux rendus de la bibliothèque sur une seule carte : bâtiments et armées gaulois et romains (lib/rendu/antiques.js), bâtiments modernes (lib/rendu/modernes.js), chacun avec ses animations. Zoomer pour lire les noms.</p>
+<p class="note">Tous les rendus de la bibliothèque sur une seule carte, de l’Antiquité à 2035 : Gaulois et Romains (lib/rendu/antiques.js), les bâtiments et les armées de 1700 à 1816 (lib/rendu/modeles.js, ceux de web_royaumes), les bâtiments modernes (lib/rendu/modernes.js), chacun avec ses animations. Zoomer pour lire les noms.</p>
 <p class="aide">Glisser : déplacer · clic droit ou Maj : tourner · molette : zoom</p>
 <script type="module">
-import { THREE, scene, cam, camera, apresCamera } from '../../lib/rendu/scene.js';
+import { THREE, scene, cam, camera, apresCamera, chaqueImage } from '../../lib/rendu/scene.js';
 import { lot, put, fige, cyl, boite, jeter } from '../../lib/rendu/toon.js';
 import { appliquerMeteo, forcerHeure } from '../../lib/rendu/meteo.js';
 import { BAT, QBAT, bFerme, modele, animer, INSTALLATIONS, QUARTIERS } from '../../lib/rendu/modernes.js';
 import { ANT, ANTIQUES } from '../../lib/rendu/antiques.js';
+import { maillageBatiment, maillageArmee, PALIERS } from '../../lib/rendu/modeles.js';
+import { animerPose, oublierPose } from '../../lib/rendu/monde.js';
+import { viderFumees, climat } from '../../lib/rendu/vie.js';
+
+const R = await (await fetch('../../sources/web_royaumes/rust/royaumes/data/regles.json')).json();
 
 // ------------------------------------------------------------------ tout le catalogue, de l'Antiquité à 2035, rangé par famille
+const PALIERS_DE = { ancien: [0, 1], lumieres: [2], empire: [3], industrie: [4, 5] };  // les paliers d'armée de chaque époque (modeles.js)
 const ERE = { 'Gaulois': 'gaulois', 'Armée gauloise': 'gaulois', 'Romains': 'romains', 'Armée romaine': 'romains' };
 const liste = [
   ...ANTIQUES.map(b => ({ ...b, ere: ERE[b.groupe], dessin: ANT[b.cle] })),
+  // les époques de web_royaumes : tous ses bâtiments à chaque époque (l'hôtel de ville au niveau 5), et ses armées, palier par palier
+  ...R.epoques.flatMap(e => [
+    ...R.batiments.map(b => ({ ere: e.cle, groupe: `${e.debut} · ${e.nom}`, nom: b.cle === 'hotel' ? `${b.nom} niv. 5` : b.nom, royaumes: { cle: b.cle, epoque: e.cle, niveau: 5 } })),
+    ...PALIERS_DE[e.cle].map(p => ({ ere: e.cle, groupe: `Armées · ${e.nom}`, nom: `${PALIERS[p].date} : ${PALIERS[p].nom}`, palier: p })),
+  ]),
   ...QUARTIERS.map(q => ({ nom: q.nom, groupe: 'Villes', dessin: QBAT[q.cle] })),
   { nom: 'Ferme céréalière', groupe: 'Fermes', dessin: (L, ex) => bFerme(L, false, ex) },
   { nom: 'Ferme d’élevage', groupe: 'Fermes', dessin: (L, ex) => bFerme(L, true, ex) },
   ...INSTALLATIONS.map(t => ({ cle: t.cle, nom: `${t.nom} (${t.an}${t.fin ? '–' + t.fin : ''})`, groupe: t.groupe, dessin: BAT[t.cle] })),
 ].map(b => ({ ere: 'modernes', ...b }));
-const GARDER = { tout: () => true, antiquite: b => b.ere !== 'modernes', gaulois: b => b.ere === 'gaulois', romains: b => b.ere === 'romains', modernes: b => b.ere === 'modernes' };
+const GARDER = { tout: () => true, antiquite: b => b.ere === 'gaulois' || b.ere === 'romains' };
+for (const e of ['gaulois', 'romains', 'ancien', 'lumieres', 'empire', 'industrie', 'modernes']) GARDER[e] = b => b.ere === e;
 const MER = ['offshore'], RIVIERE = ['fil', 'barrage', 'prise'];
-const COLS = 8, PAS = 2.3, R = 1, SOL = 0x7fb04f, EAU = 0x4f8fc0;
+const COLS = 8, PAS = 2.3, SOL = 0x7fb04f, EAU = 0x4f8fc0, COULEUR = '#3b6fd1';
 
 // ------------------------------------------------------------------ la carte : une rangée (ou plus) par famille ; refaite à chaque époque choisie
 const carte = new THREE.Group(), etiq = document.getElementById('etiquettes'), f = document.getElementById('choix');
-let poses = [], ligne = 0;
+let poses = [], ligne = 0, poses_anim = [], armees = [];
 scene.add(carte);
 function construire() {
-  for (const o of [...carte.children]) jeter(o);  // un modèle retiré de la scène sort aussi des animations
-  etiq.textContent = ''; poses = []; ligne = 0;
+  for (const o of [...carte.children]) o.userData.cache ? carte.remove(o) : jeter(o);  // les géométries de modeles.js sont partagées (en cache) : ne pas les libérer
+  for (const id of poses_anim) oublierPose(id);
+  viderFumees();
+  etiq.textContent = ''; poses = []; ligne = 0; poses_anim = []; armees = [];
   for (const [groupe, bs] of Map.groupBy(liste.filter(GARDER[f.epoque.value]), b => b.groupe)) {
     const el = document.createElement('span'); el.className = 'titre'; el.textContent = groupe; etiq.append(el);
     poses.push({ el, p: new THREE.Vector3(-PAS * 0.9, 0, ligne * PAS), titre: true });
     bs.forEach((b, k) => {
       const x = (k % COLS) * PAS + (ligne % 2) * PAS / 2, z = (ligne + (k / COLS | 0)) * PAS;  // rangées décalées, comme un plateau hexagonal
       const T = lot();
-      put(T, cyl(R * 0.965, R, 0.16, 6), MER.includes(b.cle) ? EAU : SOL, 0, -0.08, 0, 0, 0);
+      put(T, cyl(0.965, 1, 0.16, 6), MER.includes(b.cle) ? EAU : SOL, 0, -0.08, 0, 0, 0);
       if (RIVIERE.includes(b.cle)) put(T, boite(0.35, 0.02, 1.75), EAU, 0, 0.005, 0, 0, 0);
       fige(T, carte).position.set(x, 0, z);
-      const m = b.cle === 'grue' ? modele(BAT.poste, k, { chantier: true }) : modele(b.dessin, k + 1);  // le chantier : un poste en travaux, comme carte-test
-      m.groupe.position.set(x, b.cle === 'barrage' ? -0.1 : 0, z);
-      carte.add(m.groupe); animer(m);
+      if (b.royaumes) {  // bâtiment de web_royaumes : son maillage en cache, ses ailes, drapeaux et fumées animés par monde.js
+        const { mesh, anim } = maillageBatiment({ ...b.royaumes, couleur: COULEUR });
+        mesh.position.set(x, 0, z); mesh.userData.cache = true; carte.add(mesh);
+        const id = `vitrine-${b.royaumes.epoque}-${b.royaumes.cle}`; animerPose(id, mesh, anim, COULEUR); poses_anim.push(id);
+      } else if (b.palier !== undefined) {  // armée de web_royaumes : l'icône du palier, qui marche sur sa case
+        const mesh = maillageArmee(COULEUR, b.palier); mesh.position.set(x, 0, z); mesh.userData.cache = true; carte.add(mesh); armees.push({ mesh, z, ph: k });
+      } else {
+        const m = b.cle === 'grue' ? modele(BAT.poste, k, { chantier: true }) : modele(b.dessin, k + 1);  // le chantier : un poste en travaux, comme carte-test
+        m.groupe.position.set(x, b.cle === 'barrage' ? -0.1 : 0, z);
+        carte.add(m.groupe); animer(m);
+      }
       const n = document.createElement('span'); n.textContent = b.nom; etiq.append(n);
       poses.push({ el: n, p: new THREE.Vector3(x, 0, z + 0.85) });
       b.x = x; b.z = z;
@@ -85,9 +109,11 @@ apresCamera(() => {
   }
 });
 appliquerMeteo({ genre: 'soleil', temperature: 20, pluie: 0, vent: 0.5, neige_sol: 0 }, 2);
+climat.nuages = 0;  // vue de loin, les nuages passent devant les bâtiments
 const heure = () => forcerHeure(f.heure.value || null);
 f.heure.addEventListener('change', heure); heure();
 f.epoque.addEventListener('change', construire);
+chaqueImage((dt, t) => { for (const a of armees) { a.mesh.position.z = a.z + Math.sin(t * .35 + a.ph) * .12; a.mesh.position.y = Math.abs(Math.sin(t * 6)) * .02; } });
 construire();
 // #cle (ex. #legion, #nucleaire) : gros plan sur ce modèle
 const vu = liste.find(b => b.cle && '#' + b.cle === location.hash);

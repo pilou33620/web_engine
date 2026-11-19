@@ -27,6 +27,7 @@
 import { THREE, scene, cam, camera, apresCamera } from '../../lib/rendu/scene.js';
 import { lot, put, fige, cyl } from '../../lib/rendu/toon.js';
 import { appliquerMeteo, forcerHeure } from '../../lib/rendu/meteo.js';
+import { climat } from '../../lib/rendu/vie.js';
 import { modele, animer } from '../../lib/rendu/modernes.js';
 import { ANT, ANTIQUES } from '../../lib/rendu/antiques.js';
 
@@ -66,6 +67,7 @@ apresCamera(() => {
   }
 });
 appliquerMeteo({ genre: 'soleil', temperature: 20, pluie: 0, vent: 0.5, neige_sol: 0 }, 2);
+climat.nuages = 0;  // vue de loin, les nuages passent devant les bâtiments
 const heure = () => forcerHeure(f.heure.value || null);
 f.addEventListener('change', heure); heure();
 Object.assign(cam, { l: COLS * PAS + 2, h: ligne * PAS + 2, x: (COLS - 1) * PAS / 2, z: (ligne - 1) * PAS / 2, cible: 26, d: 26, lacet: 0, auto: false });

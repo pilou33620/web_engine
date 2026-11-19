@@ -3,6 +3,15 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.9.0 — 2026-11-19
+
+Pour montrer tous les rendus hors partie (la carte complète) :
+- `monde.js` : `animerPose(id, mesh, anim, couleur)` anime un bâtiment de `modeles.js` posé dans une vitrine (ailes du moulin, drapeaux,
+  cheminées, fumées), `oublierPose(id)` le retire ;
+- `vie.js` : `viderFumees()` efface les fumées en cours ;
+- maquette `carte-complete.html` : les époques de 1700 à 1816 (les 56 bâtiments de web_royaumes à chaque époque) et leurs armées, palier par palier,
+  avec l'Antiquité et les bâtiments modernes ; les vitrines n'ont plus de nuages (vus de loin, ils cachaient les bâtiments).
+
 ## 2.8.0 — 2026-11-19
 
 Plus de Gaulois et de Romains, et plus de vie, dans `rendu/antiques.js` :
