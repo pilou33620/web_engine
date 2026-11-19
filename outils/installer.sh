@@ -6,8 +6,8 @@
 # Parties (depuis la 2.15.0) : les fichiers restent dans rendu/ (les chemins d'import des jeux ne changent pas), chaque partie en prend une liste.
 #   three    three.js r186 et BufferGeometryUtils
 #   socle    scène, caméra, plateau (terrain, nature, rivières), météo et heure, vie commune (fumées, climat), routes, boue,
-#            brume, feuilles et givre, nuit (étoiles, lune, lucioles, reflets), faune (migrateurs, poissons), brouillard, étiquettes, rendu.css
-#   moderne  bâtiments modernes (modernes.js : installations, lignes, quartiers, fermes), chantiers vivants (chantiers.js)
+#            brume, feuilles et givre, nuit (étoiles, lune, lucioles, reflets, lueurs, halos), faune (migrateurs, poissons, envols), eau (vagues, cascades, sillages), brouillard, étiquettes, rendu.css
+#   moderne  bâtiments modernes (modernes.js : installations, lignes, quartiers, fermes), chantiers vivants et piquets de grève (chantiers.js), voies ferrées et trains (rail.js)
 #   antique  Gaulois et Romains (antiques.js)
 #   ancien   bâtiments et armées de 1700 à 1816, le monde de web_royaumes (monde, quartiers, animations, chroniques), images et icônes
 #   guerre   remparts, forts, sièges, flottes, espions
@@ -20,8 +20,8 @@ DEST=${1:?usage : outils/installer.sh /chemin/du/dossier partie…}; shift
 R=rendu
 declare -A FICHIERS=(
   [three]="three"
-  [socle]="$R/scene.js $R/toon.js $R/plateau.js $R/meteo.js $R/vie.js $R/boue.js $R/ambiance.js $R/nuit.js $R/faune.js $R/routes.js $R/brouillard.js $R/etiquettes.js $R/rendu.css"
-  [moderne]="$R/modernes.js $R/chantiers.js"
+  [socle]="$R/scene.js $R/toon.js $R/plateau.js $R/meteo.js $R/vie.js $R/boue.js $R/ambiance.js $R/nuit.js $R/faune.js $R/eau.js $R/routes.js $R/brouillard.js $R/etiquettes.js $R/rendu.css"
+  [moderne]="$R/modernes.js $R/chantiers.js $R/rail.js"
   [antique]="$R/antiques.js"
   [ancien]="$R/modeles.js $R/monde.js $R/quartiers.js $R/animations.js $R/chroniques.js $R/img $R/icons"
   [guerre]="$R/guerre_commun.js $R/remparts.js $R/forts.js $R/sieges.js $R/marine.js $R/espions.js"
