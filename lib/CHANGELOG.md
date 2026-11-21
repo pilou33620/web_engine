@@ -3,6 +3,13 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.24.1 — 2026-11-21
+
+Hélices (`defense.js`) : elles tournaient trop vite (20 à 36 rad/s) et sautaient d'un quart de tour entre deux images, si bien
+qu'elles semblaient figées ou à l'envers. Les pales tournent désormais à une vitesse que l'œil suit (6 à 9 rad/s, les rotors du
+drone en sens alternés) et un disque translucide donne le flou de la rotation ; moyeux et pales plus épais pour l'hélicoptère et
+le drone ; les moteurs du zeppelin sortent du ballon, sur des bras, pour qu'on voie leurs hélices.
+
 ## 2.24.0 — 2026-11-21
 
 `defense.js` refait dans le style du moteur, avec ses animations :
