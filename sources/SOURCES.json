@@ -14,6 +14,11 @@
  "maquettes": [
   {
    "source": "web_engine",
+   "chemin": "maquettes/web_engine/apiculteur.html",
+   "titre": "Apiculteur : maquette des zones"
+  },
+  {
+   "source": "web_engine",
    "chemin": "maquettes/web_engine/arbres-montagnes.html",
    "titre": "Arbres et montagnes"
   },
