@@ -122,6 +122,9 @@ const HOMME = (chemise, pantalon = 0x5a4632, chapeau = null, tablier = null) => 
   ...(tablier ? [[boite(0.06, 1.1, 0.6), 0.27, 1.15, 0, tablier]] : [])];
 const FEMME = (jupe, haut = 0xe9e2d0, coiffe = 0xf6f2ea) => [[boite(0.7, 0.9, 0.7), 0, 0.45, 0, jupe], [boite(0.5, 0.6, 0.6), 0, 1.2, 0, haut], ...bras(haut, 1.2).map(p => (p[0] = boite(0.18, 0.6, 0.18), p)), TETE(1.75), [boite(0.4, 0.16, 0.45), 0, 2.02, 0, coiffe]];
 const PANIER = [[cyl(0.32, 0.26, 0.35, 8), 0.1, 0.9, 0.62, 0xb08a50], [boite(0.05, 0.3, 0.5), 0.1, 1.2, 0.62, 0x8a6a3a]];
+const HABITS = [0x6a8aa4, 0xc0504a, 0x8a4a7a, 0x5a7a4a, 0x4a6a9a, 0xd9b45a, 0xb8603f, 0x3a6a8a, 0x8a8a5a, 0x9a5a8a, 0xd9a441, 0x5a8a6a, 0xe8e0c8, 0x7a5a3a];
+const tenue = k => { const c = HABITS[k % HABITS.length], d = HABITS[(k * 5 + 3) % HABITS.length];
+  return [() => HOMME(c), () => FEMME(c, 0xf2e6c8), () => [...FEMME(c), ...PANIER], () => HOMME(c, 0x4a4a52, d), () => FEMME(c, d, 0xf6f2ea), () => [...HOMME(c, 0x5a4632, 0x5a4632), ...PANIER]][k % 6](); };
 const APICULTEUR = [...jambes(0xeeeee4), [boite(0.34, 0.25, 0.3), 0.04, 0.12, 0.16, 0x3a4a3a], [boite(0.34, 0.25, 0.3), 0.04, 0.12, -0.16, 0x3a4a3a],
   [boite(0.55, 1, 0.8), 0, 1.38, 0, 0xf2f1e8], ...bras(0xf2f1e8), [boite(0.24, 0.24, 0.24), 0.1, 0.88, 0.48, 0xd9b860], [boite(0.24, 0.24, 0.24), 0.1, 0.88, -0.48, 0xd9b860],
   [cyl(0.36, 0.4, 0.55, 10), 0, 2.1, 0, 0x3d443c], [cyl(0.64, 0.64, 0.06, 12), 0, 2.4, 0, 0xe6dfc4], [cyl(0.3, 0.34, 0.25, 10), 0, 2.55, 0, 0xe6dfc4]];
@@ -290,48 +293,75 @@ function apiculteur(Z, liste, montrerCadre) {
     if (t < D - 1.5 && (prochaine -= dt) < 0) { prochaine = 0.35; g.localToWorld(w.copy(fum)); bouffee(w.x, w.y, w.z, 'blanche', 0.5); }
   });
 }
-// ---- le champ : rangs de lavande et de tournesols, une rangée de ruches sur la bande fauchée
+// la nature autour des ruches : touffes d'herbe haute, fleurs des champs, pierres, éparpillées sans ordre (libre(x, z) : là où on peut en mettre)
+const alea = (k, j, g) => hache(k, j, g);
+function prairie(L, n, R, g, libre = () => true) {
+  for (let k = 0; k < n; k++) {
+    const a = alea(k, 1, g) * 6.283, d = Math.sqrt(alea(k, 2, g)) * R, x = Math.cos(a) * d, z = Math.sin(a) * d, t = alea(k, 3, g);
+    if (!libre(x, z)) continue;
+    if (t < 0.55) for (let b = 0; b < 3; b++) P(L, cone(0.22, 0.9 + alea(k, b, g + 1) * 0.6, 4), [0x6aa84a, 0x7cb850, 0x5a9a3e][b], x + (b - 1) * 0.3, 0.45, z + (b % 2) * 0.25, a + b, 0);  // herbe haute
+    else if (t < 0.9) P(L, boite(0.35, 0.3, 0.35), [0xf2f0e6, 0xf0d040, 0xd96aa0, 0x7a8ad9, 0xe8603a][k % 5], x, 0.4, z, a, 0);  // fleur des champs
+    else { const p = sphere(0.6 + alea(k, 4, g) * 0.7, 0); p.scale(1, 0.55, 1); P(L, p, 0x9c968a, x, 0.2, z, a, 0.08); }  // pierre
+  }
+}
+// une ruche posée un peu de travers, comme on les pose à la main
+const rucheNat = (Z, x, z, col, h, k, g) => ruche(Z, x + (alea(k, 5, g) - 0.5) * 1.6, z + (alea(k, 6, g) - 0.5) * 1.6, col, h, (alea(k, 7, g) - 0.5) * 0.7);
+
+// ---- le champ : lavande et tournesols en rangs qui ondulent, les ruches en lisière du champ, herbes hautes et fleurs sauvages
 {
   const Z = ZONES.champ, L = lot();
   for (let z = -12; z <= 30; z += 3.4) for (let x = -34; x <= 34; x += 3.2) {
-    if (Math.hypot(x, z) > 33) continue;
-    if (x < 6) P(L, sphere(1.25, 0), hache(x, z) < 0.5 ? 0x8a6ad0 : 0x9a7ae0, x, 0.9, z, x, 0.1);  // lavande
-    else { P(L, boite(0.2, 2.2, 0.2), 0x4f8a37, x, 1.1, z, 0, 0); P(L, boite(0.9, 0.9, 0.9), 0x5fae3e, x - 0.4, 1, z, 0.6, 0); P(L, cyl(0.7, 0.7, 0.2, 10).rotateX(Math.PI / 2 - 0.5), 0xf2c230, x, 2.4, z + 0.1, 0, 0.06); P(L, cyl(0.32, 0.32, 0.24, 8).rotateX(Math.PI / 2 - 0.5), 0x5a3a1e, x, 2.42, z + 0.2, 0, 0); }
+    const i = (x * 7 + z * 13) | 0, jx = x + (alea(i, 1, 3) - 0.5) * 1.2, jz = z + Math.sin(x * 0.12) * 1.5 + (alea(i, 2, 3) - 0.5) * 0.8;
+    if (Math.hypot(jx, jz) > 30 + alea(i, 3, 3) * 5 || alea(i, 4, 3) < 0.07) continue;  // bord irrégulier, quelques manques
+    if (x < 4 + alea(i, 5, 3) * 5) { const s = 0.9 + alea(i, 6, 3) * 0.5; P(L, sphere(1.25 * s, 0), [0x8a6ad0, 0x9a7ae0, 0x7a5ac0][(i % 3 + 3) % 3], jx, 0.85 * s, jz, x, 0.1); }  // lavande
+    else { const h = 1.8 + alea(i, 7, 3) * 1.2; P(L, boite(0.2, h, 0.2), 0x4f8a37, jx, h / 2, jz, 0, 0); P(L, boite(0.9, 0.9, 0.9), 0x5fae3e, jx - 0.4, h * 0.45, jz, 0.6, 0); P(L, cyl(0.7, 0.7, 0.2, 10).rotateX(Math.PI / 2 - 0.5), 0xf2c230, jx, h + 0.2, jz + 0.1, 0, 0.06); P(L, cyl(0.32, 0.32, 0.24, 8).rotateX(Math.PI / 2 - 0.5), 0x5a3a1e, jx, h + 0.22, jz + 0.2, 0, 0); }
   }
-  P(L, boite(64, 0.04, 9), 0x9ccf62, 0, 0.02, -20, 0, 0);  // la bande fauchée
-  for (const [x, z] of [[-30, -28], [28, -27]]) feuillu(L, x, z, 2.8, x | 0);
-  P(L, boite(0.3, 2, 0.3), BOIS_F, -28, 1, -16.5, 0, 0.05); P(L, boite(3, 1.2, 0.2), PLANCHE, -28, 2.2, -16.5, 0, 0.08);
+  prairie(L, 120, 34, 11, (x, z) => z < -13 || Math.hypot(x, z) > 31);
+  for (const [x, z, s] of [[-30, -28, 2.8], [27, -26, 3.1], [-22, -30, 1.9]]) feuillu(L, x, z, s, x | 0);
+  for (let k = 0; k < 7; k++) P(L, sphere(1 + alea(k, 1, 12) * 0.6, 0), 0x5a9a3a, 18 + k * 2.1, 0.8, -28 + alea(k, 2, 12) * 3, k, 0.1);  // un bout de haie
+  P(L, boite(0.3, 2, 0.3), BOIS_F, -28, 1, -16.5, 0.2, 0.05); P(L, boite(3, 1.2, 0.2), PLANCHE, -28, 2.2, -16.5, 0.2, 0.08);
   fige(L, Z.g);
-  const l = [-14, -10, -6, -2, 2, 6, 10, 14].map((x, k) => ruche(Z, x, -21, TEINTES[k % 6], 1 + (k % 3 === 0)));
+  // les ruches suivent le bord du champ, en arc, espacées au hasard
+  const l = [-15, -10.5, -6.5, -2, 2.5, 6.5, 11, 15.5].map((x, k) => rucheNat(Z, x, -19 - Math.cos(x / 9) * 2.5, TEINTES[k % 6], 1 + (k % 3 === 0), k, 13));
   apiculteur(Z, [l[2], l[5], l[3]], false);
 }
-// ---- la forêt : clairière sous les châtaigniers en fleur et les sapins, ruches en demi-cercle, le chemin forestier
+// ---- la forêt : clairière sous les châtaigniers en fleur et les sapins, ruches à l'abri des arbres, sous-bois, tronc couché, chemin forestier
 {
   const Z = ZONES.foret, L = lot();
-  for (let k = 0; k < 46; k++) {
-    const a = hache(k, 1) * 6.3, d = 15 + hache(k, 2) * 19, x = Math.cos(a) * d, z = Math.sin(a) * d;
-    if (z > 0 && Math.abs(x) < 13) continue;  // le chemin qui entre par le sud, et la vue sur la clairière
-    (hache(k, 3) < 0.45 ? sapin : feuillu)(L, x, z, 2.4 + hache(k, 4) * 1.2, k, 6);
+  for (let k = 0; k < 52; k++) {
+    const a = alea(k, 1, 20) * 6.3, d = 14 + alea(k, 2, 20) * 20, x = Math.cos(a) * d, z = Math.sin(a) * d;
+    if (z > 0 && Math.abs(x) < 12) continue;  // le chemin qui entre par le sud, et la vue sur la clairière
+    (alea(k, 3, 20) < 0.45 ? sapin : feuillu)(L, x, z, 2 + alea(k, 4, 20) * 1.6, k, 6);
   }
-  P(L, boite(6, 0.04, 26), 0xb59a6a, 0, 0.03, 22, 0, 0);
-  for (let k = 0; k < 12; k++) { const a = hache(k, 9) * 6.3, d = 12 + hache(k, 8) * 3; P(L, sphere(0.9, 0), 0x4a8a34, Math.cos(a) * d, 0.5, Math.sin(a) * d, k, 0.1); }  // fougères à l'orée de la clairière
+  for (let k = 0; k < 4; k++) feuillu(L, (alea(k, 1, 21) - 0.5) * 6 + (k % 2 ? 6 : -6), -9 - alea(k, 2, 21) * 3, 1.3 + alea(k, 3, 21) * 0.4, k + 90);  // jeunes arbres dans la clairière
+  // le chemin forestier, qui serpente
+  for (let k = 0; k < 9; k++) P(L, boite(4.6, 0.04, 3.4), 0xb59a6a, Math.sin(k * 0.7) * 2.2, 0.03, 12 + k * 3, Math.sin(k * 0.7) * 0.3, 0);
+  for (let k = 0; k < 22; k++) { const a = alea(k, 9, 22) * 6.3, d = 11 + alea(k, 8, 22) * 6; P(L, sphere(0.6 + alea(k, 7, 22) * 0.6, 0), [0x4a8a34, 0x3e7a2c, 0x5a9a3e][k % 3], Math.cos(a) * d, 0.45, Math.sin(a) * d, k, 0.1); }  // fougères et sous-bois
+  prairie(L, 70, 14, 23, (x, z) => !(z > 8 && Math.abs(x) < 3));
   P(L, cyl(1, 1.1, 0.8, 8), 0x7a5233, -9, 0.4, 6, 0, 0.1); P(L, cyl(0.9, 0.9, 0.05, 8), 0xc9a06a, -9, 0.82, 6, 0, 0);  // une souche
+  P(L, cyl(0.6, 0.7, 7, 8).rotateZ(Math.PI / 2), 0x6e4a2c, 9, 0.6, 7, 0.5, 0.1); for (const x of [6, 11]) P(L, sphere(0.5, 0), 0x6a9a3a, x, 1.1, 7 + (x - 9) * 0.3, x, 0.05);  // un tronc couché, couvert de mousse
   fige(L, Z.g);
-  const l = [-2.6, -1.9, -1.2, -0.5, 0.2, 0.9, 1.6].map((a, k) => ruche(Z, Math.cos(a - Math.PI / 2) * 9, Math.sin(a - Math.PI / 2) * 9 + 2, TEINTES[(k + 2) % 6], 1 + (k % 2)));
+  const l = [-2.6, -1.85, -1.15, -0.5, 0.25, 0.95, 1.6].map((a, k) => { const r = 8 + alea(k, 1, 24) * 3.5; return rucheNat(Z, Math.cos(a - Math.PI / 2) * r, Math.sin(a - Math.PI / 2) * r + 2, TEINTES[(k + 2) % 6], 1 + (k % 2), k, 24); });
   apiculteur(Z, [l[1], l[4], l[6]], true);
 }
-// ---- la lisière : colza à l'ouest, bois à l'est, ruches le long de la haie, un abreuvoir
+// ---- la lisière : colza à l'ouest, bois à l'est, ruches le long d'une haie libre, un abreuvoir, une mare
 {
   const Z = ZONES.lisiere, L = lot();
-  for (let z = -30; z <= 30; z += 3) for (let x = -34; x <= -6; x += 2.6) if (Math.hypot(x, z) < 33) { P(L, boite(0.18, 1.6, 0.18), 0x5a9a3a, x, 0.8, z, 0, 0); P(L, sphere(0.85, 0), hache(x, z) < 0.5 ? 0xf2dc30 : 0xe8d020, x, 1.8, z, x, 0.08); }
-  for (let k = 0; k < 34; k++) { const x = 9 + hache(k, 1) * 24, z = (hache(k, 2) - 0.5) * 62; if (Math.hypot(x, z) < 33) (hache(k, 3) < 0.5 ? sapin : feuillu)(L, x, z, 2.3 + hache(k, 4), k + 50, 3); }
-  for (let z = -26; z <= 26; z += 2.2) P(L, sphere(1.1, 0), 0x4f8f36, 5.5, 0.9, z, z, 0.1);  // la haie
-  P(L, boite(3, 0.8, 1.4), PIERRE, -2, 0.4, 24, 0, 0.08); P(L, boite(2.6, 0.1, 1), 0x4f8fc0, -2, 0.78, 24, 0, 0);  // l'abreuvoir
+  for (let z = -30; z <= 30; z += 3) for (let x = -34; x <= -6; x += 2.6) {
+    const i = (x * 5 + z * 11) | 0, jx = x + (alea(i, 1, 30) - 0.5) * 1.2 + Math.sin(z * 0.1) * 1.2, jz = z + (alea(i, 2, 30) - 0.5) * 1;
+    if (Math.hypot(jx, jz) > 30 + alea(i, 3, 30) * 4 || jx > -6 - alea(i, 4, 30) * 4 || alea(i, 5, 30) < 0.06) continue;
+    const h = 1.3 + alea(i, 6, 30) * 0.7; P(L, boite(0.18, h, 0.18), 0x5a9a3a, jx, h / 2, jz, 0, 0); P(L, sphere(0.7 + alea(i, 7, 30) * 0.35, 0), i % 3 ? 0xf2dc30 : 0xe8d020, jx, h + 0.2, jz, x, 0.08);
+  }
+  for (let k = 0; k < 40; k++) { const x = 8 + alea(k, 1, 31) * 26, z = (alea(k, 2, 31) - 0.5) * 64; if (Math.hypot(x, z) < 33) (alea(k, 3, 31) < 0.5 ? sapin : feuillu)(L, x, z, 1.8 + alea(k, 4, 31) * 1.6, k + 50, 3); }
+  // la haie : des buissons de tailles inégales, avec des trous et quelques églantiers en fleur
+  for (let z = -27; z <= 27; z += 1.7) { const k = (z * 10) | 0; if (alea(k, 1, 32) < 0.15) continue; P(L, sphere(0.8 + alea(k, 2, 32) * 0.8, 0), alea(k, 3, 32) < 0.2 ? 0x6a9a4a : 0x4f8f36, 5.5 + (alea(k, 4, 32) - 0.5) * 2, 0.8, z, z, 0.1); if (alea(k, 5, 32) < 0.3) P(L, boite(0.3, 0.3, 0.3), 0xf2b5cf, 5 + alea(k, 6, 32), 1.6, z, 0, 0); }
+  prairie(L, 90, 33, 33, (x, z) => x > -8 && x < 7);
+  P(L, boite(3, 0.8, 1.4), PIERRE, -2, 0.4, 24, 0.2, 0.08); P(L, boite(2.6, 0.1, 1), 0x4f8fc0, -2, 0.78, 24, 0.2, 0);  // l'abreuvoir
+  { const m = cyl(3.2, 3.2, 0.06, 12); m.scale(1, 1, 0.65); P(L, m, 0x4f8fc0, 1.5, 0.04, -28, 0.4, 0); for (let k = 0; k < 6; k++) P(L, cone(0.15, 1.2, 4), 0x6a8a3a, -1 + k * 0.9, 0.6, -26.5 + (k % 2), 0, 0); }  // une mare et ses joncs
   fige(L, Z.g);
-  const l = [-21, -15, -9, -3, 3, 9, 15, 21].map((z, k) => ruche(Z, 0, z, TEINTES[(k + 4) % 6], 1 + (k % 3 === 1), 0));
+  const l = [-21, -15.5, -9, -3.5, 2, 8.5, 14, 21].map((z, k) => rucheNat(Z, -0.5 + Math.sin(z * 0.15) * 1.5, z, TEINTES[(k + 4) % 6], 1 + (k % 3 === 1), k, 34));
   apiculteur(Z, [l[6], l[3], l[1]], true);
 }
-
 // ------------------------------------------------------------------ le marché : une halle couverte sur la case du centre, des marchands sur les six cases autour
 {
   const Z = ZONES.marche, L = lot(), Lh = lot();
@@ -416,7 +446,7 @@ function apiculteur(Z, liste, montrerCadre) {
     ...DEHORS.map(([deg]) => { const a = deg * Math.PI / 180, r = SQ3 * 10 - 4.2; return { p: [Math.cos(a) * r, Math.sin(a) * r, 0, Math.atan2(-Math.sin(a), Math.cos(a))] }; }),
     { p: [-SQ3 * 10 + 4.6, 1.5, 0, Math.PI] },  // une pause à la fontaine
   ];
-  const CLIENTS = [HOMME(0x6a8aa4), HOMME(0xc0504a, 0x5a4632, 0x5a4632), FEMME(0x8a4a7a, 0xf2e6c8), FEMME(0x5a7a4a), [...FEMME(0x4a6a9a), ...PANIER], [...HOMME(0xd9b45a, 0x4a4a52, 0x8a6a3a), ...PANIER], FEMME(0xb8603f), HOMME(0x3a6a8a, 0x2f2f36, 0x2f2f36), [...FEMME(0xc0504a, 0xf6f0e0), ...PANIER], HOMME(0x8a8a5a), FEMME(0x3a5a8a, 0xe8e8e8), [...HOMME(0x9a5a8a), ...PANIER], FEMME(0xd9a441), HOMME(0x5a8a6a, 0x4a3a2a, 0xd9b45a)];
+  const CLIENTS = Array.from({ length: 26 }, (_, k) => tenue(k));
   CLIENTS.forEach((c, k) => {
     const etapes = [0, 1, 2, 3].map(j => ARRETS[(k * 4 + j * 3) % ARRETS.length]), chemin = [];
     const anneau = (a0, a1) => { let d = a1 - a0; d -= Math.round(d / 6.283) * 6.283; for (let s = 1; s < 4; s++) { const a = a0 + d * s / 4; chemin.push([Math.cos(a) * 11.5, Math.sin(a) * 11.5, 0]); } };
@@ -431,6 +461,30 @@ function apiculteur(Z, liste, montrerCadre) {
   });
 }
 
+// ---- la vie du bourg : des passants dans les trois rues, des voisins qui bavardent, des enfants qui courent autour de la fontaine
+{
+  const Z = ZONES.marche;
+  RUES.forEach((a, r) => {
+    const ux = Math.cos(a), uz = Math.sin(a);
+    for (let k = 0; k < 7; k++) {
+      const cote = (k % 2 ? 1 : -1) * (1.5 + alea(k, r, 40) * 2.5), p = d => [ux * d - uz * cote, uz * d + ux * cote];
+      const [x0, z0] = p(12 + alea(k, r, 41) * 6), [x1, z1] = p(38 + alea(k, r, 42) * 14);
+      const m = marcheur(figurine(Z.g, tenue(k * 3 + r), x0, z0), [[x0, z0, 1 + alea(k, r, 43) * 4], [x1, z1, 1 + alea(k, r, 44) * 4]], 1.4 + alea(k, r, 45) * 1.2);
+      const u = alea(k, r, 46); m.g.position.set(x0 + (x1 - x0) * u, 0, z0 + (z1 - z0) * u); m.i = k % 2;
+    }
+    // un groupe qui bavarde au coin de la rue
+    const [gx, gz] = [ux * 30 - uz * 4, uz * 30 + ux * 4];
+    for (let k = 0; k < 3; k++) {
+      const b = k * 2.1 + r, x = gx + Math.cos(b) * 0.9, z = gz + Math.sin(b) * 0.9, face = Math.atan2(Math.sin(b), -Math.cos(b));
+      marcheur(figurine(Z.g, tenue(k + r * 4 + 2), x, z), [[x, z, 5 + k, face], [x + 0.05, z, 2, face + 0.4]], 0.3);
+    }
+  });
+  // des enfants qui courent autour de la fontaine
+  for (let k = 0; k < 4; k++) {
+    const tour = Array.from({ length: 10 }, (_, j) => { const b = (j + k * 2.5) / 10 * 6.283; return [-SQ3 * 10 + Math.cos(b) * 4.4, Math.sin(b) * 4.4, 0]; });
+    const g = figurine(Z.g, HOMME(HABITS[k * 3], 0x5a4632).slice(0, 7), tour[0][0], tour[0][1]); g.scale.setScalar(0.65); marcheur(g, tour, 3.2);
+  }
+}
 // ------------------------------------------------------------------ les abeilles : des points jaunes entre l'entrée de chaque ruche et les fleurs ; un essaim au-dessus des ruches ouvertes
 G.updateMatrixWorld(true);
 const NB = 12, NE = 18, abeilles = [], pos = new Float32Array(ruches.length * (NB + NE) * 3);
