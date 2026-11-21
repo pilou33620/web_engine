@@ -39,6 +39,11 @@
   },
   {
    "source": "web_engine",
+   "chemin": "maquettes/web_engine/defense.html",
+   "titre": "Tower defense"
+  },
+  {
+   "source": "web_engine",
    "chemin": "maquettes/web_engine/pecheur-propositions.html",
    "titre": "Cabane de pêcheur : propositions"
   },

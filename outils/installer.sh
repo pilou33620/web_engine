@@ -11,6 +11,7 @@
 #   antique  Gaulois et Romains (antiques.js)
 #   ancien   bâtiments et armées de 1700 à 1816, le monde de web_royaumes (monde, quartiers, animations, chroniques), images et icônes
 #   guerre   remparts, forts, sièges, flottes, espions
+#   defense  le tower defense (web_defense) : tours, ennemis, projectiles, effets, villes à défendre (defense.js)
 #   rendu    tout (les jeux d'avant la 2.15.0)
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -25,12 +26,13 @@ declare -A FICHIERS=(
   [antique]="$R/antiques.js"
   [ancien]="$R/modeles.js $R/monde.js $R/quartiers.js $R/animations.js $R/chroniques.js $R/traces.js $R/img $R/icons"
   [guerre]="$R/guerre_commun.js $R/remparts.js $R/forts.js $R/sieges.js $R/marine.js $R/espions.js"
+  [defense]="$R/defense.js"
   [rendu]=""
 )
 # ce dont chaque partie a besoin (monde.js pose les forts, sièges et remparts ; les animations anciennes prennent les personnages antiques)
-declare -A BESOIN=([three]="" [socle]="three" [moderne]="socle" [antique]="moderne" [ancien]="socle moderne antique guerre" [guerre]="ancien" [rendu]="socle moderne antique ancien guerre")
+declare -A BESOIN=([three]="" [socle]="three" [moderne]="socle" [antique]="moderne" [ancien]="socle moderne antique guerre" [guerre]="ancien" [defense]="ancien" [rendu]="socle moderne antique ancien guerre defense")
 declare -A PRISES=()
-prendre() { [ -n "${BESOIN[$1]+x}" ] || { echo "partie inconnue : $1 (three, socle, moderne, antique, ancien, guerre, rendu)" >&2; exit 2; }
+prendre() { [ -n "${BESOIN[$1]+x}" ] || { echo "partie inconnue : $1 (three, socle, moderne, antique, ancien, guerre, defense, rendu)" >&2; exit 2; }
             [ -n "${PRISES[$1]:-}" ] && return; PRISES[$1]=1; for b in ${BESOIN[$1]}; do prendre "$b"; done; }
 for p in "$@"; do prendre "$p"; done
 PARTIES=$(printf '%s\n' "${!PRISES[@]}" | sort | tr '\n' ' ' | sed 's/ $//')

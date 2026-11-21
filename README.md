@@ -42,7 +42,7 @@ outils/
   verifier.mjs             ouvre toutes les pages et maquettes dans Chromium et échoue à la moindre erreur
 ```
 
-**Jeux branchés sur la bibliothèque :** web_royaumes et web_power, tous deux sur le moteur unique (voir le tableau de [`lib/README.md`](lib/README.md)).
+**Jeux branchés sur la bibliothèque :** web_royaumes, web_power et web_defense (tower defense, partie `defense`), tous deux sur le moteur unique (voir le tableau de [`lib/README.md`](lib/README.md)).
 
 **Règles de base :**
 - **Les graphismes se modifient dans `lib/`,** jamais dans un jeu. La CI de chaque jeu le vérifie.

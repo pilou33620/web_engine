@@ -3,6 +3,22 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.23.0 — 2026-11-21
+
+Nouvelle partie `defense` (`defense.js`, pour le tower defense web_defense ; maquette `maquettes/web_engine/defense.html`) :
+- `ERES` : quinze époques de l'Antiquité à 2035 (une tous les cinq niveaux du jeu), regroupées en cinq styles de dessin
+  (antique, poudre 1700 → 1816, guerres 1900 → 1946, moderne 1960 → 1990, futur 2005 → 2035), avec leur niveau de route et la
+  couleur des ennemis ; `STYLES` : les noms des tours et des ennemis, et le projectile de chaque tour ;
+- `tour(role, style, niveau)` : quatre rôles (rapide, zone, lent, loin) à trois niveaux (socle plus haut, fanion, cerclage doré),
+  avec une tête qui pivote vers sa cible et la bouche du tir ; archers, onagre, poix, scorpion → mousquetaires, canon, pompe à bras,
+  couleuvrine → mitrailleuse, obusier, pompe à vapeur, canon long → tourelle, lance-roquettes, canon à eau, missiles → laser,
+  plasma, rayon cryogénique, canon électrique ;
+- `ennemi(genre, style, couleur)` : fantassin, rapide, lourd, chef (de la tortue romaine et l'éléphant de guerre au méca géant ;
+  zeppelin, hélicoptère et drones volent, leurs hélices tournent) ;
+- `projectile(genre)`, effets `explosion`, `eclat`, `eclaboussure`, `rayon` (laser), `chute` ; `anneauPortee(r)`, `barreVie()` ;
+- `batimentVille(ere, coeur)` : la ville à défendre, faite des bâtiments existants (oppidum et huttes, citadelle et maisons de
+  l'époque, centre-ville et quartiers modernes), `animerVille()`.
+
 ## 2.22.0 — 2026-11-19
 
 Deux niveaux de route de plus (`routes.js`), un par époque : 4, routes impériales (Empire : larges, claires, bordées de

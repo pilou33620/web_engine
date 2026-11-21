@@ -18,6 +18,7 @@ La bibliothèque graphique commune des jeux. Elle vit dans `web_engine/lib/`, et
 | `antique` | `rendu/antiques.js` | `moderne` |
 | `ancien` | `rendu/` : `modeles`, `monde`, `quartiers`, `animations`, `chroniques`, `img/` (illustrations des événements, SVG), `icons/` (icônes de l'application, PNG) | `socle`, `moderne`, `antique`, `guerre` |
 | `guerre` | `rendu/` : `guerre_commun`, `remparts`, `forts`, `sieges`, `marine`, `espions` | `ancien` |
+| `defense` | `rendu/defense.js` : le tower defense (tours, ennemis, projectiles, effets, villes à défendre) | `ancien` |
 | `rendu` | tout (les jeux d'avant la 2.15.0) | toutes |
 
 Depuis la 2.15.0, **les parties sont des listes de fichiers de `rendu/`** (dans `outils/installer.sh`) : un jeu qui prend moins de parties a moins
@@ -38,6 +39,7 @@ que chaque import d'un fichier installé trouve son fichier, et échoue sinon.
 | `monde.js`, `vie.js`, `quartiers.js` | ce qui vit sur le plateau : bâtiments posés, fumées, drapeaux, habitants, bêtes, bateaux, vie des quartiers |
 | `meteo.js`, `routes.js`, `boue.js`, `ambiance.js`, `nuit.js`, `faune.js`, `eau.js`, `etiquettes.js` | le temps et l'heure du jour ; les routes ; la pluie (routes boueuses et mouillées, flaques, crue, eau sale, traces de boue des armées) ; brume du matin, feuilles d'automne, givre sur les toits ; les bannières et étiquettes HTML. Les effets suivent `climat` (vie.js) : un jeu peut y poser `pollution` et `eauSale` |
 | `remparts.js`, `forts.js`, `sieges.js`, `marine.js`, `espions.js`, `brouillard.js`, `guerre_commun.js` | la guerre : remparts, forts, sièges, flottes, espions, brouillard de guerre |
+| `defense.js` | le tower defense : les quinze époques (`ERES`) en cinq styles, `tour(role, style, niveau)` (tête qui pivote, bouche du tir), `ennemi(genre, style, couleur)`, `projectile(genre)`, effets (`explosion`, `eclat`, `eclaboussure`, `rayon`, `chute`), `anneauPortee`, `barreVie`, `batimentVille` |
 
 ### Mise en route
 
@@ -74,6 +76,7 @@ const en1960 = INSTALLATIONS.filter(t => t.an <= 1960 && !(t.fin && t.fin < 1960
 | Jeu | Dossier | `PARTIES` |
 |---|---|---|
 | web_royaumes | `web/graphismes/` | `ancien guerre` (donc tout ; servi par le serveur Rust) |
+| web_defense | `graphismes/` | `defense` (donc tout ; le jeu est statique : une page et ses modules) |
 | web_power | `graphismes/` | `moderne` (avec `socle` et `three` ; le moteur unique depuis la 2.3.0 : le jeu dessine dans un groupe à son échelle, voir son `js/01-moteur.js`) |
 
 ## Utiliser la bibliothèque dans un jeu
