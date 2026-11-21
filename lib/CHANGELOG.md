@@ -3,6 +3,26 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.24.0 — 2026-11-21
+
+`defense.js` refait dans le style du moteur, avec ses animations :
+- les tours deviennent de petits bâtiments : tour de guet gauloise au toit de chaume, onagre sur sa butte palissadée,
+  chaudron de poix sur son foyer, scorpion ; redoute crénelée et ses fusiliers en joue, bastion et canon de web_royaumes
+  (`canon()` de modeles.js), pompe à bras, grosse tour carrée et sa couleuvrine ; nid de mitrailleuse en sacs de sable, obusier,
+  pompe à vapeur, casemate et canon long ; tourelle double, lance-roquettes sur chenilles, camion lance-eau, rampe de missiles
+  et son radar ; tourelle laser, mortier à plasma, cristal cryogénique, canon électrique ; soldats aux coiffes de l'époque
+  (`tete()` de modeles.js, `homme()` d'antiques.js), fanions et torches selon le niveau ;
+- animations des tours : au tir (`tirer(t)`, qui rend la bouche et pose l'éclair et la fumée de poudre) recul des pièces, bras
+  de l'onagre, chaudron qui se renverse, levier de la pompe, mitrailleuse qui tremble, missile qui part et revient ; en continu
+  drapeaux au vent, flammes, fumée du chaudron et de la chaudière, radars, gyrophares, noyaux lumineux, cristal qui flotte ;
+  `tour(…, { pop: true })` sort de terre ;
+- les ennemis deviennent des troupes comme les armées du moteur (trois légionnaires, deux cavaliers, la tortue, trois fusiliers…) ;
+  `avancer(e, distance, dt)` : jambes et sabots au pas, roues qui tournent selon la distance, hélices, balancement ;
+  `abattre(e)` : la troupe s'effondre (les engins s'affaissent, les volants piquent) puis quitte la scène ; `toucher(e)` : elle tressaille ;
+- projectiles et effets : `suivreTir(p)` (traînée des roquettes, fumée de la poix), explosion avec onde au sol, éclaboussure
+  et ses gouttes, laser avec halo ;
+- `tour(role, ere, niveau)` et `ennemi(genre, ere)` prennent l'époque (ou, comme avant, un style).
+
 ## 2.23.0 — 2026-11-21
 
 Nouvelle partie `defense` (`defense.js`, pour le tower defense web_defense ; maquette `maquettes/web_engine/defense.html`) :

@@ -26,74 +26,85 @@
 import { THREE, scene, cam, camera, apresCamera, chaqueImage } from '../../lib/rendu/scene.js';
 import { lot, put, fige, cyl, jeter } from '../../lib/rendu/toon.js';
 import { appliquerMeteo, forcerHeure } from '../../lib/rendu/meteo.js';
-import { ERES, STYLES, ROLES, GENRES, tour, ennemi, projectile, barreVie, anneauPortee, batimentVille, animerVille, explosion, eclat, rayon, eclaboussure } from '../../lib/rendu/defense.js';
+import { ERES, STYLES, ROLES, GENRES, tour, tirer, ennemi, avancer, abattre, projectile, suivreTir, barreVie, anneauPortee, batimentVille, animerVille, explosion, rayon, eclaboussure, chute } from '../../lib/rendu/defense.js';
 
 const f = document.getElementById('choix'), etiq = document.getElementById('etiquettes');
 f.ere.innerHTML = ERES.map((e, i) => `<option value="${i}">${e.an < 0 ? 'Antiquité' : e.an} · ${e.nom}</option>`).join('');
+const q = new URLSearchParams(location.search);
+if (q.get('ere')) f.ere.value = q.get('ere');
 forcerHeure('jour');
 appliquerMeteo({ genre: 'soleil', temperature: 18, vent: 0.3 }, 2);
-Object.assign(cam, { x: 4, z: 3.5, d: 13, cible: 13, auto: false, lacet: 0.25, l: 20, h: 20 });
+Object.assign(cam, { x: 4.5, z: 3.5, d: +(q.get('d') || 13), cible: +(q.get('d') || 13), auto: false, lacet: 0.25, l: 20, h: 20 });
+if (q.get('x')) { cam.x = +q.get('x'); cam.z = +q.get('z'); }
 
-let carte = null, poses = [], anims = [];
+let carte = null, poses = [], tours = [], troupes = [];
 const sol = (x, z, col = 0x84c450) => { const T = lot(); put(T, cyl(0.97, 1, 0.16, 6), col, 0, -0.08, 0, 0, 0); fige(T, carte).position.set(x, 0, z); };
 function nom(txt, x, z) { const el = document.createElement('span'); el.textContent = txt; etiq.append(el); poses.push({ el, p: new THREE.Vector3(x, 0, z + 0.9) }); }
 
 function montrer() {
-  if (carte) jeter(carte);
-  etiq.innerHTML = ''; poses = []; anims = [];
+  if (carte) { for (const e of troupes) carte.remove(e.e.groupe); jeter(carte); }
+  etiq.innerHTML = ''; poses = []; tours = []; troupes = [];
   carte = new THREE.Group(); scene.add(carte);
   const E = ERES[+f.ere.value], S = STYLES[E.style];
   ROLES.forEach((r, k) => {
     for (let n = 1; n <= 3; n++) {
       const x = (n - 1) * 2.1, z = k * 2.1; sol(x, z);
-      const t = tour(r, E.style, n); t.groupe.position.set(x, 0, z); carte.add(t.groupe);
-      anims.push({ t, x, z, role: r, proj: S.tours[r][1], ph: k + n * 0.7 });
+      const t = tour(r, E, n, { pop: true }); t.groupe.position.set(x, 0, z); carte.add(t.groupe);
+      tours.push({ t, x, z, role: r, proj: S.tours[r][1], ph: k * 0.5 + n * 0.7 });
       if (n === 1) nom(S.tours[r][0], x, z);
     }
   });
-  GENRES.forEach((g, k) => {
-    const x = 7.2, z = k * 2.1; sol(x, z, 0xc9a874);
-    const e = ennemi(g, E.style, E.couleur); e.groupe.position.set(x, e.vol ? 0.8 : 0, z); carte.add(e.groupe);
-    const b = barreVie(); b.objet.position.set(x, (e.vol ? 0.8 : 0) + 0.75, z); b.regler(1 - k * 0.25); carte.add(b.objet);
-    anims.push({ e, x, z, ph: k });
-    nom(S.ennemis[g], x, z);
-  });
-  for (const [i, [x, z]] of [[10, 1], [11.7, 1], [10.85, 2.5], [10.85, -0.5]].entries()) {
+  GENRES.forEach((g, k) => { sol(7.2, k * 2.1, 0xc9a874); sol(8.9, k * 2.1, 0xc9a874); troupes.push(nouvelle(g, k)); nom(S.ennemis[g], 7.2, k * 2.1); });
+  for (const [i, [x, z]] of [[11.5, 1], [13.2, 1], [12.35, 2.5], [12.35, -0.5]].entries()) {
     sol(x, z); const b = batimentVille(E, i === 0, i + 1); b.groupe.position.set(x, 0, z); carte.add(b.groupe); animerVille(b);
   }
-  nom('Ville à défendre', 10, 1);
+  nom('Ville à défendre', 11.5, 1);
   const a = anneauPortee(1.6); a.position.set(2.1, 0.02, 0); carte.add(a);
+}
+// les ennemis marchent d'un bout à l'autre de leur rangée ; touchés trois fois, ils tombent et reviennent
+function nouvelle(g, k) {
+  const E = ERES[+f.ere.value], e = ennemi(g, E), b = barreVie();
+  carte.add(e.groupe); carte.add(b.objet); e.groupe.rotation.y = Math.PI / 2;
+  return { e, b, g, k, x: 6.6, z: k * 2.1, vie: 3, sens: 1 };
 }
 f.addEventListener('change', montrer);
 montrer();
 
-// ------------------------------------------------------------------ tirs de démonstration : chaque tour vise l'ennemi de sa rangée
 const vols = [];
 let horloge = 0;
 chaqueImage(dt => {
   horloge += dt;
-  for (const a of anims) {
-    if (a.e) { a.e.corps.position.y = Math.abs(Math.sin(horloge * 7 + a.ph)) * 1.2; for (const h of a.e.helices) h.rotation.y += dt * 25; continue; }
-    const cible = new THREE.Vector3(7.2, 0.25, a.z);
+  for (const T of troupes) {
+    const d = dt * (T.g === 'rapide' ? 0.9 : 0.45);
+    T.x += d * T.sens; if (T.x > 9.4 || T.x < 6.6) { T.sens *= -1; T.e.groupe.rotation.y = T.sens * Math.PI / 2; }
+    avancer(T.e, d, dt);
+    T.e.groupe.position.set(T.x, T.e.vol ? 0.9 : 0, T.z);
+    T.b.objet.position.set(T.x, (T.e.vol ? 0.9 : 0) + (T.g === 'chef' ? 1.05 : 0.6), T.z); T.b.regler(T.vie / 3);
+  }
+  for (const a of tours) {
+    const T = troupes[ROLES.indexOf(a.role)], cible = new THREE.Vector3(T.x, (T.e.vol ? 0.9 : 0) + 0.2, T.z);
     a.t.tete.rotation.y = Math.atan2(cible.x - a.x, cible.z - a.z);
-    if (!f.tirs.checked || ((horloge + a.ph) % 2.2) > dt) continue;
-    a.t.groupe.updateMatrixWorld(true);
-    const d = a.t.tete.localToWorld(a.t.bouche.clone());
-    if (a.proj === 'laser') { rayon(d, cible); eclat(d.x, d.y, d.z, 0x5ff0ff); continue; }
-    eclat(d.x, d.y, d.z);
+    if (!f.tirs.checked || ((horloge + a.ph) % 2.4) > dt) continue;
+    const d = tirer(a.t);
+    if (a.proj === 'laser') { rayon(d, cible); frapper(T, cible, a.role); continue; }
     const p = projectile(a.proj); p.position.copy(d); carte.add(p);
-    vols.push({ p, a: d, b: cible, t: 0, duree: d.distanceTo(cible) / 7, arc: a.role === 'zone' ? 1.2 : 0.15, role: a.role, proj: a.proj });
+    vols.push({ p, a: d, b: cible, T, t: 0, duree: d.distanceTo(cible) / 6, arc: a.role === 'zone' ? 1.2 : 0.15, role: a.role, proj: a.proj });
   }
   for (let i = vols.length - 1; i >= 0; i--) {
     const v = vols[i]; v.t += dt; const u = Math.min(1, v.t / v.duree), av = v.p.position.clone();
     v.p.position.lerpVectors(v.a, v.b, u); v.p.position.y += Math.sin(u * Math.PI) * v.arc;
-    v.p.lookAt(v.p.position.clone().add(v.p.position.clone().sub(av)));
+    v.p.lookAt(v.p.position.clone().add(v.p.position.clone().sub(av))); suivreTir(v.p);
     if (u < 1) continue;
-    carte.remove(v.p); vols.splice(i, 1);
-    if (v.role === 'zone') explosion(v.b.x, v.b.y, v.b.z, 0.5, v.proj === 'plasma' ? 0xe040ff : 0xffb040);
-    if (v.role === 'lent') eclaboussure(v.b.x, 0.01, v.b.z, { poix: 0x26262a, eau: 0x6ab8ff, glace: 0xa8f0ff }[v.proj]);
+    carte.remove(v.p); vols.splice(i, 1); frapper(v.T, v.b, v.role, v.proj);
   }
 });
+function frapper(T, b, role, proj) {
+  if (role === 'zone') explosion(b.x, b.y, b.z, 0.5, proj === 'plasma' ? 0xe040ff : 0xffb040);
+  if (role === 'lent') eclaboussure(b.x, 0.01, b.z, { poix: 0x26262a, eau: 0x5fb0e8, glace: 0xa8f0ff }[proj]);
+  if (--T.vie > 0 || T.mort) return;
+  T.mort = true; abattre(T.e); chute(T.x, 0, T.z, T.e.roule); carte.remove(T.b.objet);
+  setTimeout(() => { if (!carte.children.includes(T.e.groupe) && troupes.includes(T)) troupes[troupes.indexOf(T)] = nouvelle(T.g, T.k); }, 1500);
+}
 const vv = new THREE.Vector3();
 apresCamera(() => {
   for (const { el, p } of poses) {
