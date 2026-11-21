@@ -26,7 +26,7 @@
   <label><input type="checkbox" name="toits"> Toits</label>
   <label><input type="checkbox" name="details" checked> Noms du matériel</label>
 </form>
-<p class="note">Maquette à valider (21/11/2026) : la miellerie et le hangar côte à côte, reliés par un passage couvert, vus en coupe (cocher « Toits » pour les fermer), trois ruchers où l'apiculteur ouvre les ruches et les enfume, et le marché sur la place du bourg, marchands qui
+<p class="note">Maquette à valider (21/11/2026) : la miellerie et le hangar, chacun sur sa case, vus en coupe (cocher « Toits » pour les fermer), trois ruchers où l'apiculteur ouvre les ruches et les enfume, et le bourg, dont la place du marché tient sur plusieurs cases, marchands qui
   <span class="legende" style="background:#7cc84d"></span>vendent ou <span class="legende" style="background:#f0b030"></span>achètent.</p>
 <p class="aide">Glisser : déplacer · clic droit ou Maj : tourner · molette : zoom</p>
 <script type="module">
@@ -47,14 +47,14 @@ const TEINTES = [0x5a8ac0, 0xe0c050, 0x7aa860, 0xf0ece0, 0xd98a5a, 0x9a7ac0];
 const G = new THREE.Group(); G.scale.setScalar(0.1); scene.add(G);
 const objet = (parent, x, z, ry, dessin) => { const L = lot(); dessin(L); const g = fige(L, parent); g.position.set(x, 0, z); g.rotation.y = ry; return g; };
 const ZONES = {
-  miellerie: { nom: 'Miellerie', txt: 'extraction, maturation et mise en pot du miel', x: 58, z: 48, r: 30, sol: 0xcbbd94 },
-  hangar: { nom: 'Hangar', txt: 'le stock : hausses, cadres, ruchettes, nourrissement, la camionnette', x: 91, z: 48, r: 30, sol: 0xcbbd94 },
-  marche: { nom: 'Marché', txt: 'la place du bourg : des marchands qui achètent et d’autres qui vendent', x: 262, z: 52, r: 36, rv: 56, sol: 0xb8ad9c },
+  miellerie: { nom: 'Miellerie', txt: 'extraction, maturation et mise en pot du miel', x: 43.3, z: 45, r: 11, s: 0.53, sol: 0xcbbd94 },
+  hangar: { nom: 'Hangar', txt: 'le stock : hausses, cadres, ruchettes, nourrissement, la camionnette', x: 60.6, z: 45, r: 11, s: 0.53, sol: 0xcbbd94 },
+  marche: { nom: 'Marché', txt: 'la place du bourg : des marchands qui achètent et d’autres qui vendent', x: 259.8, z: 60, r: 36, rv: 56, sol: 0xb8ad9c },
   champ: { nom: 'Rucher du champ', txt: 'lavande et tournesols : miel de lavande', x: 58, z: 162, r: 36, sol: 0x86c052 },
   foret: { nom: 'Rucher de la forêt', txt: 'clairière sous les châtaigniers et les sapins : miel de forêt', x: 168, z: 162, r: 36, sol: 0x5e9a44 },
   lisiere: { nom: 'Rucher de la lisière', txt: 'entre le colza et le bois : miel toutes fleurs', x: 278, z: 162, r: 36, sol: 0x7cb84c },
 };
-for (const z of Object.values(ZONES)) { z.g = new THREE.Group(); z.g.position.set(z.x, 0, z.z); G.add(z.g); }
+for (const z of Object.values(ZONES)) { z.g = new THREE.Group(); z.g.position.set(z.x, 0, z.z); z.g.scale.setScalar(z.s || 1); G.add(z.g); }
 const poses = [];
 function nom(txt, x, z, classe = '', detail = false) { const el = document.createElement('span'); el.className = classe; el.textContent = txt; etiq.append(el); poses.push({ el, p: new THREE.Vector3(x * 0.1, 0.35, z * 0.1), detail }); }
 
@@ -74,9 +74,11 @@ function feuillu(L, x, z, s, i, fleurs = 0) {
 }
 
 // ------------------------------------------------------------------ le plateau : cases hexagonales, teintées par zone, chemins de terre entre les zones
-const NC = 19, NR = 15, CHEMINS = [[[100, 62], [262, 56]], [[70, 66], [58, 162]], [[96, 66], [168, 162]], [[168, 162], [278, 162]]];
+const NC = 19, NR = 15, CHEMINS = [[[60, 56], [259.8, 64]], [[43, 56], [58, 162]], [[60, 56], [168, 162]], [[168, 162], [278, 162]]];
 // le bourg autour du marché : des maisons de la bibliothèque, trois rues qui mènent à la place
 const RUES = [Math.PI, Math.PI / 2, -0.35], maisons = [];
+// les étals de la place, chacun sur sa case : les six cases autour de la fontaine, et deux cases plus loin entre les rues
+const STANDS = [0, 60, 120, 180, 240, 300, 30, 210].map((d, k) => { const a = d * Math.PI / 180, r = k < 6 ? SQ3 * 10 : 30; return [Math.cos(a) * r, Math.sin(a) * r]; });
 const rue = (dx, dz) => RUES.some(a => { const u = dx * Math.cos(a) + dz * Math.sin(a); return u > 0 && Math.abs(-dx * Math.sin(a) + dz * Math.cos(a)) < 9; });
 const distSeg = (px, pz, [[ax, az], [bx, bz]]) => { const dx = bx - ax, dz = bz - az, u = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / (dx * dx + dz * dz))); return Math.hypot(px - ax - u * dx, pz - az - u * dz); };
 {
@@ -85,7 +87,7 @@ const distSeg = (px, pz, [[ax, az], [bx, bz]]) => { const dx = bx - ax, dz = bz 
     const x = SQ3 * (c + 0.5 * (r & 1)) * 10, z = 15 * r, i = r * NC + c, h = hache(c, r, 3);
     const zone = Object.values(ZONES).find(Z => Math.hypot(x - Z.x, z - Z.z) < (Z.rv || Z.r));
     const M = ZONES.marche, dm = Math.hypot(x - M.x, z - M.z), enRue = zone === M && dm > 26 && rue(x - M.x, z - M.z);
-    if (zone === M && dm > 26 && !enRue) maisons.push([x, z, i]);
+    if (zone === M && dm > 26 && !enRue && !STANDS.some(([sx, sz]) => Math.hypot(x - M.x - sx, z - M.z - sz) < 5)) maisons.push([x, z, i]);
     const chemin = !zone && CHEMINS.some(s => distSeg(x, z, s) < 8);
     const col = new THREE.Color(enRue ? 0x9a8f80 : zone ? zone.sol : chemin ? 0xc4a774 : 0x84c450).offsetHSL(0, 0, (h - 0.5) * 0.05);
     P(T, cyl(9.65, 10, 1.6, 6), col.getHex(), x, -0.8, z, 0, 0);
@@ -159,7 +161,6 @@ let rotor;
   for (let x = -13; x <= 13; x += 2) P(Lb, boite(0.05, 0.02, 18), 0xc8c2b4, x, F + 0.01, 0, 0, 0);  // carrelage
   P(Lb, boite(29.6, 0.5, 19.6), PIERRE, 0, 0.25, 0, 0, 0.1);
   murs(Lb, Lh, [[-14, -9, 14, -9], [-14, -9, -14, 9], [14, -9, 14, 9], [-14, 9, -9, 9], [-5, 9, 14, 9]].flatMap(w => w[0] === 14 && w[2] === 14 ? [[14, -9, 14, -2], [14, 2, 14, 9]] : [w]), F, 5, MUR);
-  P(Lb, boite(6, 0.3, 4.4), 0xbdb8ac, 17, 0.15, 0, 0, 0.1); P(Lh, boite(6.6, 0.25, 5.4), 0x8a9aa4, 17, F + 5, 0, 0, 0.15);  // le passage couvert vers le hangar
   P(Lh, boite(4.6, 1.6, 0.6), MUR, 14, F + 4.2, 0, Math.PI / 2, 0.15);
   P(Lh, boite(4.6, 1.6, 0.6), MUR, -7, F + 4.2, 9, 0, 0.15);  // linteau de la porte
   for (const x of [2, 8]) P(Lh, boite(2, 1.4, 0.7), 0x3a4652, x, F + 3, 9, 0, 0.05);
@@ -194,7 +195,7 @@ let rotor;
   const a = figurine(Z.g, HOMME(0xe8e4d8, 0x4a5a6a, null, 0x3f6f9a), 2, -1.4); a.rotation.y = Math.PI / 2; marcheur(a, [[2, -1.4, 4, Math.PI / 2], [-0.6, -5.6, 3, Math.PI / 2]], 1.6);
   marcheur(figurine(Z.g, FEMME(0x5a7a9a, 0xf2f0e8), -4, -5.5), [[-4, -5.5, 3, Math.PI / 2], [7.6, -4.6, 2.5, Math.PI / 2], [7, 0.4, 3.5, Math.PI / 2], [-6, 2, 1.5]], 2.2);
   for (const [t, x, z] of [['Hausses pleines', -11, -3.5], ['Étuve', -12, 6.4], ['Désoperculation', -4, -7.4], ['Extracteur', 2, -4], ['Maturateurs', 9.4, -7], ['Mise en pot', 7, 2.5], ['Pots prêts', 13.1, 5.5], ['Évier', -12.6, 1.8]])
-    nom(t, Z.x + x, Z.z + z, '', 'bat');
+    nom(t, Z.x + x * Z.s, Z.z + z * Z.s, '', 'bat');
 }
 
 // ---- le hangar (26 × 16, ouvert devant) : rayonnages de cadres, piles de hausses, combinaisons, établi, nourrissement ; la camionnette devant
@@ -239,14 +240,15 @@ let camionnette;
   const charge = objet(o, 0, 0, 0, L => hausse(L, 0.75, 1.1, 0, 0xe0c050, 0, 0.7)); charge.scale.setScalar(0.7);
   marcheur(o, [[1.5, -2.4, 1.5, Math.PI / 2], [0.2, 11.5, 1.5, -Math.PI / 2]], 2.4, (i, t) => { charge.visible = i === 0 ? t > 0.7 : t < 0.7; });
   for (const [t, x, z] of [['Cadres', -7, -6.8], ['Hausses et corps', 5.9, -6.6], ['Ruchettes', 10.4, -2.5], ['Combinaisons', -12.5, -4.8], ['Établi', -11.2, 4.8], ['Nourrissement', 2, 4.5], ['Camionnette', 4, 14.5]])
-    nom(t, Z.x + x, Z.z + z, '', 'bat');
+    nom(t, Z.x + x * Z.s, Z.z + z * Z.s, '', 'bat');
 }
 // la cour de l'exploitation : barrière, banc, panneau
 {
   const L = lot();
-  for (let x = 26; x <= 120; x += 4) { P(L, boite(0.3, 1.3, 0.3), BOIS_F, x, 0.65, 22, 0, 0.05); P(L, boite(4, 0.18, 0.15), BOIS, x + 2, 1, 22, 0, 0); }
-  P(L, boite(0.3, 2.2, 0.3), BOIS_F, 76, 1.1, 66, 0, 0.05); P(L, boite(4, 1.4, 0.2), PLANCHE, 76, 2.4, 66, 0, 0.08); P(L, boite(1, 1, 0.22), MIEL, 74.6, 2.4, 66, 0, 0);
-  P(L, boite(3, 0.2, 1), PLANCHE, 64, 0.7, 63, 0, 0.05); for (const x of [62.8, 65.2]) P(L, boite(0.2, 0.7, 0.8), BOIS_F, x, 0.35, 62, 0, 0);
+  for (let x = 32; x <= 68; x += 4) { P(L, boite(0.3, 1.3, 0.3), BOIS_F, x, 0.65, 33, 0, 0.05); P(L, boite(4, 0.18, 0.15), BOIS, x + 2, 1, 33, 0, 0); }
+  for (let x = 51.3; x < 53; x += 0.8) P(L, boite(0.6, 0.06, 1.6), PIERRE, x, 0.03, 45, 0, 0.03);  // les dalles d'une porte à l'autre
+  P(L, boite(0.3, 2.2, 0.3), BOIS_F, 52, 1.1, 58, 0, 0.05); P(L, boite(4, 1.4, 0.2), PLANCHE, 52, 2.4, 58, 0, 0.08); P(L, boite(1, 1, 0.22), MIEL, 50.6, 2.4, 58, 0, 0);
+  P(L, boite(3, 0.2, 1), PLANCHE, 38, 0.7, 58, 0, 0.05); for (const x of [36.8, 39.2]) P(L, boite(0.2, 0.7, 0.8), BOIS_F, x, 0.35, 58, 0, 0);
   for (const [x, z] of [[30, 64], [112, 30], [120, 66]]) feuillu(L, x, z, 2.6, x);
   fige(L, G);
 }
@@ -335,7 +337,7 @@ function apiculteur(Z, liste, montrerCadre) {
     ['Grossiste', 'achete', 'miel en fûts, au poids', [0x5a5a6a, 0xd8d8d8], HOMME(0x7a5a3a, 0x2f2f36, 0x2f2f36), L => { for (let k = 0; k < 3; k++) P(L, cyl(0.6, 0.6, 1.3, 10), 0x5a6a7a, -1.8 + k * 1.4, 1.81, 0.3, 0, 0.06); P(L, boite(0.8, 0.2, 0.8), INOX, 2.6, 1.26, 0.4, 0, 0.04); P(L, cyl(0.06, 0.06, 0.8, 6), INOX_F, 2.6, 1.7, 0.4, 0, 0); }],
   ];
   ETALS.forEach(([titre, role, txt, [c1, c2], marchand, etal], k) => {
-    const a = k / ETALS.length * Math.PI * 2 + 0.2, x = Math.cos(a) * 19, z = Math.sin(a) * 19, ry = Math.atan2(-Math.cos(a), -Math.sin(a));
+    const [x, z] = STANDS[k], a = Math.atan2(z, x), d = Math.hypot(x, z), ry = Math.atan2(-Math.cos(a), -Math.sin(a));
     const g = objet(Z.g, x, z, ry, L => {
       P(L, boite(6.4, 1.1, 2), PLANCHE, 0, 0.55, 0.5, 0, 0.08); P(L, boite(6.6, 0.1, 2.2), c2, 0, 1.12, 0.5, 0, 0);
       for (const sx of [-3.1, 3.1]) for (const sz of [-1.6, 1.6]) P(L, boite(0.18, 3.4, 0.18), BOIS_F, sx, 1.7, sz, 0, 0);
@@ -344,12 +346,12 @@ function apiculteur(Z, liste, montrerCadre) {
     });
     const m = figurine(g, marchand, 0, -1.4, -Math.PI / 2);
     marcheur(m, [[0, -1.4, 3 + k % 3, -Math.PI / 2], [-1.6, -1.2, 2, -Math.PI / 2]], 0.8);
-    nom(`${titre} · ${role === 'vend' ? 'vend' : 'achète'} : ${txt}`, Z.x + Math.cos(a) * 24.5, Z.z + Math.sin(a) * 24.5 - 1, role, true);
+    nom(`${titre} · ${role === 'vend' ? 'vend' : 'achète'} : ${txt}`, Z.x + Math.cos(a) * (d + 5), Z.z + Math.sin(a) * (d + 5) - 1, role, true);
   });
   // les clients font le tour de la place et s'arrêtent devant les étals
   const CLIENTS = [HOMME(0x6a8aa4), HOMME(0xc0504a, 0x5a4632, 0x5a4632), FEMME(0x8a4a7a, 0xf2e6c8), FEMME(0x5a7a4a), [...FEMME(0x4a6a9a), ...PANIER], [...HOMME(0xd9b45a, 0x4a4a52, 0x8a6a3a), ...PANIER], FEMME(0xb8603f), HOMME(0x3a6a8a, 0x2f2f36, 0x2f2f36), [...FEMME(0xc0504a, 0xf6f0e0), ...PANIER], HOMME(0x8a8a5a), FEMME(0x3a5a8a, 0xe8e8e8), [...HOMME(0x9a5a8a), ...PANIER], FEMME(0xd9a441), HOMME(0x5a8a6a, 0x4a3a2a, 0xd9b45a)];
   CLIENTS.forEach((c, k) => {
-    const pts = []; for (let j = 0; j < 4; j++) { const e = (k * 3 + j * 5) % 8, a = e / 8 * Math.PI * 2 + 0.2 + (hache(k, j) - 0.5) * 0.25, r = 13 + hache(k, j, 2) * 2.5; pts.push([Math.cos(a) * r, Math.sin(a) * r, 2 + hache(k, j, 3) * 4, Math.atan2(-Math.sin(a), Math.cos(a))]); }
+    const pts = []; for (let j = 0; j < 4; j++) { const [sx, sz] = STANDS[(k * 3 + j * 5) % 8], d = Math.hypot(sx, sz), u = (d - 4 - hache(k, j, 2) * 1.5) / d, w = (hache(k, j) - 0.5) * 2; pts.push([sx * u - sz / d * w, sz * u + sx / d * w, 2 + hache(k, j, 3) * 4, Math.atan2(-sz, sx)]); }
     // entre deux étals, on passe par l'anneau intérieur pour contourner la fontaine
     const chemin = []; pts.forEach((p, j) => { const q = pts[(j + 1) % 4], a0 = Math.atan2(p[1], p[0]); let a1 = Math.atan2(q[1], q[0]); chemin.push(p); for (let s = 1; s < 4; s++) { let d = a1 - a0; d -= Math.round(d / 6.283) * 6.283; const a = a0 + d * s / 4; chemin.push([Math.cos(a) * 11, Math.sin(a) * 11, 0]); } });
     const g = figurine(Z.g, c, pts[0][0], pts[0][1]); const m = marcheur(g, chemin, 2 + hache(k, 9)); m.i = k % chemin.length;
@@ -382,10 +384,10 @@ function majAbeilles(t) {
 }
 
 // ------------------------------------------------------------------ noms des zones, vues, animation
-for (const Z of Object.values(ZONES)) { nom(Z.nom, Z.x, Z.z + Z.r - 2, 'titre'); const el = poses.at(-1).el, d = document.createElement('small'); d.textContent = Z.txt; el.append(document.createElement('br'), d); }
+for (const Z of Object.values(ZONES)) { nom(Z.nom, Z.x, Z.z + Z.r + (Z.s ? 4 : -2), 'titre'); const el = poses.at(-1).el, d = document.createElement('small'); d.textContent = Z.txt; el.append(document.createElement('br'), d); }
 const VUES = [
-  ['Vue d’ensemble', 16.5, 11.5, 32], ['Exploitation', 7.45, 5.2, 10], ['Miellerie', 5.8, 4.6, 6], ['Hangar', 9.1, 5.4, 6.5],
-  ['Rucher du champ', 5.8, 14.6, 7.5], ['Rucher de la forêt', 16.8, 16.2, 7.5], ['Rucher de la lisière', 27.8, 16.2, 7.5], ['Marché', 26.2, 5.8, 12],
+  ['Vue d’ensemble', 16.5, 11.5, 32], ['Exploitation', 5.2, 4.9, 7], ['Miellerie', 4.33, 4.6, 4.2], ['Hangar', 6.06, 4.8, 4.2],
+  ['Rucher du champ', 5.8, 14.6, 7.5], ['Rucher de la forêt', 16.8, 16.2, 7.5], ['Rucher de la lisière', 27.8, 16.2, 7.5], ['Marché', 26, 6.6, 12],
 ];
 f.vue.innerHTML = VUES.map((v, i) => `<option value="${i}">${v[0]}</option>`).join('');
 const viser = () => { const [, x, z, d] = VUES[+f.vue.value]; Object.assign(cam, { x, z, cible: d, auto: false, lacet: 0 }); };
