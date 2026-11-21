@@ -26,7 +26,7 @@
   <label><input type="checkbox" name="toits"> Toits</label>
   <label><input type="checkbox" name="details" checked> Noms du matériel</label>
 </form>
-<p class="note">Maquette à valider (21/11/2026) : la miellerie et le hangar vus en coupe (cocher « Toits » pour les fermer), trois ruchers où l'apiculteur ouvre les ruches et les enfume, et le marché, marchands qui
+<p class="note">Maquette à valider (21/11/2026) : la miellerie et le hangar côte à côte, reliés par un passage couvert, vus en coupe (cocher « Toits » pour les fermer), trois ruchers où l'apiculteur ouvre les ruches et les enfume, et le marché sur la place du bourg, marchands qui
   <span class="legende" style="background:#7cc84d"></span>vendent ou <span class="legende" style="background:#f0b030"></span>achètent.</p>
 <p class="aide">Glisser : déplacer · clic droit ou Maj : tourner · molette : zoom</p>
 <script type="module">
@@ -35,6 +35,7 @@
 import { THREE, scene, cam, camera, apresCamera, chaqueImage, hache, SQ3 } from '../../lib/rendu/scene.js';
 import { lot, put, fige, cyl, cone, boite, sphere } from '../../lib/rendu/toon.js';
 import { appliquerMeteo, forcerHeure } from '../../lib/rendu/meteo.js';
+import { maillageBatiment } from '../../lib/rendu/modeles.js';
 import { climat, bouffee } from '../../lib/rendu/vie.js';
 
 const f = document.getElementById('choix'), etiq = document.getElementById('etiquettes');
@@ -46,9 +47,9 @@ const TEINTES = [0x5a8ac0, 0xe0c050, 0x7aa860, 0xf0ece0, 0xd98a5a, 0x9a7ac0];
 const G = new THREE.Group(); G.scale.setScalar(0.1); scene.add(G);
 const objet = (parent, x, z, ry, dessin) => { const L = lot(); dessin(L); const g = fige(L, parent); g.position.set(x, 0, z); g.rotation.y = ry; return g; };
 const ZONES = {
-  miellerie: { nom: 'Miellerie', txt: 'extraction, maturation et mise en pot du miel', x: 52, z: 48, r: 30, sol: 0xcbbd94 },
-  hangar: { nom: 'Hangar', txt: 'le stock : hausses, cadres, ruchettes, nourrissement, la camionnette', x: 124, z: 48, r: 30, sol: 0xcbbd94 },
-  marche: { nom: 'Marché', txt: 'des marchands qui achètent et d’autres qui vendent', x: 262, z: 52, r: 36, sol: 0xb8ad9c },
+  miellerie: { nom: 'Miellerie', txt: 'extraction, maturation et mise en pot du miel', x: 58, z: 48, r: 30, sol: 0xcbbd94 },
+  hangar: { nom: 'Hangar', txt: 'le stock : hausses, cadres, ruchettes, nourrissement, la camionnette', x: 91, z: 48, r: 30, sol: 0xcbbd94 },
+  marche: { nom: 'Marché', txt: 'la place du bourg : des marchands qui achètent et d’autres qui vendent', x: 262, z: 52, r: 36, rv: 56, sol: 0xb8ad9c },
   champ: { nom: 'Rucher du champ', txt: 'lavande et tournesols : miel de lavande', x: 58, z: 162, r: 36, sol: 0x86c052 },
   foret: { nom: 'Rucher de la forêt', txt: 'clairière sous les châtaigniers et les sapins : miel de forêt', x: 168, z: 162, r: 36, sol: 0x5e9a44 },
   lisiere: { nom: 'Rucher de la lisière', txt: 'entre le colza et le bois : miel toutes fleurs', x: 278, z: 162, r: 36, sol: 0x7cb84c },
@@ -73,15 +74,20 @@ function feuillu(L, x, z, s, i, fleurs = 0) {
 }
 
 // ------------------------------------------------------------------ le plateau : cases hexagonales, teintées par zone, chemins de terre entre les zones
-const NC = 19, NR = 15, CHEMINS = [[[124, 60], [262, 56]], [[88, 64], [58, 162]], [[110, 64], [168, 162]], [[168, 162], [278, 162]], [[52, 48], [124, 48]]];
+const NC = 19, NR = 15, CHEMINS = [[[100, 62], [262, 56]], [[70, 66], [58, 162]], [[96, 66], [168, 162]], [[168, 162], [278, 162]]];
+// le bourg autour du marché : des maisons de la bibliothèque, trois rues qui mènent à la place
+const RUES = [Math.PI, Math.PI / 2, -0.35], maisons = [];
+const rue = (dx, dz) => RUES.some(a => { const u = dx * Math.cos(a) + dz * Math.sin(a); return u > 0 && Math.abs(-dx * Math.sin(a) + dz * Math.cos(a)) < 9; });
 const distSeg = (px, pz, [[ax, az], [bx, bz]]) => { const dx = bx - ax, dz = bz - az, u = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / (dx * dx + dz * dz))); return Math.hypot(px - ax - u * dx, pz - az - u * dz); };
 {
   const T = lot(), D = lot();
   for (let r = 0; r < NR; r++) for (let c = 0; c < NC; c++) {
     const x = SQ3 * (c + 0.5 * (r & 1)) * 10, z = 15 * r, i = r * NC + c, h = hache(c, r, 3);
-    const zone = Object.values(ZONES).find(Z => Math.hypot(x - Z.x, z - Z.z) < Z.r);
+    const zone = Object.values(ZONES).find(Z => Math.hypot(x - Z.x, z - Z.z) < (Z.rv || Z.r));
+    const M = ZONES.marche, dm = Math.hypot(x - M.x, z - M.z), enRue = zone === M && dm > 26 && rue(x - M.x, z - M.z);
+    if (zone === M && dm > 26 && !enRue) maisons.push([x, z, i]);
     const chemin = !zone && CHEMINS.some(s => distSeg(x, z, s) < 8);
-    const col = new THREE.Color(zone ? zone.sol : chemin ? 0xc4a774 : 0x84c450).offsetHSL(0, 0, (h - 0.5) * 0.05);
+    const col = new THREE.Color(enRue ? 0x9a8f80 : zone ? zone.sol : chemin ? 0xc4a774 : 0x84c450).offsetHSL(0, 0, (h - 0.5) * 0.05);
     P(T, cyl(9.65, 10, 1.6, 6), col.getHex(), x, -0.8, z, 0, 0);
     if (zone || chemin) continue;
     // la campagne autour : bosquets sur les bords, quelques arbres, buissons et fleurs ailleurs
@@ -91,6 +97,13 @@ const distSeg = (px, pz, [[ax, az], [bx, bz]]) => { const dx = bx - ax, dz = bz 
     else for (let k = 0; k < 6; k++) P(D, boite(0.5, 0.3, 0.5), [0xf2f0e6, 0xf0d040, 0xd96aa0][k % 3], x + (hache(i, k, 7) - 0.5) * 14, 0.15, z + (hache(i, k, 8) - 0.5) * 14, 0, 0);
   }
   fige(T, G); fige(D, G);
+}
+{
+  const CLES = ['maison', 'maison_pierre', 'immeuble', 'boulangerie', 'maison', 'taverne', 'hotel_particulier', 'maison_pierre', 'ecole'], M = ZONES.marche;
+  for (const [x, z, i] of maisons) {
+    const { mesh } = maillageBatiment({ cle: CLES[i % CLES.length], epoque: 'industrie', couleur: '#b84a3a' });
+    mesh.scale.multiplyScalar(10); mesh.position.set(x, 0, z); mesh.rotation.y = Math.round(Math.atan2(M.x - x, M.z - z) / (Math.PI / 3)) * Math.PI / 3; G.add(mesh);
+  }
 }
 
 // ------------------------------------------------------------------ les personnages (face à +x, pieds à y = 0)
@@ -145,7 +158,9 @@ let rotor;
   P(Lb, boite(29, 0.3, 19), 0xe2ddd0, 0, 0.15, 0, 0, 0.15);
   for (let x = -13; x <= 13; x += 2) P(Lb, boite(0.05, 0.02, 18), 0xc8c2b4, x, F + 0.01, 0, 0, 0);  // carrelage
   P(Lb, boite(29.6, 0.5, 19.6), PIERRE, 0, 0.25, 0, 0, 0.1);
-  murs(Lb, Lh, [[-14, -9, 14, -9], [-14, -9, -14, 9], [14, -9, 14, 9], [-14, 9, -9, 9], [-5, 9, 14, 9]], F, 5, MUR);
+  murs(Lb, Lh, [[-14, -9, 14, -9], [-14, -9, -14, 9], [14, -9, 14, 9], [-14, 9, -9, 9], [-5, 9, 14, 9]].flatMap(w => w[0] === 14 && w[2] === 14 ? [[14, -9, 14, -2], [14, 2, 14, 9]] : [w]), F, 5, MUR);
+  P(Lb, boite(6, 0.3, 4.4), 0xbdb8ac, 17, 0.15, 0, 0, 0.1); P(Lh, boite(6.6, 0.25, 5.4), 0x8a9aa4, 17, F + 5, 0, 0, 0.15);  // le passage couvert vers le hangar
+  P(Lh, boite(4.6, 1.6, 0.6), MUR, 14, F + 4.2, 0, Math.PI / 2, 0.15);
   P(Lh, boite(4.6, 1.6, 0.6), MUR, -7, F + 4.2, 9, 0, 0.15);  // linteau de la porte
   for (const x of [2, 8]) P(Lh, boite(2, 1.4, 0.7), 0x3a4652, x, F + 3, 9, 0, 0.05);
   prisme(Lh, 19.6, 29.6, 4, 0xa8553a, 0, F + 5, 0, Math.PI / 2);
@@ -168,8 +183,8 @@ let rotor;
   table(Lb, 7, 2.5, 5, 2.2, PLANCHE, F, 1);
   for (let a = 0; a < 4; a++) for (let b = 0; b < 3; b++) pot(Lb, 5.4 + a * 0.75, F + 1.06, 1.9 + b * 0.6);
   P(Lb, boite(0.5, 1.4, 0.5), INOX_F, 9, F + 1.75, 2.5, 0, 0.04);  // doseuse
-  for (let e = 0; e < 3; e++) { P(Lb, boite(1.4, 0.12, 8), PLANCHE, 13.1, F + 0.6 + e * 1.1, 3.5, 0, 0.05); for (let k = 0; k < 9; k++) pot(Lb, 13.1, F + 0.66 + e * 1.1, 0 + k * 0.85, 0.9); }
-  for (const z of [-0.6, 7.6]) P(Lb, boite(1.4, 3.3, 0.12), BOIS_F, 13.1, F + 1.65, z, 0, 0);
+  for (let e = 0; e < 3; e++) { P(Lb, boite(1.4, 0.12, 5.8), PLANCHE, 13.1, F + 0.6 + e * 1.1, 5.5, 0, 0.05); for (let k = 0; k < 8; k++) pot(Lb, 13.1, F + 0.66 + e * 1.1, 3 + k * 0.7, 0.9); }
+  for (const z of [2.6, 8.4]) P(Lb, boite(1.4, 3.3, 0.12), BOIS_F, 13.1, F + 1.65, z, 0, 0);
   // cartons d'expédition près de la porte, évier
   for (const [x, z, y] of [[-3, 7, 0], [-1.8, 7.2, 0], [-2.4, 7.1, 0.9]]) P(Lb, boite(1.1, 0.9, 1.1), 0xb8925a, x, F + 0.45 + y, z, 0.2, 0.05);
   P(Lb, boite(2.4, 1, 1.4), INOX, -12.6, F + 0.5, 1.8, 0, 0.06); P(Lb, boite(2, 0.3, 1), 0x6a8a9a, -12.6, F + 0.92, 1.8, 0, 0);
@@ -178,7 +193,7 @@ let rotor;
   // l'apiculteur tourne l'extracteur, l'aide va de la désoperculation aux maturateurs puis à la mise en pot
   const a = figurine(Z.g, HOMME(0xe8e4d8, 0x4a5a6a, null, 0x3f6f9a), 2, -1.4); a.rotation.y = Math.PI / 2; marcheur(a, [[2, -1.4, 4, Math.PI / 2], [-0.6, -5.6, 3, Math.PI / 2]], 1.6);
   marcheur(figurine(Z.g, FEMME(0x5a7a9a, 0xf2f0e8), -4, -5.5), [[-4, -5.5, 3, Math.PI / 2], [7.6, -4.6, 2.5, Math.PI / 2], [7, 0.4, 3.5, Math.PI / 2], [-6, 2, 1.5]], 2.2);
-  for (const [t, x, z] of [['Hausses pleines', -11, -3.5], ['Étuve', -12, 6.4], ['Désoperculation', -4, -7.4], ['Extracteur', 2, -4], ['Maturateurs', 9.4, -7], ['Mise en pot', 7, 2.5], ['Pots prêts', 13.1, 3.5], ['Évier', -12.6, 1.8]])
+  for (const [t, x, z] of [['Hausses pleines', -11, -3.5], ['Étuve', -12, 6.4], ['Désoperculation', -4, -7.4], ['Extracteur', 2, -4], ['Maturateurs', 9.4, -7], ['Mise en pot', 7, 2.5], ['Pots prêts', 13.1, 5.5], ['Évier', -12.6, 1.8]])
     nom(t, Z.x + x, Z.z + z, '', 'bat');
 }
 
@@ -187,7 +202,7 @@ let camionnette;
 {
   const Z = ZONES.hangar, Lb = lot(), Lh = lot(), F = 0.3;
   P(Lb, boite(27, 0.3, 17), 0xbdb8ac, 0, 0.15, 0, 0, 0.15);
-  murs(Lb, Lh, [[-13, -8, 13, -8], [-13, -8, -13, 8], [13, -8, 13, 8]], F, 5.2, 0x8b6a45, 0.5);
+  murs(Lb, Lh, [[-13, -8, 13, -8], [-13, -8, -13, -2], [-13, 2, -13, 8], [13, -8, 13, 8]], F, 5.2, 0x8b6a45, 0.5);
   for (const x of [-13, -4.3, 4.3, 13]) { P(Lb, boite(0.6, 1.6, 0.6), BOIS_F, x, F + 0.8, 8, 0, 0.1); P(Lh, boite(0.6, 4, 0.6), BOIS_F, x, F + 3.6, 8, 0, 0.1); }
   const toit = boite(28, 0.3, 18.5); toit.rotateX(-0.1); P(Lh, toit, 0x8a9aa4, 0, F + 5.8, 0, 0, 0.2);
   for (let x = -13; x <= 13; x += 1.6) { const n = boite(0.25, 0.25, 18.5); n.rotateX(-0.1); P(Lh, n, 0x7a8a94, x, F + 6, 0, 0, 0); }
@@ -199,11 +214,11 @@ let camionnette;
   // ruchettes pour les essaims
   for (let k = 0; k < 5; k++) { P(Lb, boite(1.1, 0.9, 1.7), 0xc9a06a, 9 + (k % 3) * 1.4, F + 0.45 + (k > 2 ? 0.9 : 0), -2.5, 0, 0.06); }
   // combinaisons et voiles au mur
-  for (let k = 0; k < 4; k++) { const z = -5 + k * 1.6; P(Lb, boite(0.3, 2.2, 1), 0xf2f1e8, -12.5, F + 2.2, z, 0, 0.05); P(Lb, cyl(0.45, 0.45, 0.06, 10), 0xe6dfc4, -12.4, F + 3.6, z, 0, 0.03); P(Lb, cyl(0.3, 0.33, 0.45, 8), 0x3d443c, -12.4, F + 3.35, z, 0, 0); }
+  for (let k = 0; k < 4; k++) { const z = -7 + k * 1.5; P(Lb, boite(0.3, 2.2, 1), 0xf2f1e8, -12.5, F + 2.2, z, 0, 0.05); P(Lb, cyl(0.45, 0.45, 0.06, 10), 0xe6dfc4, -12.4, F + 3.6, z, 0, 0.03); P(Lb, cyl(0.3, 0.33, 0.45, 8), 0x3d443c, -12.4, F + 3.35, z, 0, 0); }
   // l'établi : une ruche en montage, enfumoirs, lève-cadres, peinture
-  table(Lb, -11.2, 3.5, 2.2, 5, PLANCHE, F, 1.1); hausse(Lb, -11.2, F + 1.17, 4.5, 0xf0ece0, Math.PI / 2);
-  for (const z of [1.8, 2.5]) { P(Lb, cyl(0.2, 0.2, 0.5, 8), INOX, -11.4, F + 1.42, z, 0, 0.04); P(Lb, cone(0.2, 0.3, 8), INOX_F, -11.4, F + 1.82, z, 0, 0.03); }
-  P(Lb, boite(0.6, 0.05, 0.12), 0xc04030, -10.8, F + 1.2, 2.9, 0.4, 0); P(Lb, cyl(0.3, 0.3, 0.45, 8), 0x5a8ac0, -10.7, F + 1.4, 6, 0, 0.04);
+  table(Lb, -11.2, 4.8, 2.2, 5, PLANCHE, F, 1.1); hausse(Lb, -11.2, F + 1.17, 5.8, 0xf0ece0, Math.PI / 2);
+  for (const z of [3, 3.7]) { P(Lb, cyl(0.2, 0.2, 0.5, 8), INOX, -11.4, F + 1.42, z, 0, 0.04); P(Lb, cone(0.2, 0.3, 8), INOX_F, -11.4, F + 1.82, z, 0, 0.03); }
+  P(Lb, boite(0.6, 0.05, 0.12), 0xc04030, -10.8, F + 1.2, 4.2, 0.4, 0); P(Lb, cyl(0.3, 0.3, 0.45, 8), 0x5a8ac0, -10.7, F + 1.4, 6, 0, 0.04);
   // nourrissement : sacs de sucre et bidons de sirop sur palette
   P(Lb, boite(3, 0.3, 3), PLANCHE, 0, F + 0.15, 4.5, 0, 0.06);
   for (let k = 0; k < 6; k++) P(Lb, boite(1.3, 0.45, 0.8), 0xf0ece0, -0.7 + (k % 2) * 1.4, F + 0.52 + (k / 2 | 0) * 0.46, 4.5, 0, 0.05);
@@ -223,16 +238,16 @@ let camionnette;
   const o = figurine(Z.g, [...HOMME(0x6a8a5a, 0x4a4a52, 0xd9b45a)], 1.5, -2.4);
   const charge = objet(o, 0, 0, 0, L => hausse(L, 0.75, 1.1, 0, 0xe0c050, 0, 0.7)); charge.scale.setScalar(0.7);
   marcheur(o, [[1.5, -2.4, 1.5, Math.PI / 2], [0.2, 11.5, 1.5, -Math.PI / 2]], 2.4, (i, t) => { charge.visible = i === 0 ? t > 0.7 : t < 0.7; });
-  for (const [t, x, z] of [['Cadres', -7, -6.8], ['Hausses et corps', 5.9, -6.6], ['Ruchettes', 10.4, -2.5], ['Combinaisons', -12.5, -2.6], ['Établi', -11.2, 3.5], ['Nourrissement', 2, 4.5], ['Camionnette', 4, 14.5]])
+  for (const [t, x, z] of [['Cadres', -7, -6.8], ['Hausses et corps', 5.9, -6.6], ['Ruchettes', 10.4, -2.5], ['Combinaisons', -12.5, -4.8], ['Établi', -11.2, 4.8], ['Nourrissement', 2, 4.5], ['Camionnette', 4, 14.5]])
     nom(t, Z.x + x, Z.z + z, '', 'bat');
 }
 // la cour de l'exploitation : barrière, banc, panneau
 {
   const L = lot();
-  for (let x = 22; x <= 154; x += 4) if (x < 80 || x > 96) { P(L, boite(0.3, 1.3, 0.3), BOIS_F, x, 0.65, 22, 0, 0.05); P(L, boite(4, 0.18, 0.15), BOIS, x + 2, 1, 22, 0, 0); }
-  P(L, boite(0.3, 2.2, 0.3), BOIS_F, 88, 1.1, 66, 0, 0.05); P(L, boite(4, 1.4, 0.2), PLANCHE, 88, 2.4, 66, 0, 0.08); P(L, boite(1, 1, 0.22), MIEL, 86.6, 2.4, 66, 0, 0);
-  P(L, boite(3, 0.2, 1), PLANCHE, 70, 0.7, 62, 0, 0.05); for (const x of [68.8, 71.2]) P(L, boite(0.2, 0.7, 0.8), BOIS_F, x, 0.35, 62, 0, 0);
-  for (const [x, z] of [[30, 64], [96, 30], [150, 64]]) feuillu(L, x, z, 2.6, x);
+  for (let x = 26; x <= 120; x += 4) { P(L, boite(0.3, 1.3, 0.3), BOIS_F, x, 0.65, 22, 0, 0.05); P(L, boite(4, 0.18, 0.15), BOIS, x + 2, 1, 22, 0, 0); }
+  P(L, boite(0.3, 2.2, 0.3), BOIS_F, 76, 1.1, 66, 0, 0.05); P(L, boite(4, 1.4, 0.2), PLANCHE, 76, 2.4, 66, 0, 0.08); P(L, boite(1, 1, 0.22), MIEL, 74.6, 2.4, 66, 0, 0);
+  P(L, boite(3, 0.2, 1), PLANCHE, 64, 0.7, 63, 0, 0.05); for (const x of [62.8, 65.2]) P(L, boite(0.2, 0.7, 0.8), BOIS_F, x, 0.35, 62, 0, 0);
+  for (const [x, z] of [[30, 64], [112, 30], [120, 66]]) feuillu(L, x, z, 2.6, x);
   fige(L, G);
 }
 
@@ -369,8 +384,8 @@ function majAbeilles(t) {
 // ------------------------------------------------------------------ noms des zones, vues, animation
 for (const Z of Object.values(ZONES)) { nom(Z.nom, Z.x, Z.z + Z.r - 2, 'titre'); const el = poses.at(-1).el, d = document.createElement('small'); d.textContent = Z.txt; el.append(document.createElement('br'), d); }
 const VUES = [
-  ['Vue d’ensemble', 16.5, 11.5, 32], ['Exploitation', 8.8, 5.2, 13], ['Miellerie', 5.2, 4.6, 6], ['Hangar', 12.4, 5.4, 6.5],
-  ['Rucher du champ', 5.8, 14.6, 7.5], ['Rucher de la forêt', 16.8, 16.2, 7.5], ['Rucher de la lisière', 27.8, 16.2, 7.5], ['Marché', 26.2, 5.4, 9],
+  ['Vue d’ensemble', 16.5, 11.5, 32], ['Exploitation', 7.45, 5.2, 10], ['Miellerie', 5.8, 4.6, 6], ['Hangar', 9.1, 5.4, 6.5],
+  ['Rucher du champ', 5.8, 14.6, 7.5], ['Rucher de la forêt', 16.8, 16.2, 7.5], ['Rucher de la lisière', 27.8, 16.2, 7.5], ['Marché', 26.2, 5.8, 12],
 ];
 f.vue.innerHTML = VUES.map((v, i) => `<option value="${i}">${v[0]}</option>`).join('');
 const viser = () => { const [, x, z, d] = VUES[+f.vue.value]; Object.assign(cam, { x, z, cible: d, auto: false, lacet: 0 }); };
