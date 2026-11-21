@@ -3,6 +3,20 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.25.0 — 2026-11-21
+
+- Le vent dans les arbres (`plateau.js`, tous les jeux) : les sapins et les feuillus des forêts et des bosquets ploient dans le
+  sens du vent, en rafales décalées d'un arbre à l'autre, plus fort par grand vent (meteo.js donne `U.vent` et `U.dir`) ; le
+  pied reste fixe (attribut `souple` des sommets, que `fusion()` de toon.js conserve désormais). Les ombres restent immobiles.
+- Pièges du tower defense (`defense.js`) : `PIEGES` (pointes, boue, mine, barrage), leurs noms dans `STYLES[style].pieges`
+  et `piege(role, ere, { pop })`, cinq allures (chausse-trappes, fossé boueux, fosse à feu, abattis ; chevaux de frise, marais,
+  fougasse, gabions ; barbelés, tranchée inondée, mine, hérissons ; herse à clous, mousse collante, mine antichar, blocs de béton ;
+  champ de lames, champ de gravité, mine à impulsion, mur de force). Animations : les pointes jaillissent (`declencher`) et
+  s'émoussent (`usure`), la mine montre sa charge et son voyant tant qu'elle est armée (`arme`), la barricade tremble sous les
+  coups, penche quand elle faiblit et disparaît détruite (`vie`) ; boue qui bouillonne, roseaux, champs qui battent.
+- `batimentVille()` / `animerVille()` : les bâtiments de 1700 à 1816 ont leurs drapeaux, cheminées et fumées (`animerPose` de
+  monde.js) ; `oublierVille()` les retire.
+
 ## 2.24.1 — 2026-11-21
 
 Hélices (`defense.js`) : elles tournaient trop vite (20 à 36 rad/s) et sautaient d'un quart de tour entre deux images, si bien

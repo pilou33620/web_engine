@@ -29,7 +29,7 @@ que chaque import d'un fichier installé trouve son fichier, et échoue sinon.
 | Module de `rendu/` | Rôle |
 |---|---|
 | `scene.js`, `toon.js` | la scène, la caméra et la lumière ; l'ombrage toon et les contours, les briques des modèles (`lot`, `put`, `fige`, `boite`, `cyl`, `cone`, `sphere`) |
-| `plateau.js` | le terrain et la nature : cases, mer, rivières, forêts, collines, montagnes, champs, saisons et neige |
+| `plateau.js` | le terrain et la nature : cases, mer, rivières, forêts (les arbres ploient au vent), collines, montagnes, champs, saisons et neige |
 | `modeles.js` | les bâtiments anciens (styles Ancien Régime, Lumières, Empire, Révolution industrielle) et les armées |
 | `modernes.js` | les bâtiments modernes : installations électriques, lignes (`pylone`, `BAT.ligne15`…`ligne400`), eau, déchets, quartiers, fermes ; leur catalogue (`INSTALLATIONS`, `QUARTIERS`) et les époques modernes (`EPOQUES`) ; les parties mobiles (`piece`) et leur animation (`modele`, `animer`) |
 | `animations.js` | la vie des bâtiments anciens hors partie : `animationsAncien(cle, epoque, boites, couleur)`, une recette par bâtiment (artisans, porteurs, passants, charrettes, bêtes, soldats, wagonnets, train) posée dans ses espaces libres ; `bivouacAncien(palier, couleur)`, l'armée au repos ; animés par `modele()` et `animer()` |
@@ -39,7 +39,7 @@ que chaque import d'un fichier installé trouve son fichier, et échoue sinon.
 | `monde.js`, `vie.js`, `quartiers.js` | ce qui vit sur le plateau : bâtiments posés, fumées, drapeaux, habitants, bêtes, bateaux, vie des quartiers |
 | `meteo.js`, `routes.js`, `boue.js`, `ambiance.js`, `nuit.js`, `faune.js`, `eau.js`, `etiquettes.js` | le temps et l'heure du jour ; les routes ; la pluie (routes boueuses et mouillées, flaques, crue, eau sale, traces de boue des armées) ; brume du matin, feuilles d'automne, givre sur les toits ; les bannières et étiquettes HTML. Les effets suivent `climat` (vie.js) : un jeu peut y poser `pollution` et `eauSale` |
 | `remparts.js`, `forts.js`, `sieges.js`, `marine.js`, `espions.js`, `brouillard.js`, `guerre_commun.js` | la guerre : remparts, forts, sièges, flottes, espions, brouillard de guerre |
-| `defense.js` | le tower defense, dans le style du moteur : les quinze époques (`ERES`) en cinq styles, `tour(role, ere, niveau, { pop })` (tête qui pivote, animations au repos) et `tirer(t)` (recul, fumée, éclair), `ennemi(genre, ere)`, `avancer(e, d, dt)` (jambes, roues, hélices), `abattre(e)`, `toucher(e)`, `projectile(genre)` et `suivreTir(p)`, effets (`explosion`, `eclat`, `eclaboussure`, `rayon`, `chute`), `anneauPortee`, `barreVie`, `batimentVille` |
+| `defense.js` | le tower defense, dans le style du moteur : les quinze époques (`ERES`) en cinq styles, `tour(role, ere, niveau, { pop })` (tête qui pivote, animations au repos) et `tirer(t)` (recul, fumée, éclair), `ennemi(genre, ere)`, `avancer(e, d, dt)` (jambes, roues, hélices), `abattre(e)`, `toucher(e)`, `piege(role, ere)` et `declencher(p)` (pièges animés), `projectile(genre)` et `suivreTir(p)`, effets (`explosion`, `eclat`, `eclaboussure`, `rayon`, `chute`), `anneauPortee`, `barreVie`, `batimentVille` |
 
 ### Mise en route
 
