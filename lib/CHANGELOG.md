@@ -3,6 +3,49 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.30.0 — 2026-11-23
+
+Corrections de l'époque d'Empire demandées après la 2.29.0 (web_conquete ; utilisables par tous les jeux, champs nouveaux facultatifs,
+rien ne change pour un jeu qui ne s'en sert pas).
+
+- Le phare éclaire la nuit (`nuit.js`, `feuPhare(x, y, z, faisceau)`) : la lanterne brille (halo face à la caméra) et deux faisceaux
+  lumineux (mélange additif, qui s'éteignent vers le bout) balaient la mer ; la nuit et au crépuscule, discrets le jour ; en 1700, le
+  brasier : un halo orangé, sans faisceau. En qualité normale ou riche, un grand halo et la tache de chaque faisceau sur l'eau (`lueur`) ;
+  en qualité légère, la lanterne et les faisceaux seulement. Tous les phares tiennent en deux appels de dessin (maillages instanciés).
+  Le feu est demandé à chaque image par le bâtiment posé (`maillageBatiment` : nouvelle entrée `{ type: 'phare', pos, faisceau }` de
+  `anim`, que `animerPose`/`synchroniser` de monde.js posent) et par ses pièces mobiles (`animationsAncien` : `ex.feux` de `modele()`,
+  nouveau champ `feux` du modèle, animé par `animer()`) ; une même lanterne demandée deux fois n'est dessinée qu'une fois. Le faisceau jaune
+  pâle (une pièce mobile opaque) disparaît.
+- La barrière de la douane s'ouvre (`modeles.js`, `monde.js`) : le bras rayé aux couleurs du camp est une pièce mobile (`brasBarriere(couleur)`,
+  entrée `{ type: 'barriere', pos, couleur }` de `anim`, posée dans le groupe du bâtiment par `animerPose`) qui pivote dans le plan du sol
+  (lisible vue de haut) : fermé en travers de la route, il s'ouvre pendant que la charrette attend, reste ouvert à son passage et se rabat
+  après, sur la même horloge que la charrette d'animations.js (`PIECES_EMPIRE.barriere.T`, `.ouverte(u)`). Poteau d'appui en face.
+- Les routes commerciales se voient de loin (`marine.js`) : la largeur du ruban suit le zoom (à peu près constante à l'écran, de 0,075 de
+  tout près à 0,42 au plus ; pointillés aux mêmes proportions), calculée par le nuanceur (rien n'est rebâti) ; de loin, un liseré sombre continu.
+- Une flotte part vers le bon côté : `etat.sorties[].vers = [dx, dz]` (de quel côté est le théâtre : flèche, départs et arrivées par cette
+  balise) ; `flottes[].sortie` (la balise à prendre) ou `flottes[].vers` (la direction du théâtre : la balise qui va le mieux de ce côté,
+  sinon droit vers le bord de la fenêtre) avec l'ordre `route` ; `arrivees[].vers` (le côté d'où elle vient). Sans eux, comme avant.
+- Une flotte qui sort de la vue ne saute plus (`jouerMoisMarine`) : un mouvement de flotte avec `sortie: true` (ou `[dx, dz]`), ou dont le
+  trajet finit par des cases négatives (hors fenêtre), va jusqu'au bord puis s'estompe au-delà ; avec `entree: true` (ou `[dx, dz]`), ou un
+  trajet qui commence hors fenêtre, elle paraît au bord en fondu puis navigue. Les mouvements avancent désormais à vitesse régulière le long
+  de leurs cases (même tracé qu'avant). Format en tête de marine.js.
+- Départ d'une flotte que le jeu ne suit plus : `departFlotte({ case, proprio, navires, sortie?, vers?, armee?, epoque? })` (exportée) et
+  le champ `departs` du rapport de `jouerMoisMarine` : la flotte gagne la balise, s'éloigne et s'efface, sans exister dans `etat.flottes`
+  (elle survit à `majMarine`).
+- Chantier visible (`animations.js`) : `maillageEnChantier({ cle, couleur, epoque, saison, neige, av })`, n'importe quel bâtiment ancien
+  monté jusqu'à la part `av` des travaux (0 à 1 : murs ouverts en haut, toits posés à la fin) sous un échafaudage de bois qui monte avec lui,
+  maçon, manœuvre, porteur et chèvre de levage (`chantierVivant`) ; un modèle de `modele()`, à animer par `animer()`. (`maillageChantier()`
+  n'est qu'un échafaudage fixe ; `chantierVivant` seul ne montre pas le bâtiment.)
+- Raspberry Pi (réglage de qualité de scene.js) : en qualité légère, `animationsAncien` ne pose que les deux premières lignes de chaque
+  recette (moins de pièces mobiles, donc moins d'appels de dessin) ; pas de grand halo du phare ; les drapeaux des bâtiments partagent un
+  matériau par couleur (un par drapeau avant) ; `nuit.js` n'alloue plus de tableaux à chaque image (taches de lumière, feux) et accepte
+  bien 400 taches (66 avant, par erreur). Mesuré dans Chromium sans GPU, processeur ralenti ×4, qualité légère,
+  mêmes maquettes avant et après : carte-complete passe de 1048–1122 à 831–851 appels de dessin par image (−20 %, triangles 262 k → 232 k),
+  batiments-empire de 362–372 à 307–313 (−16 %) ; la mer de marine-empire reste à 77–78 appels (le liseré des routes ne se dessine que
+  de loin, les feux des phares seulement s'il y en a). Le temps par image y est celui du rendu logiciel (230 à 700 ms) : à refaire sur le Pi.
+- Maquettes : `batiments-empire.html` (phare de nuit, barrière, réglage « Chantier », `?heure=nuit&chantier=0.4`), `marine-empire.html`
+  (phare sur la côte et heure, routes de loin, départ orienté vers la Baltique, sortie et entrée dans la vue, départ non suivi).
+
 ## 2.29.0 — 2026-11-23
 
 Les bâtiments et la marine de l'époque d'Empire (pour web_conquete, chantier « Empire » : emplacements, marine, commerce
