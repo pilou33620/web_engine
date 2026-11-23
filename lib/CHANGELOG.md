@@ -3,6 +3,31 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.27.0 — 2026-11-23
+
+- Plus de vie sur le plateau (`vie.js`, tous les jeux), dans le style des autres figurines :
+  - voyageurs entre les villes : charrettes, cavaliers et piétons (baluchon, bâton) font l'aller et retour par la route, sur le
+    tracé du ruban (`passage()`), chacun sur sa droite ; un trajet par paire de villes voisines sur le réseau, 28 au plus, un à
+    trois voyageurs selon la longueur ; les piétons rentrent la nuit et sous la pluie ;
+  - troupeaux de moutons, leur berger et son chien qui fait le tour du troupeau, dans six autres prés (pas l'hiver, ni la nuit,
+    ni sous la pluie) ;
+  - barques qui remontent et descendent les rivières sur la courbe de l'eau, entre deux cascades (six au plus, pas sur l'eau gelée).
+  Nouveaux modèles : `cavalier`, `voyageur`, `berger`, `chien`.
+- Décor bâti plus vite (`toon.js`, tous les jeux) : `put()` ne refabrique plus une sphère ou un cône par défaut à chaque copie
+  (clone() de three.js), écrit les couleurs sans tableau intermédiaire (une conversion par teinte), tourne et pose la pièce en
+  une passe ; le contour ne grossit que les positions (son matériau ne lit pas les normales). Les sommets sont les mêmes
+  (`node outils/essai-toon.mjs`, lancé par la CI). Avec la 2.26.0, une reconstruction du plateau de web_conquete prend de 2 à
+  3,5 fois moins de temps qu'en 2.25.1.
+
+## 2.26.0 — 2026-11-23
+
+Construire une carte avec son état (`plateau.js`, tous les jeux) : `construire(carte, etat)` prend désormais l'état de la partie
+(facultatif, au format de `majEtat`) et ne bâtit le décor qu'une fois. Sans lui, l'appel à `majEtat()` qui suit d'habitude le
+rebâtissait aussitôt (le bâti, les routes et les territoires ne sont connus qu'avec l'état) : deux fois le temps de calcul à
+chaque nouvelle carte. web_conquete, qui rebâtit une fenêtre de la carte quand la vue change de niveau de zoom, s'arrête ainsi de
+35 à 60 % moins longtemps. `majEtat(etat, forcer)` : `forcer` rebâtit le décor même si rien n'a changé. Les jeux qui appellent
+`construire(carte)` seul ne changent pas.
+
 ## 2.25.1 — 2026-11-23
 
 Arbres sur les routes (`plateau.js`, tous les jeux) : les arbres des forêts, les buissons, rochers, fleurs et cailloux des
