@@ -28,12 +28,19 @@
     <option value="sucre">Sucre</option><option value="tabac">Tabac</option><option value="cafe">Café</option><option value="coton">Coton</option><option value="the">Thé</option>
     <option value="epices">Épices</option><option value="indigo">Indigo</option><option value="ivoire">Ivoire</option><option value="fourrures">Fourrures</option>
   </select></label>
+  <label>Heure <select name="heure"><option value="jour">Jour</option><option value="crepuscule">Crépuscule</option><option value="nuit">Nuit</option></select></label>
   <span class="groupe">
     <button type="button" data-voir="comptoirs">Comptoirs</button>
     <button type="button" data-voir="routes">Routes</button>
+    <button type="button" data-voir="loin">Routes de loin</button>
+    <button type="button" data-voir="phare">Phare de nuit</button>
     <button type="button" data-voir="corsaire">Corsaire : abordage</button>
     <button type="button" data-voir="depart">Départ vers l’Amérique</button>
     <button type="button" data-voir="arrivee">Arrivée des Indes</button>
+    <button type="button" data-voir="baltique">Départ orienté (vers le nord)</button>
+    <button type="button" data-voir="sortie">Sortie de la vue</button>
+    <button type="button" data-voir="entree">Entrée dans la vue</button>
+    <button type="button" data-voir="departs">Départ non suivi (departs)</button>
   </span>
   <span class="groupe">Bataille :
     <button type="button" data-phase="approche">1. Approche</button>
@@ -48,7 +55,8 @@
 <script type="module">
 // Une mer d'essai bâtie ici (côte à l'ouest avec un port, deux îles, haute mer à l'est et au sud), passée au vrai pipeline
 // (plateau.js, monde.js, marine.js) ; seuls les champs nouveaux de l'état (comptoirs, routes_mer, sorties, ordres des flottes)
-// et les fonctions abordageCorsaire, sceneNavale et le rapport de jouerMoisMarine (arrivees) sont mis en scène par les boutons.
+// et les fonctions abordageCorsaire, sceneNavale, departFlotte et le rapport de jouerMoisMarine (arrivees, departs, mouvements qui sortent de
+// la fenêtre ou y entrent) sont mis en scène par les boutons ; un phare sur la côte (bâtiment de monde.js) éclaire la mer la nuit.
 import { cam, posCase, viser } from '../../lib/rendu/scene.js';
 import * as plateau from '../../lib/rendu/plateau.js';
 import { initMonde, synchroniser } from '../../lib/rendu/monde.js';
@@ -82,11 +90,14 @@ const ROYAUMES = [['France', '#2f5fd6'], ['Grande-Bretagne', '#c23b2e'], ['Provi
   .map(([nom, couleur], id) => ({ ...base.royaumes[0], id, nom, couleur, joueur: id === 0, techs_liste: [] }));
 const villeC = ic(cote(8), 8), portC = ic(cote(9), 9), merPort = ic(cote(9) + 1, 9);
 const PALIER = { ancien: 1, lumieres: 2, empire: 3, industrie: 5, cuirasses: 5 };
-const S_AMERIQUE = ic(L - 1, 6), S_INDES = ic(15, H - 1);
+const S_AMERIQUE = ic(L - 1, 6), S_INDES = ic(15, H - 1), S_BALTIQUE = ic(21, 0), PHARE = ic(cote(5), 5);
 const BATAILLE = ic(9, 11);
 const etat = {
   flotteRoute: '', // ordre de la flotte qui part vers l'Amérique
+  versNord: false, // la flotte part-elle vers le nord (flottes[].vers) ?
   arrivee: false,  // la flotte des Indes est-elle sur la carte ?
+  sortante: true,  // la flotte hollandaise du sud est-elle dans la fenêtre ?
+  entrante: false, // la flotte espagnole du nord est-elle entrée dans la fenêtre ?
 };
 function etatJeu() {
   const choix = f.epoque.value, ep = choix === 'cuirasses' ? 'industrie' : choix, fer = choix === 'cuirasses';
@@ -95,8 +106,10 @@ function etatJeu() {
     { id: 1, proprio: 0, case: merPort, navires: guerre, chemin: [], a_quai: 1, armee: null, ordre: '' },
     { id: 2, proprio: 0, case: ic(cote(11) + 1, 11), navires: { flute: 1 }, chemin: [], armee: null, ordre: 'commerce' },
     { id: 3, proprio: 1, case: ic(11, 7), navires: fer ? { fregate_helice: 1 } : { corvette: 1 }, chemin: [], armee: null, ordre: 'corsaire' },
-    { id: 4, proprio: 0, case: ic(21, 7), navires: { fregate: 1, flute: 2 }, chemin: [], armee: { id: 30, effectif: 1200 }, ordre: etat.flotteRoute },
+    { id: 4, proprio: 0, case: ic(21, 7), navires: { fregate: 1, flute: 2 }, chemin: [], armee: { id: 30, effectif: 1200 }, ordre: etat.flotteRoute, ...(etat.versNord ? { vers: [0, -1] } : {}) },
   ];
+  if (etat.sortante) flottes.push({ id: 6, proprio: 2, case: ic(13, 14), navires: { fregate: 1, corvette: 1 }, chemin: [], armee: null, ordre: '' });
+  if (etat.entrante) flottes.push({ id: 7, proprio: 3, case: ic(9, 3), navires: { vaisseau: 1, fregate: 1 }, chemin: [], armee: null, ordre: '' });
   if (etat.arrivee) flottes.push({ id: 5, proprio: 3, case: ic(15, 15), navires: fer ? { cuirasse: 1, vapeur: 1 } : { vaisseau: 2, flute: 1 }, chemin: [], armee: null, ordre: '' });
   return {
     ...base, annee: 1700, saison: 2, mois: 7, epoque: { cle: ep, nom: ep }, explore: null, visible: null,
@@ -107,6 +120,7 @@ function etatJeu() {
     batiments: [
       { ...base.batiments[0], id: 1, cle: 'hotel', proprio: 0, case: villeC, ville: 1 },
       { ...base.batiments[0], id: 2, cle: 'port', proprio: 0, case: portC, ville: 1, face: 0 },
+      { ...base.batiments[0], id: 3, cle: 'phare', proprio: 0, case: PHARE, ville: 1, face: 0 },
     ],
     armees: [], forts: [], sieges: [], espions: [], blocus: [], routes: [],
     cases: { proprio: terrain.map((t, i) => (t >= 3 && i % L <= 4 ? 0 : -1)), arbres: carte.arbres, foret: carte.foret, bois: zeros() },
@@ -124,13 +138,14 @@ function etatJeu() {
       { id: 2, proprio: 2, chemin: [ic(5, 2), ic(8, 3), ic(11, 6), ic(12, 9), ic(14, 11), ic(17, 12)], coupee: true },
       { id: 3, proprio: 3, chemin: [ic(cote(14) + 1, 14), ic(8, 15), ic(12, 16), S_INDES], coupee: false },
     ],
-    sorties: [{ case: S_AMERIQUE, nom: 'vers l’Amérique' }, { case: S_INDES, nom: 'vers les Indes' }],
+    // (la Baltique : vers = [dx, dz], le théâtre est au nord-est ; sans vers, la flèche suivrait le bord le plus proche)
+    sorties: [{ case: S_AMERIQUE, nom: 'vers l’Amérique' }, { case: S_INDES, nom: 'vers les Indes' }, { case: S_BALTIQUE, nom: 'vers la Baltique', vers: [0.6, -1] }],
   };
 }
 let E = null;
 function appliquer() {
   E = etatJeu();
-  forcerHeure('jour');
+  forcerHeure(f.heure.value);
   plateau.majEtat(E);
   plateau.majSaison(E.saison, 0);
   synchroniser(E);
@@ -151,9 +166,42 @@ const VOIR = {
   },
   depart() {
     voirCase(ic(24, 6), 9);
-    etat.flotteRoute = ''; appliquer();
+    etat.flotteRoute = ''; etat.versNord = false; appliquer();
     setTimeout(() => { etat.flotteRoute = 'route'; appliquer(); }, 600);
     note.textContent = 'Ordre « route » : la flotte (avec son armée) gagne la balise « vers l’Amérique », s’éloigne vers l’horizon et s’estompe.';
+  },
+  loin() { voirCase(ic(13, 9), 70); note.textContent = 'De loin, le ruban des routes garde à peu près sa largeur à l’écran (bornée) et prend un liseré sombre ; de près, il redevient fin.'; },
+  phare() {
+    f.heure.value = 'nuit'; if (f.epoque.value === 'ancien') f.epoque.value = 'lumieres';
+    appliquer(); voirCase(ic(cote(5) + 1, 5), 9);
+    note.textContent = 'Le phare la nuit : la lanterne brille, deux faisceaux balaient la mer et y posent leur tache de lumière (en qualité légère : la lanterne et les faisceaux seulement ; en 1700, le brasier : un halo orangé, sans faisceau). Discret le jour.';
+  },
+  baltique() {
+    voirCase(ic(21, 3), 13);
+    etat.flotteRoute = ''; etat.versNord = true; appliquer();
+    setTimeout(() => { etat.flotteRoute = 'route'; appliquer(); }, 600);
+    note.textContent = 'Ordre « route » avec flottes[].vers = [0, −1] : la flotte ne prend pas la balise la plus proche (l’Amérique) mais celle du nord (« vers la Baltique », dont sorties[].vers oriente la flèche).';
+  },
+  sortie() {
+    voirCase(ic(15, 17), 12);
+    etat.sortante = true; appliquer();
+    etat.sortante = false; const apres = etatJeu();
+    jouerMoisMarine({ mouvements: [{ flotte: true, armee: 6, proprio: 2, trajet: [ic(13, 14), ic(14, 15), ic(14, 16), ic(15, 17), -1] }] }, apres, 4500);
+    setTimeout(appliquer, 5000);  // (le jeu pose l'état suivant à la fin du mois : la flotte n'y est plus)
+    note.textContent = 'Mouvement qui sort de la fenêtre (trajet terminé par −1, ou sortie: true) : la flotte suit ses cases, gagne le bord et s’estompe au-delà.';
+  },
+  entree() {
+    voirCase(ic(8, 1), 11);
+    etat.entrante = false; appliquer();
+    etat.entrante = true; const apres = etatJeu();
+    jouerMoisMarine({ mouvements: [{ flotte: true, armee: 7, proprio: 3, trajet: [-1, ic(8, 0), ic(8, 1), ic(9, 2), ic(9, 3)] }] }, apres, 4500);
+    setTimeout(appliquer, 5000);
+    note.textContent = 'Mouvement qui entre dans la fenêtre (trajet commencé par −1, ou entree: true) : la flotte paraît au bord en fondu, puis suit ses cases.';
+  },
+  departs() {
+    voirCase(ic(22, 9), 11);
+    jouerMoisMarine({ departs: [{ case: ic(20, 9), proprio: 1, navires: { vaisseau: 1, fregate: 2 }, vers: [1, 0.2], armee: 800 }] }, E);
+    note.textContent = 'Rapport du mois, departs : une flotte anglaise que le jeu ne suit plus (absente de etat.flottes) gagne la balise de l’Amérique et s’efface (departFlotte).';
   },
   arrivee() {
     voirCase(ic(15, 14), 9);
@@ -193,7 +241,7 @@ f.epoque.addEventListener('change', () => { if (phaseEnCours) bataille(phaseEnCo
 appliquer();
 const p0 = posCase(ic(13, 9));
 Object.assign(cam, { l: Math.sqrt(3) * L, h: 1.5 * H, x: p0.x, z: p0.z, cible: 30, d: 30, auto: false });
-const q = new URLSearchParams(location.search).get('voir');  // ?voir=comptoirs, routes, corsaire, depart, arrivee, ou une phase de bataille
+const q = new URLSearchParams(location.search).get('voir');  // ?voir=comptoirs, routes, loin, phare, corsaire, depart, arrivee, baltique, sortie, entree, departs, ou une phase de bataille
 if (VOIR[q]) VOIR[q](); else if (PHASES[q]) bataille(q);
 </script>
 </body>

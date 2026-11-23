@@ -34,6 +34,7 @@
   <label><input type="checkbox" name="neige"> Neige</label>
   <label>Heure <select name="heure"><option value="jour">Jour</option><option value="aube">Aube</option><option value="crepuscule">Crépuscule</option><option value="nuit">Nuit</option><option value="">Cycle</option></select></label>
   <label><input type="checkbox" name="ruine"> Incendié</label>
+  <label>Chantier <select name="chantier"><option value="">—</option><option value="0.1">10 %</option><option value="0.4">40 %</option><option value="0.7">70 %</option><option value="1">fini</option></select></label>
   <label><input type="checkbox" name="tourner" checked> Tourner</label>
   <label><input type="checkbox" name="noms" checked> Noms</label>
 </form>
@@ -41,7 +42,7 @@
   <label><b>Place</b> <select name="place"><option value="1">Village (1 emplacement)</option><option value="3" selected>Ville (3 emplacements)</option><option value="5">Capitale (5 emplacements)</option></select></label>
   <div id="emplacements"></div>
 </form>
-<p class="note" id="note">Les bâtiments des nouvelles chaînes (chantier naval, cale sèche, école militaire, université, séminaire, phare, douane, plantations) et ceux que les chaînes reprennent, dessinés par lib/rendu/modeles.js et animés par lib/rendu/animations.js. #cle dans l'adresse (ex. #phare) : gros plan.</p>
+<p class="note" id="note">Les bâtiments des nouvelles chaînes (chantier naval, cale sèche, école militaire, université, séminaire, phare, douane, plantations) et ceux que les chaînes reprennent, dessinés par lib/rendu/modeles.js et animés par lib/rendu/animations.js. La nuit, le phare s'allume (halo et faisceaux, nuit.js) ; la barrière de la douane s'ouvre devant la charrette ; « Chantier » : chaque bâtiment monté à mesure des travaux (maillageEnChantier). #cle dans l'adresse (ex. #phare) : gros plan ; ?heure=nuit&amp;chantier=0.4 : réglages.</p>
 <p class="aide">Glisser : déplacer · clic droit ou Maj : tourner · molette : zoom</p>
 <script type="module">
 import { THREE, scene, cam, camera, apresCamera, chaqueImage } from '../../lib/rendu/scene.js';
@@ -51,7 +52,7 @@ import { climat, viderFumees } from '../../lib/rendu/vie.js';
 import { modele, animer } from '../../lib/rendu/modernes.js';
 import { maillageBatiment } from '../../lib/rendu/modeles.js';
 import { animerPose, oublierPose } from '../../lib/rendu/monde.js';
-import { animationsAncien } from '../../lib/rendu/animations.js';
+import { animationsAncien, maillageEnChantier } from '../../lib/rendu/animations.js';
 
 // ------------------------------------------------------------------ les bâtiments : nouveaux, et ceux que les chaînes reprennent
 const NOMS = {
@@ -85,12 +86,17 @@ const carte = new THREE.Group(), PAS = 2.3, COLS = 5, SQ3 = Math.sqrt(3);
 scene.add(carte);
 let poses = [], anims = [], ancres = {};
 const PRAIRIE = 0x84c450, TEINTES = [0xe2e9f2, 0xf0fbe8, 0xfff4d8, 0xffd8a8], BLANC = 0xf4f7fb, EAU = 0x4f8fc0;
-const reglages = () => ({ epoque: f.epoque.value, couleur: f.camp.value, saison: +f.saison.value, neige: f.neige.checked ? 1 : 0, ruine: f.ruine.checked });
+const reglages = () => ({ epoque: f.epoque.value, couleur: f.camp.value, saison: +f.saison.value, neige: f.neige.checked ? 1 : 0, ruine: f.ruine.checked, chantier: f.chantier.value === '' ? null : +f.chantier.value });
 const tuile = (x, z, col) => { const T = lot(); put(T, cyl(0.965, 1, 0.16, 6), col, 0, -0.08, 0, 0, 0); fige(T, carte).position.set(x, 0, z); };
 const nom = (txt, x, z, classe = '') => { const el = document.createElement('span'); el.textContent = txt; if (classe) el.className = classe; etiq.append(el); poses.push({ el, p: new THREE.Vector3(x, 0, z), titre: classe === 'titre' }); };
 
 /** Pose un bâtiment animé au centre de la case (x, z) : son maillage (en cache), ses drapeaux, fumées et ailes (monde.js), ses habitants (animations.js). */
 function poser(cle, x, z, R, niveau = 1) {
+  if (R.chantier !== null && !R.ruine) {  // en chantier : monté à mesure des travaux, sous ses échafaudages, ouvriers au travail
+    const m = maillageEnChantier({ cle, couleur: R.couleur, epoque: R.epoque, saison: R.saison, neige: R.neige, av: R.chantier });
+    m.groupe.position.set(x, 0, z); carte.add(m.groupe); animer(m);
+    return;
+  }
   const { mesh, anim, boites } = maillageBatiment({ cle, couleur: R.couleur, epoque: R.epoque, saison: R.saison, neige: R.neige, niveau, ruine: R.ruine });
   mesh.position.set(x, 0, z); mesh.userData.cache = true; carte.add(mesh);
   const id = `empire-${anims.length}-${cle}`; animerPose(id, mesh, anim, R.couleur); anims.push(id);
@@ -180,6 +186,7 @@ chaqueImage(dt => { if (f.tourner.checked) cam.lacet += dt * 0.12; });
 const heure = () => forcerHeure(f.heure.value || null);
 f.addEventListener('change', e => { if (e.target.name === 'heure') heure(); else if (!['tourner', 'noms'].includes(e.target.name)) construire(e.target.name === 'vue'); });
 fv.addEventListener('change', e => { if (e.target.name === 'place') emplacements(); construire(); });
+for (const [k, v] of new URLSearchParams(location.search)) if (f[k] && f[k].type !== 'checkbox') f[k].value = v;  // ?heure=nuit&chantier=0.4…
 emplacements(); heure();
 cam.auto = false; cam.lacet = 0;
 construire(true);
