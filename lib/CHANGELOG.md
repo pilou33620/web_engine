@@ -3,6 +3,16 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.28.0 — 2026-11-23
+
+Le décor par morceaux (`plateau.js`, au choix du jeu) : `decorProgressif(ms)` ; avec ms > 0, `construire()`, `majEtat()`,
+`majSaison()`… ne bâtissent plus aussitôt que les cases, le relief, les rivières et les contours ; le décor (arbres, buissons,
+rochers, montagnes, champs, fleurs) est posé ensuite par morceaux, au plus ms millisecondes par image, du centre de la carte vers
+les bords, et figé par paquets d'au moins 256 cases. `decorEnCours()` dit s'il en reste. Le décor obtenu est le même, pièce pour
+pièce (`node outils/essai-decor-progressif.mjs`, lancé par la CI : sur une carte de 60 × 50 cases, 3 s d'arrêt deviennent 70 ms,
+puis environ 190 images de 9 ms en médiane). Sans cet appel (ms = 0, par défaut), rien ne change : web_royaumes et web_power
+bâtissent leur décor d'un coup, comme avant. web_conquete l'active (6 ms) : changer de niveau de zoom n'arrête plus l'image.
+
 ## 2.27.0 — 2026-11-23
 
 - Plus de vie sur le plateau (`vie.js`, tous les jeux), dans le style des autres figurines :
