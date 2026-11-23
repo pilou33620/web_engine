@@ -9,7 +9,7 @@ export async function load(url, ctx, suivant) {
   const r = await suivant(url, ctx);
   const remplacer = (a, b) => { const s = String(r.source); if (!s.includes(a)) throw new Error('essai à refaire, introuvable : ' + a); return { ...r, source: s.replace(a, b) }; };
   if (url.endsWith('/rendu/scene.js')) return remplacer('new THREE.WebGLRenderer(', 'new globalThis.FauxRendu(');
-  if (url.endsWith('/rendu/plateau.js')) return remplacer('=> put(L, g, col, x, y, z, ry, ep);', '=> (globalThis.poses.push([col, x, z]), put(L, g, col, x, y, z, ry, ep));');
+  if (url.endsWith('/rendu/plateau.js')) return remplacer('? null : put(L, g, col, x, y, z, ry, simple ? 0 : ep);', '? null : (globalThis.poses.push([col, x, z]), put(L, g, col, x, y, z, ry, simple ? 0 : ep));');
   return r;
 }`;
 register('data:text/javascript,' + encodeURIComponent(crochets));

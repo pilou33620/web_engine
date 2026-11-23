@@ -71,6 +71,33 @@ const en1960 = INSTALLATIONS.filter(t => t.an <= 1960 && !(t.fin && t.fin < 1960
 - **Un modèle neuf :** utilisez les briques de `toon.js`, en unités de 10 par case, puis ramenez le groupe à l'échelle du plateau (× 0,1, `ECH_BAT`).
 - **Exemples complets :** `web_engine/carte-test/carte.js` (toutes les époques sur une carte) et `web_engine/galerie/web_royaumes/monde.html`.
 
+### Qualité, vue de loin, première image, heure (2.31.0)
+
+- **Réglage de qualité (`scene.js`) :** `qualite` (lecture) et `reglerQualite(niveau, options)`. `niveau` : `'leger'`, `'normal'`,
+  `'riche'`, ou `null` pour ne changer que les options. Options facultatives : `retenir: false` (le niveau n'est pas enregistré comme
+  le choix de l'appareil, pour une qualité automatique), `echelle` (facteur de la définition, par exemple `0.7`), `decor: false`
+  (décor clairsemé : `plateau.js` ne refait que le décor, pas les cases), `vie: false` (les figures de `vie.js` et `quartiers.js`
+  ne bougent plus et disparaissent, sans rien rebâtir). L'anticrénelage est choisi une fois, à la création du moteur de rendu :
+  coupé en qualité légère (celle de l'adresse `?qualite=`, celle qui est enregistrée, sinon celle qui est devinée), ou forcé par
+  `?aa=0` / `?aa=1` (`qualite.aa`).
+
+```js
+S.reglerQualite('leger', { retenir: false, echelle: 0.85 });  // un palier automatique : rien n'est enregistré
+S.reglerQualite(null, { decor: false, vie: false });           // le palier le plus sobre, sans rebâtir la fenêtre
+```
+
+- **Hexagones simples pour la vue de loin (`plateau.js`) :** `hexagonesSimples(true)` puis `construire(…)` : cases sans flancs cachés
+  ni dessous (identiques à l'écran), décor sans contours ni pièces de moins de 0,1, cônes sans fond, buttes à 20 faces ; les routes
+  perdent leurs contours. Trois à quatre fois moins de triangles pour une grande carte vue de loin ; à réserver aux hexagones de
+  moins d'une trentaine de pixels à l'écran (de près, les sillons et les troncs manquent). Pris à la reconstruction suivante ;
+  `casesSimples()` dit ce qui est bâti. Par défaut (`false`), rien ne change.
+- **Première image (`scene.js`) :** `await prechauffer()` une fois la scène posée (avec `decorProgressif`, quand `decorEnCours()` est
+  faux) : les programmes des shaders sont compilés pendant le chargement plutôt qu'à la première image.
+- **Heure sans `meteo.js` (`nuit.js`) :** un jeu qui pilote son heure appelle `eclairage('jour' | 'aube' | 'crepuscule' | 'nuit')`
+  (ou des poids `{ jour, aube, nuit, phase }`) à chaque changement d'heure : `climat` et les consignes de lumière de la scène sont
+  posés, et les fenêtres, les lueurs et les feux des phares s'allument la nuit. Avec `meteo.js`, c'est son cycle ou `forcerHeure()`
+  qui décide (`forcerHeure` seul ne fait rien sans `meteo.js`).
+
 ## Jeux qui utilisent la bibliothèque
 
 | Jeu | Dossier | `PARTIES` |

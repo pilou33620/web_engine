@@ -3,6 +3,45 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.31.0 — 2026-11-23
+
+La vue de loin d'une grande carte, la qualité automatique et la première image (demandés par web_conquete ; options facultatives,
+rien ne change pour un jeu qui ne s'en sert pas, sauf l'anticrénelage coupé en qualité légère).
+
+- Hexagones simples pour la vue de loin (`plateau.js`, `hexagonesSimples(true)` avant `construire()`, `casesSimples()`) : les cases
+  ne gardent que leur dessus (4 triangles) et les flancs qui se voient (vers une case plus basse, une colline en pente ou le bord) ;
+  le décor perd ses contours et ses pièces de moins de 0,1 de large (fleurs, cailloux, troncs, sillons), ses cônes leur fond, les
+  buttes des collines passent de 80 à 20 faces ; les routes perdent leurs contours. Les cases sont identiques à l'écran ; de loin le
+  décor est très proche (1,5 % des pixels changent sur la grande carte de mesure), de près il ne convient pas (sillons, troncs) :
+  pour des hexagones de moins d'une trentaine de pixels (web_conquete : les niveaux `leger` de `carte-moteur.js`).
+- Les cases sont écrites directement dans un seul maillage (plus de géométrie par case à copier puis fusionner) ; les rubans des
+  rivières et des routes dans des tableaux typés, sans copie ; l'usure des routes compte les tronçons d'un coup par parcours (mêmes
+  valeurs, vérifiées sur des réseaux au hasard). Même résultat à l'écran par défaut (0,01 % des pixels, l'anticrénelage).
+- Anticrénelage (`scene.js`) : choisi avant la création du moteur de rendu, coupé en qualité légère (adresse, choix enregistré ou
+  qualité devinée), forcé par `?aa=0` / `?aa=1` ; `qualite.aa`.
+- `reglerQualite(niveau, { retenir, echelle, decor, vie })` : `niveau` peut être `null` (options seules) ; `retenir: false` n'enregistre
+  pas le niveau ; `echelle` multiplie la définition ; `decor: false` donne un décor clairsemé (un compte d'un arbre par case de forêt,
+  ni arbres épars, ni buissons, ni fleurs ; les champs restent) en ne refaisant que le décor ; `vie: false` arrête et cache les
+  figures de `vie.js` et `quartiers.js` sans rien rebâtir. Les matériaux ne sont plus recompilés que si les ombres changent.
+- `prechauffer()` (`scene.js`) : compile les programmes des shaders pendant le chargement (`compileAsync` de three.js r186, ou
+  `compile` sans compilation parallèle, sans l'avertissement de three.js).
+- `PCFSoftShadowMap`, retiré de three.js, remplacé par `PCFShadowMap` (ce que three.js utilisait déjà, sans l'avertissement).
+- Départs et arrivées par l'horizon (`marine.js` : `departFlotte`, `departs`, ordre `route`, `arrivees`) : au-delà de la balise, la
+  flotte parcourt une distance qui suit le zoom (la moitié de `cam.d`, 4,5 au moins), en 8 à 10 s, ses navires grossis de loin
+  (jusqu'à ×3), en fondu seulement sur le dernier (ou le premier) cinquième ; son étiquette, plus grande (`.arm.horizon`), reste lisible
+  à tout zoom.
+- `eclairage(heure)` (`nuit.js`) : l'éclairage d'une heure fixe sans `meteo.js` (`'jour'`, `'aube'`, `'crepuscule'`, `'nuit'` ou des
+  poids `{ jour, aube, nuit, phase }`) : `climat` et les consignes de lumière de la scène ; fenêtres, lueurs et feux des phares
+  ressortent la nuit. Les couleurs de chaque heure (`LUMIERE`) sont désormais dans `nuit.js`, partagées avec `meteo.js`.
+- Mesures (Chromium sans GPU, processeur ralenti ×4, 1200 × 800) : grande carte de 130 × 92 cases vue de loin comme les niveaux légers
+  de web_conquete (hexagones de 14 px, un arbre par forêt) : qualité légère, 2 003 k → 568 k triangles avec les hexagones simples
+  (÷ 3,5), 20 → 17 appels de dessin, boucle JS 11,6 → 6,3 ms par image ; qualité normale (ombres), 3 181 k → 1 123 k (÷ 2,8).
+  `construire()` de cette carte (décor par morceaux, sans ralentissement) 492 → 279 ms, `majRoutes` 296 → 229 ms. Qualité légère
+  sans anticrénelage : batiments-empire 230 → 104 ms par image, marine-empire 230 → 153 ms, carte-complete 447 → 305 ms (rendu
+  logiciel : à refaire sur le Pi).
+- Essais : `essai-decor-progressif.mjs` vérifie aussi les hexagones simples (par morceaux comme d'un coup, et rien que des pièces
+  du décor complet) ; les crochets des deux essais suivent la nouvelle ligne de `p()`.
+
 ## 2.30.0 — 2026-11-23
 
 Corrections de l'époque d'Empire demandées après la 2.29.0 (web_conquete ; utilisables par tous les jeux, champs nouveaux facultatifs,

@@ -10,6 +10,7 @@
 .barres i{display:block;width:9px;height:3px;border-radius:2px;background:rgba(255,255,255,.35)}
 .barres i.on{background:#ffd34d}
 .arm{white-space:nowrap;font:800 11px Nunito;color:#fff;background:var(--c);border-radius:6px;padding:1px 6px;border:1.5px solid rgba(255,255,255,.8)}
+.arm.horizon{font-size:13px;padding:2px 8px;box-shadow:0 1px 4px rgba(0,0,0,.45)}  /* flotte qui gagne l'horizon ou en revient (marine.js) */
 .arm.sel{outline:2px solid #ffd34d;outline-offset:1px}
 .arm.marche::after{content:" 🚩";font-size:9px}
 .fx{font-size:24px;animation:fx 1.8s ease-out forwards}

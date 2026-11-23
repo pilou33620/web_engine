@@ -9,7 +9,7 @@ export async function load(url, ctx, suivant) {
   const r = await suivant(url, ctx);
   const remplacer = (a, b) => { const s = String(r.source); if (!s.includes(a)) throw new Error('essai à refaire, introuvable : ' + a); return { ...r, source: s.replace(a, b) }; };
   if (url.endsWith('/rendu/scene.js')) return remplacer('new THREE.WebGLRenderer(', 'new globalThis.FauxRendu(');
-  if (url.endsWith('/rendu/plateau.js')) return remplacer('=> put(L, g, col, x, y, z, ry, ep);', '=> (globalThis.poses.push([col, x, y, z, ry]), put(L, g, col, x, y, z, ry, ep));');
+  if (url.endsWith('/rendu/plateau.js')) return remplacer('? null : put(L, g, col, x, y, z, ry, simple ? 0 : ep);', '? null : (globalThis.poses.push([col, x, y, z, ry]), put(L, g, col, x, y, z, ry, simple ? 0 : ep));');
   return r;
 }`;
 register('data:text/javascript,' + encodeURIComponent(crochets));
@@ -43,4 +43,14 @@ const memes = parMorceaux.length === unCoup.length && parMorceaux.every((p, k) =
 const ok = memes && avant === 0 && !plateau.decorEnCours();
 console.log(`décor par morceaux : ${ok ? 'OK' : 'ÉCHEC'} (${parMorceaux.length} pièces ${memes ? 'identiques' : 'DIFFÉRENTES'} ; d'un coup ${dUnCoup.toFixed(0)} ms, ` +
   `par morceaux ${dCases.toFixed(0)} ms puis ${n} images, la plus longue ${pire.toFixed(0)} ms)`);
-process.exit(ok ? 0 : 1);
+
+// hexagones simples (vue de loin) : par morceaux comme d'un coup aussi, et seulement des pièces du décor complet (les petites en moins)
+plateau.decorProgressif(0); plateau.hexagonesSimples(true);
+plateau.construire(carte, etat); const simpleUnCoup = tri(poses.splice(0));
+plateau.decorProgressif(6); plateau.construire(carte, etat);
+for (let k = 0; plateau.decorEnCours() && k < 100000; k++) image(ms += 16);
+const simpleMorceaux = tri(poses.splice(0)), complet = new Set(unCoup);
+const okSimple = simpleMorceaux.length === simpleUnCoup.length && simpleMorceaux.every((p, k) => p === simpleUnCoup[k]) && simpleUnCoup.every(p => complet.has(p)) && simpleUnCoup.length < unCoup.length;
+console.log(`hexagones simples : ${okSimple ? 'OK' : 'ÉCHEC'} (${simpleUnCoup.length} pièces sur ${unCoup.length}, les mêmes par morceaux)`);
+plateau.hexagonesSimples(false); plateau.decorProgressif(0);
+process.exit(ok && okSimple ? 0 : 1);
