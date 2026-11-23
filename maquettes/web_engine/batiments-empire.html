@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bâtiments de l'Empire</title>
+<link rel="stylesheet" href="../../lib/rendu/rendu.css">
+<link rel="stylesheet" href="../../galerie/visionneuse.css">
+<style>
+  #etiquettes span { font-size: 11px; background: rgba(20, 26, 19, .72); }
+  #etiquettes span.titre { font-size: 14px; font-weight: 600; background: rgba(20, 26, 19, .88); }
+  #etiquettes span.niv { font-size: 10px; opacity: .85; }
+  .barre label { white-space: nowrap; }
+  #village { position: fixed; left: 8px; bottom: 28px; margin: 0; padding: 8px 12px; background: rgba(20, 26, 19, .86); border-radius: 10px; display: grid; gap: 5px; max-width: calc(100vw - 40px); }
+  #village[hidden] { display: none; }
+  #village b { font-weight: 600; }
+  #village select { font: inherit; max-width: 46vw; }
+  #village .emp { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  #village .emp > span { min-width: 7.5em; opacity: .85; }
+  .note { position: fixed; top: 92px; left: 8px; right: 8px; margin: 0; padding: 6px 10px; font-size: 13px; background: rgba(20, 26, 19, .7); border-radius: 8px; }
+  @media (max-width: 700px) { .note { display: none; } }
+</style>
+</head>
+<body>
+<canvas id="carte" aria-label="Bâtiments des chaînes à emplacements, façon Empire, et un village d'essai"></canvas>
+<div id="etiquettes"></div>
+<div id="eclair"></div>
+<form class="barre" id="choix">
+  <b>Bâtiments de l'Empire</b>
+  <label>Vue <select name="vue"><option value="galerie">Galerie</option><option value="village">Village d'essai</option></select></label>
+  <label>Époque <select name="epoque"><option value="ancien">1700</option><option value="lumieres" selected>1750 · Lumières</option><option value="empire">1789 · Empire</option><option value="industrie">1816 · Industrie</option></select></label>
+  <label>Camp <select name="camp"><option value="#3b6fd1">Bleu</option><option value="#c8372d">Rouge</option><option value="#2f8a4a">Vert</option><option value="#d9a521">Jaune</option><option value="#e9e4d6">Blanc</option><option value="#6a3fa0">Violet</option></select></label>
+  <label>Saison <select name="saison"><option value="0">Hiver</option><option value="1">Printemps</option><option value="2" selected>Été</option><option value="3">Automne</option></select></label>
+  <label><input type="checkbox" name="neige"> Neige</label>
+  <label>Heure <select name="heure"><option value="jour">Jour</option><option value="aube">Aube</option><option value="crepuscule">Crépuscule</option><option value="nuit">Nuit</option><option value="">Cycle</option></select></label>
+  <label><input type="checkbox" name="ruine"> Incendié</label>
+  <label><input type="checkbox" name="tourner" checked> Tourner</label>
+  <label><input type="checkbox" name="noms" checked> Noms</label>
+</form>
+<form id="village" hidden>
+  <label><b>Place</b> <select name="place"><option value="1">Village (1 emplacement)</option><option value="3" selected>Ville (3 emplacements)</option><option value="5">Capitale (5 emplacements)</option></select></label>
+  <div id="emplacements"></div>
+</form>
+<p class="note" id="note">Les bâtiments des nouvelles chaînes (chantier naval, cale sèche, école militaire, université, séminaire, phare, douane, plantations) et ceux que les chaînes reprennent, dessinés par lib/rendu/modeles.js et animés par lib/rendu/animations.js. #cle dans l'adresse (ex. #phare) : gros plan.</p>
+<p class="aide">Glisser : déplacer · clic droit ou Maj : tourner · molette : zoom</p>
+<script type="module">
+import { THREE, scene, cam, camera, apresCamera, chaqueImage } from '../../lib/rendu/scene.js';
+import { lot, put, fige, cyl, boite, jeter } from '../../lib/rendu/toon.js';
+import { appliquerMeteo, forcerHeure } from '../../lib/rendu/meteo.js';
+import { climat, viderFumees } from '../../lib/rendu/vie.js';
+import { modele, animer } from '../../lib/rendu/modernes.js';
+import { maillageBatiment } from '../../lib/rendu/modeles.js';
+import { animerPose, oublierPose } from '../../lib/rendu/monde.js';
+import { animationsAncien } from '../../lib/rendu/animations.js';
+
+// ------------------------------------------------------------------ les bâtiments : nouveaux, et ceux que les chaînes reprennent
+const NOMS = {
+  chantier_naval: 'Chantier naval', cale_seche: 'Cale sèche', ecole_militaire: 'École militaire', universite: 'Université', seminaire: 'Séminaire',
+  phare: 'Phare', douane: 'Bureau des douanes', plantation_sucre: 'Plantation de canne à sucre', plantation_tabac: 'Plantation de tabac',
+  plantation_cafe: 'Plantation de café', plantation_coton: 'Plantation de coton', plantation_the: 'Plantation de thé', plantation_epices: 'Plantation d’épices',
+  plantation_indigo: 'Plantation d’indigo',
+  haras: 'Haras', fonderie: 'Fonderie', armurerie: 'Fonderie de canons', arsenal: 'Arsenal', ecole: 'Collège', academie: 'Académie des sciences',
+  eglise: 'Paroisse', cathedrale: 'Cathédrale', port: 'Port de commerce', entrepot: 'Entrepôt', comptoir: 'Compagnie de commerce',
+};
+const NOUVEAUX = ['chantier_naval', 'cale_seche', 'ecole_militaire', 'universite', 'seminaire', 'phare', 'douane', 'plantation_sucre', 'plantation_tabac', 'plantation_cafe', 'plantation_coton', 'plantation_the', 'plantation_epices', 'plantation_indigo'];
+const REPRIS = ['haras', 'fonderie', 'armurerie', 'arsenal', 'ecole', 'academie', 'eglise', 'cathedrale', 'port', 'entrepot', 'comptoir'];
+const MER = new Set(['chantier_naval', 'cale_seche', 'port', 'phare']);  // l'eau du côté +x
+
+// les chaînes de SPEC-EMPIRE (module 4) : le bâtiment web_engine de chaque niveau (le dernier nommé sert aux niveaux suivants)
+const DENREES = { sucre: 'canne à sucre', tabac: 'tabac', cafe: 'café', coton: 'coton', the: 'thé', epices: 'épices', indigo: 'indigo' };
+const CHAINES = {
+  haras: { nom: 'Haras', niveaux: ['Haras', 'Haras royal', 'École de cavalerie'], bats: ['haras', 'haras', 'haras'] },
+  fonderie: { nom: 'Fonderie', niveaux: ['Fonderie', 'Fonderie de canons', 'Arsenal'], bats: ['fonderie', 'armurerie', 'arsenal'] },
+  ecole_militaire: { nom: 'École militaire', niveaux: ['Salle d’armes', 'École militaire', 'École polytechnique'], bats: ['ecole_militaire', 'ecole_militaire', 'ecole_militaire'] },
+  universite: { nom: 'Université', niveaux: ['Collège', 'Université', 'Académie des sciences'], bats: ['ecole', 'universite', 'academie'] },
+  eglise: { nom: 'Église', niveaux: ['Paroisse', 'Séminaire', 'Cathédrale'], bats: ['eglise', 'seminaire', 'cathedrale'] },
+  port: { nom: 'Port (mer)', niveaux: ['Port de commerce', 'Chantier naval', 'Arsenal de marine'], bats: ['port', 'chantier_naval', 'cale_seche'] },
+  douane: { nom: 'Douane (quai)', niveaux: ['Bureau des douanes', 'Entrepôt', 'Compagnie de commerce'], bats: ['douane', 'entrepot', 'comptoir'] },
+  phare: { nom: 'Phare (mer)', niveaux: ['Phare'], bats: ['phare'] },
+  ...Object.fromEntries(Object.entries(DENREES).map(([d, n]) => [`plantation_${d}`, { nom: `Plantation (${n})`, niveaux: ['Plantation', 'Grande plantation', 'Sucrerie / manufacture'], bats: Array(3).fill(`plantation_${d}`) }])),
+};
+
+const f = document.getElementById('choix'), fv = document.getElementById('village'), etiq = document.getElementById('etiquettes');
+const carte = new THREE.Group(), PAS = 2.3, COLS = 5, SQ3 = Math.sqrt(3);
+scene.add(carte);
+let poses = [], anims = [], ancres = {};
+const PRAIRIE = 0x84c450, TEINTES = [0xe2e9f2, 0xf0fbe8, 0xfff4d8, 0xffd8a8], BLANC = 0xf4f7fb, EAU = 0x4f8fc0;
+const reglages = () => ({ epoque: f.epoque.value, couleur: f.camp.value, saison: +f.saison.value, neige: f.neige.checked ? 1 : 0, ruine: f.ruine.checked });
+const tuile = (x, z, col) => { const T = lot(); put(T, cyl(0.965, 1, 0.16, 6), col, 0, -0.08, 0, 0, 0); fige(T, carte).position.set(x, 0, z); };
+const nom = (txt, x, z, classe = '') => { const el = document.createElement('span'); el.textContent = txt; if (classe) el.className = classe; etiq.append(el); poses.push({ el, p: new THREE.Vector3(x, 0, z), titre: classe === 'titre' }); };
+
+/** Pose un bâtiment animé au centre de la case (x, z) : son maillage (en cache), ses drapeaux, fumées et ailes (monde.js), ses habitants (animations.js). */
+function poser(cle, x, z, R, niveau = 1) {
+  const { mesh, anim, boites } = maillageBatiment({ cle, couleur: R.couleur, epoque: R.epoque, saison: R.saison, neige: R.neige, niveau, ruine: R.ruine });
+  mesh.position.set(x, 0, z); mesh.userData.cache = true; carte.add(mesh);
+  const id = `empire-${anims.length}-${cle}`; animerPose(id, mesh, anim, R.couleur); anims.push(id);
+  if (R.ruine) return;  // une ruine : plus personne
+  const vie = modele(animationsAncien(cle, R.epoque, boites, R.couleur), anims.length);
+  vie.groupe.position.set(x, 0, z); carte.add(vie.groupe); animer(vie);
+}
+function vider() {
+  for (const o of [...carte.children]) o.userData.cache ? carte.remove(o) : jeter(o);  // les géométries de modeles.js sont partagées : ne pas les libérer
+  for (const id of anims) oublierPose(id);
+  viderFumees(); etiq.textContent = ''; poses = []; anims = []; ancres = {};
+}
+
+// ------------------------------------------------------------------ la galerie : deux familles, rangées décalées comme un plateau hexagonal
+function galerie() {
+  const R = reglages(), sol = solDe(R);
+  let ligne = 0;
+  for (const [titre, liste] of [['Nouveaux bâtiments', NOUVEAUX], ['Repris par les chaînes', REPRIS]]) {
+    nom(titre, -PAS * 0.9, ligne * PAS, 'titre');
+    liste.forEach((cle, k) => {
+      const x = (k % COLS) * PAS + (ligne % 2) * PAS / 2, z = (ligne + (k / COLS | 0)) * PAS;
+      tuile(x, z, sol); if (MER.has(cle)) { const T = lot(); put(T, boite(1.3, 0.02, 2.2), EAU, 1.15, -0.15, 0, 0, 0); fige(T, carte).position.set(x, 0, z); }  // l'eau au-delà du bord de la case
+      poser(cle, x, z, R);
+      nom(NOMS[cle], x, z + 0.95); ancres[cle] = [x, z];
+    });
+    ligne += Math.ceil(liste.length / COLS);
+  }
+  return { l: COLS * PAS + 2, h: ligne * PAS + 2, x: (COLS - 1) * PAS / 2, z: (ligne - 1) * PAS / 2, d: 24 };
+}
+
+// ------------------------------------------------------------------ le village d'essai : la mairie au centre, les emplacements tout autour, la mer à l'est
+const VOISINS = [0, 60, -60, 120, -120, 180].map(a => [Math.cos(a * Math.PI / 180) * SQ3, -Math.sin(a * Math.PI / 180) * SQ3]);  // est, nord-est, sud-est, nord-ouest…
+const PAR_DEFAUT = [['port', 2], ['ecole_militaire', 1], ['universite', 2], ['eglise', 2], ['plantation_sucre', 1]];
+function emplacements() {
+  const n = +fv.place.value, div = document.getElementById('emplacements'), avant = [...div.querySelectorAll('.emp')].map(e => [e.querySelector('[name=chaine]').value, e.querySelector('[name=niveau]').value]);
+  div.textContent = '';
+  for (let i = 0; i < n; i++) {
+    const [ch, nv] = avant[i] || PAR_DEFAUT[i], ligne = document.createElement('div'); ligne.className = 'emp';
+    const sc = document.createElement('select'); sc.name = 'chaine'; sc.setAttribute('aria-label', `Chaîne de l’emplacement ${i + 1}`);
+    sc.add(new Option('— vide —', '')); for (const [k, c] of Object.entries(CHAINES)) sc.add(new Option(c.nom, k)); sc.value = ch;
+    const sn = document.createElement('select'); sn.name = 'niveau'; sn.setAttribute('aria-label', `Niveau de l’emplacement ${i + 1}`);
+    const niveaux = () => { const c = CHAINES[sc.value], v = sn.value || nv; sn.textContent = ''; (c?.niveaux || ['—']).forEach((t, j) => sn.add(new Option(`${j + 1} · ${t}`, j + 1))); sn.value = Math.min(+v || 1, sn.options.length); sn.disabled = !c; };
+    sc.addEventListener('change', niveaux); niveaux();
+    const lib = document.createElement('span'); lib.textContent = `Emplacement ${i + 1}`;
+    ligne.append(lib, sc, sn); div.append(ligne);
+  }
+}
+function village() {
+  const R = reglages(), sol = solDe(R), n = +fv.place.value, choix = [...fv.querySelectorAll('.emp')].map(e => [e.querySelector('[name=chaine]').value, +e.querySelector('[name=niveau]').value]);
+  for (const z of [-3, -1.5, 0, 1.5, 3]) for (const k of [0, 1]) tuile((Math.abs(z) % 3 ? 1.5 : 2) * SQ3 + k * SQ3, z, EAU);  // la côte
+  tuile(0, 0, sol); poser('hotel', 0, 0, R, n); nom(['', 'Village', '', 'Ville', '', 'Capitale'][n], 0, 0.95, 'titre');
+  // les chaînes de mer prennent d'abord les cases du bord de l'eau (est), les autres le reste ; les cases libres reçoivent des maisons
+  const libres = VOISINS.map((p, i) => i), places = [];
+  choix.forEach(([ch], i) => { const mer = ch === 'port' || ch === 'phare'; const j = libres.splice(mer ? 0 : libres.length > 3 ? 3 : 0, 1)[0]; places[i] = j; });
+  for (const j of libres) { const [x, z] = VOISINS[j]; tuile(x, z, sol); poser(n === 1 ? 'cabane' : 'maison', x, z, R); }
+  choix.forEach(([ch, nv], i) => {
+    const [x, z] = VOISINS[places[i]], c = CHAINES[ch];
+    tuile(x, z, sol);
+    if (!c) { nom(`${i + 1} · vide`, x, z + 0.95, 'niv'); return; }
+    const bat = c.bats[Math.min(nv, c.bats.length) - 1];
+    poser(bat, x, z, R);
+    nom(`${i + 1} · ${c.niveaux[Math.min(nv, c.niveaux.length) - 1]}`, x, z + 0.95); nom(`(${bat})`, x, z + 1.2, 'niv');
+  });
+  return { l: 8, h: 8, x: 1.1, z: 0.9, d: 9.5 };
+}
+const solDe = R => new THREE.Color(PRAIRIE).multiply(new THREE.Color(TEINTES[R.saison])).lerp(new THREE.Color(BLANC), R.neige * 0.6).getHex();
+
+// ------------------------------------------------------------------ construire, régler, regarder
+function construire(recadrer = false) {
+  vider();
+  const R = reglages(), v = f.vue.value;
+  fv.hidden = v !== 'village'; document.getElementById('note').hidden = v === 'village';
+  appliquerMeteo({ genre: R.neige ? 'neige' : 'soleil', temperature: R.neige ? -3 : [4, 14, 24, 12][R.saison], pluie: 0, vent: 0.5, neige_sol: R.neige }, R.saison);
+  climat.nuages = 0; climat.neige = false;  // vue de près : ni nuages devant les bâtiments, ni flocons
+  const c = v === 'village' ? village() : galerie();
+  if (recadrer) Object.assign(cam, { l: c.l, h: c.h, x: c.x, z: c.z, cible: c.d, d: c.d });
+}
+apresCamera(() => {
+  const v = new THREE.Vector3(), noms = f.noms.checked;
+  for (const { el, p, titre } of poses) {
+    v.copy(p).project(camera);
+    el.hidden = v.z > 1 || (!titre && (!noms || cam.d > 30));
+    el.style.transform = `translate(${(v.x + 1) / 2 * innerWidth}px, ${(1 - v.y) / 2 * innerHeight}px) translate(-50%, -50%)`;
+  }
+});
+chaqueImage(dt => { if (f.tourner.checked) cam.lacet += dt * 0.12; });
+const heure = () => forcerHeure(f.heure.value || null);
+f.addEventListener('change', e => { if (e.target.name === 'heure') heure(); else if (!['tourner', 'noms'].includes(e.target.name)) construire(e.target.name === 'vue'); });
+fv.addEventListener('change', e => { if (e.target.name === 'place') emplacements(); construire(); });
+emplacements(); heure();
+cam.auto = false; cam.lacet = 0;
+construire(true);
+// #cle (ex. #phare, #plantation_the) : gros plan sur ce bâtiment de la galerie
+const vu = ancres[location.hash.slice(1)];
+if (vu) { f.tourner.checked = false; Object.assign(cam, { x: vu[0], z: vu[1], cible: 4.5, d: 4.5 }); }
+</script>
+</body>
+</html>
