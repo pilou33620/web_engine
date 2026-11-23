@@ -41,6 +41,7 @@ outils/
   instantane-royaumes.sh   régénère galerie/web_royaumes/donnees avec le vrai moteur Rust
   verifier.mjs             ouvre toutes les pages et maquettes dans Chromium et échoue à la moindre erreur
   essai-arbres-routes.mjs  sans navigateur : aucun arbre du plateau ne pousse sur le ruban d'une route
+  essai-toon.mjs           sans navigateur : put() de toon.js donne les mêmes sommets que les opérations de three.js
 ```
 
 **Jeux branchés sur la bibliothèque :** web_royaumes, web_power et web_defense (tower defense, partie `defense`), tous deux sur le moteur unique (voir le tableau de [`lib/README.md`](lib/README.md)).
@@ -52,7 +53,7 @@ outils/
 
 **Mettre à jour les graphismes de tous les jeux :**
 1. Modifier `lib/` ici.
-2. Lancer `node outils/verifier.mjs` et `node outils/essai-arbres-routes.mjs`.
+2. Lancer `node outils/verifier.mjs`, `node outils/essai-arbres-routes.mjs` et `node outils/essai-toon.mjs`.
 3. Augmenter la version dans `lib/package.json` et l'expliquer dans `lib/CHANGELOG.md`.
 4. Pousser sur main.
 
