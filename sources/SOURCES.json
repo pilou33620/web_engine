@@ -29,6 +29,11 @@
   },
   {
    "source": "web_engine",
+   "chemin": "maquettes/web_engine/batiments-empire.html",
+   "titre": "Bâtiments de l'Empire"
+  },
+  {
+   "source": "web_engine",
    "chemin": "maquettes/web_engine/batiments-modernes.html",
    "titre": "Bâtiments modernes"
   },
@@ -41,6 +46,11 @@
    "source": "web_engine",
    "chemin": "maquettes/web_engine/defense.html",
    "titre": "Tower defense"
+  },
+  {
+   "source": "web_engine",
+   "chemin": "maquettes/web_engine/marine-empire.html",
+   "titre": "Marine et commerce maritime"
   },
   {
    "source": "web_engine",

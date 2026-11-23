@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marine et commerce maritime</title>
+<link rel="stylesheet" href="../../lib/rendu/rendu.css">
+<link rel="stylesheet" href="../../galerie/visionneuse.css">
+<style>
+  .barre button { font: inherit; padding: 3px 9px; border-radius: 7px; border: 1px solid rgba(255, 255, 255, .35); background: #2c3a2a; color: #f3f0e6; cursor: pointer; }
+  .barre button:hover, .barre button:focus-visible { background: #3f5a3b; }
+  .barre .groupe { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .note { position: fixed; left: 8px; bottom: 26px; max-width: min(560px, calc(100% - 16px)); margin: 0; padding: 6px 10px; font-size: 13px; background: rgba(20, 26, 19, .78); border-radius: 8px; }
+  .note:empty { display: none; }
+</style>
+</head>
+<body>
+<canvas id="carte" aria-label="Mer d'essai : comptoirs, routes commerciales, corsaires, routes vers d'autres théâtres et bataille navale par phases"></canvas>
+<div id="etiquettes"></div>
+<div id="eclair"></div>
+<form class="barre" id="choix">
+  <b>Marine et commerce</b>
+  <label>Époque <select name="epoque">
+    <option value="ancien">1700 · Ancien Régime</option><option value="lumieres">1750 · Lumières</option><option value="empire">1789 · Révolution et Empire</option>
+    <option value="industrie">1816 · Révolution industrielle</option><option value="cuirasses">1860 · Cuirassés</option>
+  </select></label>
+  <label>Denrée du comptoir <select name="denree">
+    <option value="sucre">Sucre</option><option value="tabac">Tabac</option><option value="cafe">Café</option><option value="coton">Coton</option><option value="the">Thé</option>
+    <option value="epices">Épices</option><option value="indigo">Indigo</option><option value="ivoire">Ivoire</option><option value="fourrures">Fourrures</option>
+  </select></label>
+  <span class="groupe">
+    <button type="button" data-voir="comptoirs">Comptoirs</button>
+    <button type="button" data-voir="routes">Routes</button>
+    <button type="button" data-voir="corsaire">Corsaire : abordage</button>
+    <button type="button" data-voir="depart">Départ vers l’Amérique</button>
+    <button type="button" data-voir="arrivee">Arrivée des Indes</button>
+  </span>
+  <span class="groupe">Bataille :
+    <button type="button" data-phase="approche">1. Approche</button>
+    <button type="button" data-phase="bordees">2. Bordées</button>
+    <button type="button" data-phase="abordage">3. Abordage</button>
+    <button type="button" data-phase="fin">4. Fin</button>
+    <button type="button" data-phase="">Effacer</button>
+  </span>
+</form>
+<p class="note" id="note"></p>
+<p class="aide">Glisser : déplacer · clic droit ou Maj : tourner · molette : zoom</p>
+<script type="module">
+// Une mer d'essai bâtie ici (côte à l'ouest avec un port, deux îles, haute mer à l'est et au sud), passée au vrai pipeline
+// (plateau.js, monde.js, marine.js) ; seuls les champs nouveaux de l'état (comptoirs, routes_mer, sorties, ordres des flottes)
+// et les fonctions abordageCorsaire, sceneNavale et le rapport de jouerMoisMarine (arrivees) sont mis en scène par les boutons.
+import { cam, posCase, viser } from '../../lib/rendu/scene.js';
+import * as plateau from '../../lib/rendu/plateau.js';
+import { initMonde, synchroniser } from '../../lib/rendu/monde.js';
+import { majMarine, jouerMoisMarine, abordageCorsaire, sceneNavale } from '../../lib/rendu/marine.js';
+import { appliquerMeteo, forcerHeure } from '../../lib/rendu/meteo.js';
+import { TECHS_PALIER } from '../../lib/rendu/modeles.js';
+
+const charger = c => fetch(c).then(r => r.json());
+const [R, base] = await Promise.all([charger('../../sources/web_royaumes/rust/royaumes/data/regles.json'), charger('../../galerie/web_royaumes/donnees/etat.json')]);
+const f = document.getElementById('choix'), note = document.getElementById('note');
+
+// ------------------------------------------------------------------ la mer d'essai : côte découpée à l'ouest, deux îles
+const L = 26, H = 18, N = L * H, ic = (c, r) => r * L + c;
+const cote = r => 2 + Math.round(Math.sin(r * 0.55) * 1.2 + Math.sin(r * 1.7) * 0.5);
+const ILES = [[13, 3], [14, 3], [13, 4], [14, 4], [15, 4], [19, 12], [20, 12], [19, 13], [20, 13], [21, 13], [20, 14]];
+const terrain = new Array(N).fill(0);
+for (let r = 0; r < H; r++) for (let c = 0; c <= cote(r); c++) terrain[ic(c, r)] = c < cote(r) - 1 ? 4 : 3;
+for (const [c, r] of ILES) terrain[ic(c, r)] = 3;
+terrain[ic(14, 4)] = 4;
+for (let i = 0; i < N; i++) if (terrain[i] === 0 && voisinsDe(i).some(n => terrain[n] >= 3)) terrain[i] = 1;
+function voisinsDe(i) { const c = i % L, r = (i / L) | 0, d = r & 1 ? [[1, 0], [-1, 0], [0, -1], [1, -1], [0, 1], [1, 1]] : [[1, 0], [-1, 0], [-1, -1], [0, -1], [-1, 1], [0, 1]]; return d.map(([dc, dr]) => [c + dc, r + dr]).filter(([x, y]) => x >= 0 && y >= 0 && x < L && y < H).map(([x, y]) => ic(x, y)); }
+const zeros = () => new Array(N).fill(0);
+const foret = zeros(); for (let r = 0; r < H; r += 3) foret[ic(0, r)] = 1;
+const carte = { l: L, h: H, version: 1, terrain, riviere: zeros(), fertile: zeros(), poissons: terrain.map(t => (t === 1 ? 1 : 0)), gisement: new Array(N).fill(null), arbres: foret.map(x => x * 4), foret, rivieres: [] };
+
+initMonde(R);
+plateau.construire(carte);
+
+// ------------------------------------------------------------------ les camps, le port, les flottes, et le commerce
+const ROYAUMES = [['France', '#2f5fd6'], ['Grande-Bretagne', '#c23b2e'], ['Provinces-Unies', '#e07a1f'], ['Espagne', '#d9b02a']]
+  .map(([nom, couleur], id) => ({ ...base.royaumes[0], id, nom, couleur, joueur: id === 0, techs_liste: [] }));
+const villeC = ic(cote(8), 8), portC = ic(cote(9), 9), merPort = ic(cote(9) + 1, 9);
+const PALIER = { ancien: 1, lumieres: 2, empire: 3, industrie: 5, cuirasses: 5 };
+const S_AMERIQUE = ic(L - 1, 6), S_INDES = ic(15, H - 1);
+const BATAILLE = ic(9, 11);
+const etat = {
+  flotteRoute: '', // ordre de la flotte qui part vers l'Amérique
+  arrivee: false,  // la flotte des Indes est-elle sur la carte ?
+};
+function etatJeu() {
+  const choix = f.epoque.value, ep = choix === 'cuirasses' ? 'industrie' : choix, fer = choix === 'cuirasses';
+  const guerre = fer ? { cuirasse: 2, fregate_helice: 1 } : ep === 'industrie' ? { vaisseau: 1, fregate: 1, vapeur: 1 } : { vaisseau: 1, fregate: 2 };
+  const flottes = [
+    { id: 1, proprio: 0, case: merPort, navires: guerre, chemin: [], a_quai: 1, armee: null, ordre: '' },
+    { id: 2, proprio: 0, case: ic(cote(11) + 1, 11), navires: { flute: 1 }, chemin: [], armee: null, ordre: 'commerce' },
+    { id: 3, proprio: 1, case: ic(11, 7), navires: fer ? { fregate_helice: 1 } : { corvette: 1 }, chemin: [], armee: null, ordre: 'corsaire' },
+    { id: 4, proprio: 0, case: ic(21, 7), navires: { fregate: 1, flute: 2 }, chemin: [], armee: { id: 30, effectif: 1200 }, ordre: etat.flotteRoute },
+  ];
+  if (etat.arrivee) flottes.push({ id: 5, proprio: 3, case: ic(15, 15), navires: fer ? { cuirasse: 1, vapeur: 1 } : { vaisseau: 2, flute: 1 }, chemin: [], armee: null, ordre: '' });
+  return {
+    ...base, annee: 1700, saison: 2, mois: 7, epoque: { cle: ep, nom: ep }, explore: null, visible: null,
+    meteo: { ...base.meteo, genre: 'soleil', temperature: 20, pluie: 0, vent: 0.45, neige_sol: 0 },
+    joueur: { ...base.joueur, techs: TECHS_PALIER.slice(1, PALIER[choix] + 1) },
+    royaumes: ROYAUMES,
+    villes: [{ ...base.villes[0], id: 1, nom: 'Brest', proprio: 0, case: villeC, niveau: 3, capitale: false, fortif: 0, enceinte: [villeC] }],
+    batiments: [
+      { ...base.batiments[0], id: 1, cle: 'hotel', proprio: 0, case: villeC, ville: 1 },
+      { ...base.batiments[0], id: 2, cle: 'port', proprio: 0, case: portC, ville: 1, face: 0 },
+    ],
+    armees: [], forts: [], sieges: [], espions: [], blocus: [], routes: [],
+    cases: { proprio: terrain.map((t, i) => (t >= 3 && i % L <= 4 ? 0 : -1)), arbres: carte.arbres, foret: carte.foret, bois: zeros() },
+    flottes,
+    // comptoirs en mer : occupé, disputé, libre, occupé par un autre camp
+    comptoirs: [
+      { id: 1, case: ic(12, 5), denree: f.denree.value, navires: [{ proprio: 0 }, { proprio: 0 }] },
+      { id: 2, case: ic(18, 11), denree: 'epices', navires: [{ proprio: 0 }, { proprio: 1 }], dispute: true },
+      { id: 3, case: ic(16, 2), denree: 'fourrures', navires: [] },
+      { id: 4, case: ic(22, 14), denree: 'the', navires: [{ proprio: 2 }, { proprio: 2 }, { proprio: 2 }] },
+    ],
+    // routes commerciales (cases de mer) : française vers l'Amérique, hollandaise coupée par le corsaire anglais, espagnole vers les Indes
+    routes_mer: [
+      { id: 1, proprio: 0, chemin: [merPort, ic(6, 8), ic(9, 7), ic(13, 6), ic(17, 6), ic(21, 6), S_AMERIQUE], coupee: false },
+      { id: 2, proprio: 2, chemin: [ic(5, 2), ic(8, 3), ic(11, 6), ic(12, 9), ic(14, 11), ic(17, 12)], coupee: true },
+      { id: 3, proprio: 3, chemin: [ic(cote(14) + 1, 14), ic(8, 15), ic(12, 16), S_INDES], coupee: false },
+    ],
+    sorties: [{ case: S_AMERIQUE, nom: 'vers l’Amérique' }, { case: S_INDES, nom: 'vers les Indes' }],
+  };
+}
+let E = null;
+function appliquer() {
+  E = etatJeu();
+  forcerHeure('jour');
+  plateau.majEtat(E);
+  plateau.majSaison(E.saison, 0);
+  synchroniser(E);
+  majMarine(E);
+  appliquerMeteo(E.meteo, E.saison);
+}
+
+// ------------------------------------------------------------------ boutons
+const voirCase = (c, d = 9) => { const p = posCase(c); viser(p.x, p.z, d); };
+const VOIR = {
+  comptoirs() { voirCase(ic(15, 8), 13); note.textContent = 'Comptoirs en mer : ponton, caisses aux couleurs de la denrée, bouée et pavillon, ancre ; les marchands mouillés autour et leurs chaloupes. Sucre occupé par la France, épices disputées (pavillon qui alterne, coups de feu), fourrures libres (pavillon blanc), thé aux Provinces-Unies (3 places sur 3).'; },
+  routes() { voirCase(ic(13, 9), 17); note.textContent = 'Routes commerciales : ruban pointillé animé aux couleurs du camp, flûte qui la parcourt. La route hollandaise est coupée par le corsaire anglais : rouge, pointillés arrêtés, plus de navire.'; },
+  corsaire() {
+    const a = posCase(ic(11, 7)), b = posCase(ic(10, 8));
+    viser((a.x + b.x) / 2, (a.z + b.z) / 2, 6);
+    abordageCorsaire(3, ic(10, 8), { proprio: 2 });
+    note.textContent = 'Corsaire anglais (pavillon noir, flamme rouge) : il rattrape un marchand hollandais, coup de semonce, grappins et fusillade, puis le marchand hisse les couleurs du corsaire.';
+  },
+  depart() {
+    voirCase(ic(24, 6), 9);
+    etat.flotteRoute = ''; appliquer();
+    setTimeout(() => { etat.flotteRoute = 'route'; appliquer(); }, 600);
+    note.textContent = 'Ordre « route » : la flotte (avec son armée) gagne la balise « vers l’Amérique », s’éloigne vers l’horizon et s’estompe.';
+  },
+  arrivee() {
+    voirCase(ic(15, 14), 9);
+    etat.arrivee = false; appliquer();
+    etat.arrivee = true; appliquer();
+    jouerMoisMarine({ arrivees: [{ flotte: 5, sortie: S_INDES }] }, E);
+    note.textContent = 'Rapport du mois (arrivees) : la flotte espagnole des Indes apparaît à l’horizon et gagne sa case.';
+  },
+};
+const PHASES = {
+  approche: { coules: [0, 0], pris: [0, 0], txt: 'Approche : les deux lignes se rapprochent ; la flèche blanche montre le vent (ici aux Anglais).' },
+  bordees: { coules: [0, 1], pris: [0, 0], txt: 'Bordées : chaque ligne tire à son tour (éclairs, fumée de poudre, gerbes) ; un navire anglais coule.' },
+  abordage: { coules: [0, 1], pris: [0, 0], txt: 'Abordage : les navires appariés jettent leurs grappins ; fusillade.' },
+  fin: { coules: [2, 3], pris: [0, 1], txt: 'Fin : les coulés brûlent et sombrent ; un anglais pris hisse les couleurs françaises et passe derrière la ligne.' },
+};
+function bataille(phase) {
+  if (!phase) { sceneNavale(null); note.textContent = ''; return; }
+  const fer = f.epoque.value === 'cuirasses', P = PHASES[phase];
+  voirCase(BATAILLE, 7);
+  sceneNavale({
+    case: BATAILLE, phase, vent: 1, coules: P.coules, pris: P.pris,
+    camps: [{ proprio: 0, navires: fer ? { cuirasse: 2, fregate_helice: 2, vapeur: 1 } : { vaisseau: 2, fregate: 3, corvette: 2 } }, { proprio: 1, navires: fer ? { cuirasse: 3, fregate_helice: 2 } : { vaisseau: 3, fregate: 2, corvette: 1 } }],
+  });
+  note.textContent = P.txt;
+}
+f.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.voir) VOIR[b.dataset.voir]();
+  else if ('phase' in b.dataset) bataille(b.dataset.phase);
+});
+let phaseEnCours = null;
+f.addEventListener('change', () => { appliquer(); });
+document.querySelectorAll('[data-phase]').forEach(b => b.addEventListener('click', () => { phaseEnCours = b.dataset.phase || null; }));
+f.epoque.addEventListener('change', () => { if (phaseEnCours) bataille(phaseEnCours); });
+
+appliquer();
+const p0 = posCase(ic(13, 9));
+Object.assign(cam, { l: Math.sqrt(3) * L, h: 1.5 * H, x: p0.x, z: p0.z, cible: 30, d: 30, auto: false });
+const q = new URLSearchParams(location.search).get('voir');  // ?voir=comptoirs, routes, corsaire, depart, arrivee, ou une phase de bataille
+if (VOIR[q]) VOIR[q](); else if (PHASES[q]) bataille(q);
+</script>
+</body>
+</html>
