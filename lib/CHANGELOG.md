@@ -3,6 +3,27 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.29.0 — 2026-11-23
+
+Les bâtiments et la marine de l'époque d'Empire (pour web_conquete, chantier « Empire » : emplacements, marine, commerce
+maritime ; utilisables par tous les jeux, rien ne change pour ceux qui ne s'en servent pas).
+
+- Nouveaux bâtiments anciens (`modeles.js`, `BATR`), aux quatre époques, à la couleur du camp, en ruine automatiquement :
+  `chantier_naval`, `cale_seche`, `ecole_militaire`, `universite`, `seminaire`, `phare`, `douane`, et sept plantations
+  (`plantation_sucre`, `plantation_tabac`, `plantation_cafe`, `plantation_coton`, `plantation_the`, `plantation_epices`,
+  `plantation_indigo`). L'eau est du côté +x pour le chantier naval, la cale sèche et le phare (comme `port`). Export
+  `PIECES_EMPIRE` : les points où `animations.js` accroche leurs pièces mobiles.
+- Leurs animations (`animations.js`, `RECETTES`) : coque bordée planche par planche (`bordages`), balancier de pompe (`pompe`),
+  cadets à l'exercice et tambour (`cadets`, `tambour`), étudiants en robe (`etudiants`), cloche et procession (`cloche`,
+  `procession`), faisceau du phare (`faisceau`), charrette arrêtée à la douane (`douane`), récolte (`recolte`), moulin à sucre
+  (`moulinSucre`), `ouvrierEn`.
+- Marine (`marine.js`), champs d'état facultatifs : comptoirs en mer (`etat.comptoirs`), routes commerciales
+  (`etat.routes_mer` : ne pas les mettre dans `etat.routes`, que `plateau.js` lit autrement), balises vers les autres théâtres
+  (`etat.sorties`), corsaires (`flottes[].ordre = 'corsaire'`) et départs (`'route'`) ; rapport de `jouerMoisMarine` :
+  `arrivees`, `abordages` ; nouvelles fonctions `abordageCorsaire(...)` et `sceneNavale({case, camps, phase, vent, coules, pris})`
+  (bataille navale pilotée phase par phase) ; navire `cuirasse` ; `fregate_helice` et `vaisseau_helice` reconnus.
+- Maquettes `maquettes/web_engine/batiments-empire.html` (galerie et village d'essai) et `marine-empire.html`.
+
 ## 2.28.0 — 2026-11-23
 
 Le décor par morceaux (`plateau.js`, au choix du jeu) : `decorProgressif(ms)` ; avec ms > 0, `construire()`, `majEtat()`,
