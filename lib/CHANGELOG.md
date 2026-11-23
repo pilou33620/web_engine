@@ -3,6 +3,16 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.25.1 — 2026-11-23
+
+Arbres sur les routes (`plateau.js`, tous les jeux) : les arbres des forêts, les buissons, rochers, fleurs et cailloux des
+gisements, tirés au hasard dans la case, s'écartaient des rivières mais pas des routes, si bien qu'en forêt des arbres poussaient
+sur le ruban. `auHasard()` les écarte désormais du tracé des routes de la case (du point de passage au milieu de chaque bord relié,
+demi-largeur du ruban le plus large et une marge : `ECART_ROUTE`) ; une case de route a quatre essais de plus, tirés à part, pour
+garder sa forêt aussi dense (les arbres des autres cases ne bougent pas). Le tracé est désormais calculé à un seul endroit
+(`passage()` et `traceRoute()` de plateau.js, que routes.js dessine) ; `majEtat()` refait le décor quand une route relie
+autrement des cases déjà desservies. Essai sans navigateur : `node outils/essai-arbres-routes.mjs` (lancé par la CI).
+
 ## 2.25.0 — 2026-11-21
 
 - Le vent dans les arbres (`plateau.js`, tous les jeux) : les sapins et les feuillus des forêts et des bosquets ploient dans le

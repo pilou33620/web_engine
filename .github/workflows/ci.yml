@@ -20,6 +20,8 @@ jobs:
         run: bash outils/tester-installateur.sh
       - name: Modules de la bibliothèque (syntaxe)
         run: for f in lib/rendu/*.js; do node --check "$f" || exit 1; done
+      - name: Décor à l'écart des routes (sans navigateur)
+        run: node outils/essai-arbres-routes.mjs
       - name: Chromium
         run: npm i --no-save playwright && npx playwright install --with-deps chromium
       - name: Pages
