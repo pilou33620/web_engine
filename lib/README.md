@@ -29,7 +29,7 @@ que chaque import d'un fichier installé trouve son fichier, et échoue sinon.
 | Module de `rendu/` | Rôle |
 |---|---|
 | `scene.js`, `toon.js` | la scène, la caméra et la lumière ; l'ombrage toon et les contours, les briques des modèles (`lot`, `put`, `fige`, `boite`, `cyl`, `cone`, `sphere`) |
-| `plateau.js` | le terrain et la nature : cases, mer, rivières, forêts (les arbres ploient au vent), collines, montagnes, champs, saisons et neige |
+| `plateau.js` | le terrain et la nature : cases, mer, rivières, bras de mer, forêts (les arbres ploient au vent), collines, montagnes, champs, saisons et neige |
 | `modeles.js` | les bâtiments anciens (styles Ancien Régime, Lumières, Empire, Révolution industrielle) et les armées |
 | `modernes.js` | les bâtiments modernes : installations électriques, lignes (`pylone`, `BAT.ligne15`…`ligne400`), eau, déchets, quartiers, fermes ; leur catalogue (`INSTALLATIONS`, `QUARTIERS`) et les époques modernes (`EPOQUES`) ; les parties mobiles (`piece`) et leur animation (`modele`, `animer`) |
 | `animations.js` | la vie des bâtiments anciens hors partie : `animationsAncien(cle, epoque, boites, couleur)`, une recette par bâtiment (artisans, porteurs, passants, charrettes, bêtes, soldats, wagonnets, train) posée dans ses espaces libres (deux lignes de la recette seulement en qualité légère) ; `bivouacAncien(palier, couleur)`, l'armée au repos ; `maillageEnChantier({ cle, couleur, epoque, av })`, un bâtiment ancien monté à mesure des travaux sous ses échafaudages, ouvriers au travail ; animés par `modele()` et `animer()` |
@@ -120,6 +120,21 @@ S.reglerQualite(null, { decor: false, vie: false });           // le palier le p
 2. **Vérifier :** `node outils/verifier.mjs` (la galerie et la carte test utilisent `lib/`).
 3. **Versionner :** augmentez la version dans `lib/package.json` et décrivez le changement dans `lib/CHANGELOG.md`.
 4. **Publier :** poussez sur main. Les jeux reçoivent la demande de fusion le lundi suivant, ou tout de suite avec `bash outils/maj-graphismes.sh` (ou le bouton « Run workflow » de l'action « graphismes »).
+
+### Bras de mer (2.33.0)
+
+- **Les bras de mer étroits (`plateau.js`) :** champ facultatif `bras` de la carte donnée à `construire()`, à côté de `rivieres`.
+  Chaque bras est une chaîne de cases voisines, du fond vers la mer (comme une rivière d'amont en aval), qui finit par la case d'eau
+  où il débouche (un détroit commence et finit par une case d'eau) : une liste de cases, ou `{ cases, largeur }` (`largeur` : facteur
+  de la largeur, 1 par défaut). Sur les cases de terre, un ruban d'eau de mer (le matériau translucide de la mer, qui suit le gel),
+  étroit au fond (0,1 de demi-largeur), qui s'élargit en trompe jusqu'à l'embouchure (0,44), descend au niveau de la mer et s'y fond
+  dans la case d'eau ; dessous, un fond de sable bordé d'un mince liseré de roche. Ni berge de sable, ni cascade, ni barques
+  (`vie.js` ne lit que `rivieres`) ; les arbres et les rochers s'en écartent comme d'une rivière. Sans `bras`, rien ne change.
+  Le champ `riviere` des cases reste au jeu (ponts, routes). Maquette : `maquettes/web_engine/bras-de-mer.html`.
+
+```js
+plateau.construire({ ...carte, bras: [[fond, case2, case3, mer], { cases: estuaire, largeur: 1.3 }] });
+```
 
 ### Troupes en campagne (2.32.0)
 

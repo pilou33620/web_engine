@@ -39,6 +39,11 @@
   },
   {
    "source": "web_engine",
+   "chemin": "maquettes/web_engine/bras-de-mer.html",
+   "titre": "Bras de mer"
+  },
+  {
+   "source": "web_engine",
    "chemin": "maquettes/web_engine/carte-complete.html",
    "titre": "Carte complète"
   },
