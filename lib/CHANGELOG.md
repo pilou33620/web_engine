@@ -3,6 +3,27 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.34.0 — 2026-11-24
+
+Les agents sur la carte (demandés par web_conquete, SPEC-POLITIQUE module 4, W6 ; ajout, rien ne change pour un jeu qui ne s'en sert pas).
+
+- `agents.js` (partie `guerre`) : `maillageAgent({ type, couleur, epoque, marche, cache, niveau, leger })`, un agent en figurine à l'échelle
+  des troupes de `maillageTroupe` (groupe à l'échelle 0,1, face à +z, géométries en cache) : espion (manteau sombre, écharpe du camp, tricorne
+  puis chapeau mou, lanterne sourde), gentilhomme (habit brodé à la couleur du camp, perruque, cheveux poudrés ou naturels selon l'époque,
+  épée au côté), prêtre (soutane, ceinture du camp, croix, chapeau rond), diplomate (habit de cour, écharpe en sautoir du camp,
+  porte-documents) ; habits selon l'époque (`ancien`, `lumieres`, `empire`, `industrie`) ; socle à la couleur du camp, le niveau (1 à 5)
+  en étoiles. Au repos, il regarde alentour et ajuste son chapeau (le prêtre bénit) ; `userData.marche` : il marche au pas ;
+  `userData.cache` : silhouette translucide et œil barré ; les deux se changent sans rien rebâtir. En qualité légère, la figurine est
+  d'un bloc (elle pivote doucement au repos). `jeterAgent(grp)` le retire.
+- `sceneMission({ type, position | case, couleurs, reussite, duree, epoque, echelle, cap, agent, parent })` : scènes courtes de mission,
+  posées, jouées et retirées toutes seules, qui rendent leur durée en ms : duel, sabotage, assassinat, espionnage, apaisement, diplomate
+  reçu, agent pris ; réussite et échec différents, marque ✓ ou ✗ à la fin. `finirMissions()` les arrête. Qualité légère : moins de pièces
+  et de particules.
+- `outils/installer.sh` : `agents.js` dans la partie `guerre`.
+- Maquette `maquettes/web_engine/agents.html` : les quatre agents par époque (au repos, en marche, cachés), une couleur au choix, une troupe
+  pour l'échelle, un bouton par scène, réussie ou manquée (`?vue=colonne,rangée` : de tout près ; `?mission=duel&echec` : une scène en
+  boucle).
+
 ## 2.33.0 — 2026-11-24
 
 Les bras de mer (demandés par web_conquete : ses rias, fjords, lochs, golfes courts et estuaires étaient des rubans de rivière, en

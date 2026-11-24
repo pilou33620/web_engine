@@ -17,7 +17,7 @@ La bibliothèque graphique commune des jeux. Elle vit dans `web_engine/lib/`, et
 | `moderne` | `rendu/modernes.js`, `rendu/chantiers.js`, `rendu/rail.js` | `socle` |
 | `antique` | `rendu/antiques.js` | `moderne` |
 | `ancien` | `rendu/` : `modeles`, `monde`, `quartiers`, `animations`, `chroniques`, `img/` (illustrations des événements, SVG), `icons/` (icônes de l'application, PNG) | `socle`, `moderne`, `antique`, `guerre` |
-| `guerre` | `rendu/` : `guerre_commun`, `remparts`, `forts`, `sieges`, `marine`, `espions` | `ancien` |
+| `guerre` | `rendu/` : `guerre_commun`, `remparts`, `forts`, `sieges`, `marine`, `espions`, `agents` | `ancien` |
 | `defense` | `rendu/defense.js` : le tower defense (tours, ennemis, projectiles, effets, villes à défendre) | `ancien` |
 | `rendu` | tout (les jeux d'avant la 2.15.0) | toutes |
 
@@ -39,6 +39,7 @@ que chaque import d'un fichier installé trouve son fichier, et échoue sinon.
 | `monde.js`, `vie.js`, `quartiers.js` | ce qui vit sur le plateau : bâtiments posés, fumées, drapeaux, habitants, bêtes, bateaux, vie des quartiers |
 | `meteo.js`, `routes.js`, `boue.js`, `ambiance.js`, `nuit.js`, `faune.js`, `eau.js`, `etiquettes.js` | le temps et l'heure du jour ; les routes ; la pluie (routes boueuses et mouillées, flaques, crue, eau sale, traces de boue des armées) ; brume du matin, feuilles d'automne, givre sur les toits ; les bannières et étiquettes HTML. Les effets suivent `climat` (vie.js) : un jeu peut y poser `pollution` et `eauSale` |
 | `remparts.js`, `forts.js`, `sieges.js`, `marine.js`, `espions.js`, `brouillard.js`, `guerre_commun.js` | la guerre : remparts, forts, sièges, flottes, espions, brouillard de guerre |
+| `agents.js` | les agents sur la carte (espion, gentilhomme, prêtre, diplomate) : `maillageAgent`, `jeterAgent` ; les scènes courtes de mission : `sceneMission`, `finirMissions` |
 | `defense.js` | le tower defense, dans le style du moteur : les quinze époques (`ERES`) en cinq styles, `tour(role, ere, niveau, { pop })` (tête qui pivote, animations au repos) et `tirer(t)` (recul, fumée, éclair), `ennemi(genre, ere)`, `avancer(e, d, dt)` (jambes, roues, hélices), `abattre(e)`, `toucher(e)`, `piege(role, ere)` et `declencher(p)` (pièges animés), `projectile(genre)` et `suivreTir(p)`, effets (`explosion`, `eclat`, `eclaboussure`, `rayon`, `chute`), `anneauPortee`, `barreVie`, `batimentVille` |
 
 ### Mise en route
@@ -120,6 +121,42 @@ S.reglerQualite(null, { decor: false, vie: false });           // le palier le p
 2. **Vérifier :** `node outils/verifier.mjs` (la galerie et la carte test utilisent `lib/`).
 3. **Versionner :** augmentez la version dans `lib/package.json` et décrivez le changement dans `lib/CHANGELOG.md`.
 4. **Publier :** poussez sur main. Les jeux reçoivent la demande de fusion le lundi suivant, ou tout de suite avec `bash outils/maj-graphismes.sh` (ou le bouton « Run workflow » de l'action « graphismes »).
+
+### Agents sur la carte (2.34.0)
+
+- **Les agents (`agents.js`) :** `maillageAgent({ type, couleur, epoque, marche, cache, niveau, leger })` rend un `THREE.Group` à l'échelle
+  0,1 (comme `maillageTroupe`, face à +z), géométries fusionnées en cache par type, couleur et époque. `type` : `'espion'` (manteau sombre au
+  col relevé, écharpe du camp, tricorne puis chapeau mou, lanterne sourde), `'gentilhomme'` (habit brodé d'or à la couleur du camp, perruque
+  en 1700, cheveux poudrés aux Lumières, naturels ensuite, épée au côté), `'pretre'` (soutane, pèlerine, ceinture du camp, croix d'or, chapeau
+  rond, bréviaire), `'diplomate'` (habit de cour crème puis uniforme bleu brodé, écharpe en sautoir du camp, porte-documents) ; `epoque` :
+  `'ancien'`, `'lumieres'`, `'empire'`, `'industrie'` ; `niveau` (1 à 5) : les étoiles sur le socle à la couleur du camp ; `leger` (par
+  défaut, la qualité légère) : la figurine d'un bloc. Animé tant qu'il est dans la scène (masqué, il ne coûte rien) : au repos il regarde à
+  gauche, à droite, puis porte la main à son chapeau (le prêtre bénit ; d'un bloc, il pivote doucement) ; `userData.marche = true` : il
+  marche au pas (le jeu le déplace et l'oriente lui-même) ; `userData.cache = true` : silhouette translucide sans contours et petit œil barré
+  au-dessus. Les deux se changent à tout moment, sans rien rebâtir. `jeterAgent(grp)` le retire (tout est partagé, rien à libérer).
+  `TYPES_AGENT` : les quatre types.
+- **Les scènes de mission :** `sceneMission({ type, position, case, couleurs, reussite, duree, epoque, echelle, cap, agent, parent })` pose
+  une scène courte au point donné (`position` : `{ x, y, z }` ou `[x, y, z]`, sinon `case` : une case du plateau), la joue et la retire
+  toute seule ; elle rend sa durée en ms (0 pour un type inconnu). `type` : `'duel'` (deux gentilshommes, les lames se croisent, l'un tombe),
+  `'sabotage'` (l'espion allume la mèche ; le feu prend, fumée noire, la palissade s'effondre), `'assassinat'` (une silhouette sombre approche,
+  la cible s'efface), `'espionnage'` (l'espion observe derrière un buisson, une feuille s'envole de la table vers lui), `'apaisement'` (la
+  cloche sonne, le prêtre bénit, la foule agitée se calme et s'incline), `'diplomate'` (diplomate reçu : ses couleurs hissées au mât,
+  révérence), `'pris'` (agent pris : deux gardes l'encadrent et l'emmènent). `couleurs` : `[camp de l'agent, camp adverse]` ; `reussite` :
+  la mission de l'agent réussit (sinon : l'agent tombe, la mèche fait long feu, la cible pare, la feuille s'envole au loin, la foule
+  s'échauffe, le drapeau redescend ; pour `'pris'`, réussite : il s'échappe) ; une marque ✓ ou ✗ paraît aux trois quarts. `duree` : en ms
+  (par défaut 4 800 à 6 000) ; `echelle` : celle des figurines (0,1 ; un jeu qui grossit ses troupes passe la même) ; `cap` : rotation de la
+  scène (0 : les acteurs de profil pour la caméra du plateau) ; `agent` : le type de l'agent pris ; `parent` : la scène par défaut.
+  `finirMissions()` arrête et retire les scènes en cours ; `TYPES_MISSION` : les sept types. En qualité légère, moins de pieux, de gens et
+  de particules. Maquette : `maquettes/web_engine/agents.html`.
+
+```js
+const a = maillageAgent({ type: 'espion', couleur: '#3b6fd1', epoque: 'lumieres', niveau: 3 });
+a.position.set(x, y, z); a.scale.multiplyScalar(1.8); scene.add(a);
+a.userData.marche = true; a.rotation.y = Math.atan2(dx, dz);   // en route
+a.userData.cache = true;                                         // caché
+jeterAgent(a);
+const ms = sceneMission({ type: 'duel', position: { x, y, z }, couleurs: ['#3b6fd1', '#c0392b'], reussite: true, epoque: 'empire', echelle: 0.18 });
+```
 
 ### Bras de mer (2.33.0)
 

@@ -10,7 +10,7 @@
 #   moderne  bâtiments modernes (modernes.js : installations, lignes, quartiers, fermes), chantiers vivants et piquets de grève (chantiers.js), voies ferrées et trains (rail.js), crises (crises.js : panaches, chutes des barrages, reflets, blackout)
 #   antique  Gaulois et Romains (antiques.js)
 #   ancien   bâtiments et armées de 1700 à 1816, le monde de web_royaumes (monde, quartiers, animations, chroniques), images et icônes
-#   guerre   remparts, forts, sièges, flottes, espions
+#   guerre   remparts, forts, sièges, flottes, espions, agents (figurines et scènes de mission)
 #   defense  le tower defense (web_defense) : tours, ennemis, projectiles, effets, villes à défendre (defense.js)
 #   rendu    tout (les jeux d'avant la 2.15.0)
 set -euo pipefail
@@ -25,7 +25,7 @@ declare -A FICHIERS=(
   [moderne]="$R/modernes.js $R/chantiers.js $R/rail.js $R/crises.js"
   [antique]="$R/antiques.js"
   [ancien]="$R/modeles.js $R/monde.js $R/quartiers.js $R/animations.js $R/chroniques.js $R/traces.js $R/img $R/icons"
-  [guerre]="$R/guerre_commun.js $R/remparts.js $R/forts.js $R/sieges.js $R/marine.js $R/espions.js"
+  [guerre]="$R/guerre_commun.js $R/remparts.js $R/forts.js $R/sieges.js $R/marine.js $R/espions.js $R/agents.js"
   [defense]="$R/defense.js"
   [rendu]=""
 )

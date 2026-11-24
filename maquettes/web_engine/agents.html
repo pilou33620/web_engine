@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agents sur la carte</title>
+<link rel="stylesheet" href="../../lib/rendu/rendu.css">
+<link rel="stylesheet" href="../../galerie/visionneuse.css">
+<style>
+  #etiquettes span { font-size: 11px; background: rgba(20, 26, 19, .72); }
+  #etiquettes span.titre { font-size: 14px; font-weight: 600; background: rgba(20, 26, 19, .88); }
+  .barre button { font: inherit; padding: 3px 9px; border-radius: 7px; border: 1px solid rgba(255, 255, 255, .35); background: #2c3a2a; color: #f3f0e6; cursor: pointer; }
+  .barre button:hover, .barre button:focus-visible { background: #3f5a3b; }
+  .barre .groupe { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .note { position: fixed; left: 8px; bottom: 26px; max-width: min(620px, calc(100% - 16px)); margin: 0; padding: 6px 10px; font-size: 13px; background: rgba(20, 26, 19, .78); border-radius: 8px; }
+</style>
+</head>
+<body>
+<canvas id="carte" aria-label="Agents sur la carte : espion, gentilhomme, prêtre et diplomate par époque, au repos, en marche et cachés, et les scènes de mission"></canvas>
+<div id="etiquettes"></div>
+<div id="eclair"></div>
+<form class="barre" id="choix">
+  <b>Agents</b>
+  <label>Couleur <select name="couleur"><option value="#3b6fd1">Bleu</option><option value="#c0392b">Rouge</option><option value="#2e8b57">Vert</option><option value="#d4a017">Jaune</option></select></label>
+  <label>Époque des scènes <select name="epoque"><option value="ancien">1700</option><option value="lumieres">Lumières</option><option value="empire">Empire</option><option value="industrie">Industrie</option></select></label>
+  <button type="button" id="grille">Tous les agents</button>
+  <span class="groupe" id="missions"></span>
+</form>
+<p class="note">maillageAgent (lib 2.34.0) : dans chaque case, l’agent au repos (il regarde alentour, ajuste son chapeau ; le prêtre bénit), en marche, puis caché (silhouette translucide, œil barré) ; socle aux couleurs du camp, le niveau en étoiles. sceneMission : un bouton par scène, ✓ réussie, ✗ manquée (la mission de l’agent bleu… ou de la couleur choisie).</p>
+<p class="aide">Glisser : déplacer · clic droit ou Maj : tourner · molette : zoom</p>
+<script type="module">
+import { THREE, scene, cam, camera, apresCamera } from '../../lib/rendu/scene.js';
+import { lot, put, fige, cyl, jeter } from '../../lib/rendu/toon.js';
+import { maillageTroupe, jeterTroupe } from '../../lib/rendu/modeles.js';
+import { maillageAgent, jeterAgent, sceneMission, finirMissions, TYPES_AGENT, TYPES_MISSION } from '../../lib/rendu/agents.js';
+import { appliquerMeteo } from '../../lib/rendu/meteo.js';
+import { climat } from '../../lib/rendu/vie.js';
+
+const NOMS = { espion: 'Espion', gentilhomme: 'Gentilhomme', pretre: 'Prêtre', diplomate: 'Diplomate' };
+const EPOQUES = [['ancien', '1700'], ['lumieres', 'Lumières'], ['empire', 'Empire'], ['industrie', 'Industrie']];
+const MISSIONS = { duel: 'Duel', sabotage: 'Sabotage', assassinat: 'Assassinat', espionnage: 'Espionnage', apaisement: 'Apaisement', diplomate: 'Diplomate reçu', pris: 'Agent pris' };
+const AUTRE = { '#3b6fd1': '#c0392b', '#c0392b': '#3b6fd1', '#2e8b57': '#d4a017', '#d4a017': '#2e8b57' };
+const PAS = 1.3, SOL = 0x84c450, SCENE = new THREE.Vector3(1.5 * PAS, 0, 4.7 * PAS);
+const groupe = new THREE.Group(), etiq = document.getElementById('etiquettes'), f = document.getElementById('choix');
+let poses = [];
+scene.add(groupe);
+const tuile = (x, z, r) => { const T = lot(); put(T, cyl(r, r * 1.03, 0.16, 6), SOL, 0, -0.08, 0, 0, 0); fige(T, groupe).position.set(x, 0, z); };
+const titre = (txt, x, z, cls = 'titre') => { const el = document.createElement('span'); el.className = cls; el.textContent = txt; etiq.append(el); poses.push({ el, p: new THREE.Vector3(x, 0, z) }); };
+function afficher() {
+  for (const o of [...groupe.children]) o.userData.agent ? jeterAgent(o) : o.userData.troupe ? jeterTroupe(o) : jeter(o);
+  etiq.textContent = ''; poses = [];
+  const couleur = f.couleur.value;
+  TYPES_AGENT.forEach((t, c) => titre(NOMS[t], c * PAS, -PAS * 0.62));
+  EPOQUES.forEach(([ep, nom], r) => {
+    titre(nom, -PAS * 0.85, r * PAS);
+    TYPES_AGENT.forEach((type, c) => {
+      tuile(c * PAS, r * PAS, 0.6);
+      ['repos', 'marche', 'cache'].forEach((etat, k) => {
+        const m = maillageAgent({ type, couleur, epoque: ep, niveau: 1 + (r + c + k) % 5, marche: etat === 'marche', cache: etat === 'cache' });
+        m.position.set(c * PAS + (k - 1) * 0.36, 0, r * PAS + (k === 1 ? 0.12 : 0)); m.rotation.y = etat === 'marche' ? 0.9 : 0.25;
+        groupe.add(m);
+      });
+    });
+  });
+  titre('repos · marche · caché', 1.5 * PAS, 3.55 * PAS, '');
+  // une troupe de maillageTroupe pour l'échelle
+  tuile(4.3 * PAS, 0, 0.75);
+  const tr = maillageTroupe({ couleur, palier: 1, armes: { inf: 1, cav: 0.3 } }); tr.position.set(4.3 * PAS, 0, 0); tr.rotation.y = 0.3; groupe.add(tr);
+  titre('Troupe (échelle)', 4.3 * PAS, -PAS * 0.62);
+  tuile(SCENE.x, SCENE.z, 0.75); titre('Scènes de mission', SCENE.x, SCENE.z + 0.9);
+}
+// un bouton par scène, réussie et manquée
+const zone = document.getElementById('missions');
+for (const type of TYPES_MISSION) for (const ok of [true, false]) {
+  const b = document.createElement('button'); b.type = 'button'; b.textContent = `${MISSIONS[type] || type} ${ok ? '✓' : '✗'}`; b.dataset.mission = type; b.dataset.ok = ok ? '1' : '';
+  zone.append(b);
+}
+function jouer(type, reussite, duree) {
+  finirMissions();
+  const couleur = f.couleur.value;
+  Object.assign(cam, { x: SCENE.x, z: SCENE.z - 0.05, cible: 2.2, d: 2.2, lacet: 0, auto: false });
+  return sceneMission({ type, position: SCENE, couleurs: [couleur, AUTRE[couleur]], reussite, epoque: f.epoque.value, duree });
+}
+zone.addEventListener('click', e => { const b = e.target.closest('button'); if (b) jouer(b.dataset.mission, !!b.dataset.ok); });
+document.getElementById('grille').addEventListener('click', () => { finirMissions(); Object.assign(cam, { x: 2.2 * PAS, z: 2.4 * PAS, cible: 9.5, d: 9.5, lacet: 0 }); });
+window.jouerMission = jouer;  // (essais et captures : jouerMission(type, reussite, duree))
+apresCamera(() => {
+  const v = new THREE.Vector3();
+  for (const { el, p } of poses) { v.copy(p).project(camera); el.hidden = v.z > 1; el.style.transform = `translate(${(v.x + 1) / 2 * innerWidth}px, ${(1 - v.y) / 2 * innerHeight}px) translate(-50%, -50%)`; }
+});
+appliquerMeteo({ genre: 'soleil', temperature: 20, pluie: 0, vent: 0.4, neige_sol: 0 }, 2);
+climat.nuages = 0;
+f.couleur.addEventListener('change', afficher);
+afficher();
+Object.assign(cam, { l: 6 * PAS, h: 7 * PAS, x: 2.2 * PAS, z: 2.4 * PAS, cible: 9.5, d: 9.5, lacet: 0, auto: false });
+// ?vue=colonne,rangée : de tout près sur une case (captures) ; ?mission=duel (et &echec) : joue une scène en boucle
+const q = new URLSearchParams(location.search), vue = q.get('vue')?.split(',').map(Number);
+if (vue) Object.assign(cam, { x: vue[0] * PAS, z: vue[1] * PAS + 0.1, cible: 1.6, d: 1.6 });
+if (q.get('mission')) { const rejouer = () => setTimeout(rejouer, jouer(q.get('mission'), !q.has('echec')) + 600); rejouer(); }
+</script>
+</body>
+</html>
