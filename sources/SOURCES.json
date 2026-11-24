@@ -58,14 +58,19 @@
    "titre": "Cabane de pêcheur : propositions"
   },
   {
-   "source": "web_power",
-   "chemin": "maquettes/web_power/dechets.html",
-   "titre": "Maquette Déchets"
+   "source": "web_engine",
+   "chemin": "maquettes/web_engine/troupes.html",
+   "titre": "Troupes en campagne"
   },
   {
    "source": "web_power-heliosphere",
    "chemin": "maquettes/web_power-heliosphere/conquete-spatiale.html",
    "titre": "Héliosphère"
+  },
+  {
+   "source": "web_power",
+   "chemin": "maquettes/web_power/dechets.html",
+   "titre": "Maquette Déchets"
   },
   {
    "source": "web_royaumes",

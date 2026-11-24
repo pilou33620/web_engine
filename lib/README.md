@@ -120,3 +120,18 @@ S.reglerQualite(null, { decor: false, vie: false });           // le palier le p
 2. **Vérifier :** `node outils/verifier.mjs` (la galerie et la carte test utilisent `lib/`).
 3. **Versionner :** augmentez la version dans `lib/package.json` et décrivez le changement dans `lib/CHANGELOG.md`.
 4. **Publier :** poussez sur main. Les jeux reçoivent la demande de fusion le lundi suivant, ou tout de suite avec `bash outils/maj-graphismes.sh` (ou le bouton « Run workflow » de l'action « graphismes »).
+
+### Troupes en campagne (2.32.0)
+
+- **Une armée vue de près sur une carte de campagne (`modeles.js`) :** `maillageTroupe({ couleur, palier, armes, marche, leger })` rend
+  un petit groupe de figurines (face à +z, à l'échelle 0,1, géométries en cache) d'après ce que compte l'armée, `armes = { inf, leg,
+  cav, art }` (effectifs ou parts) : le porte-drapeau, l'infanterie de ligne (piquiers au départ, grenadier ensuite), des tirailleurs,
+  un ou deux cavaliers, un canon et son servant, 10 figurines en tout (6 en qualité légère, `leger` par défaut) ; `compoTroupe(armes,
+  leger)` donne ce compte. Au repos : en carré, au bivouac (tentes et feu) ; `marche: true` : en colonne courte, cavalerie en tête,
+  canon attelé en queue. Le drapeau flotte, et la troupe marche au pas quand `userData.avance` est vrai, tant que le groupe est dans la
+  scène (masqué, il ne coûte rien). `jeterTroupe(grp)` le retire et libère son drapeau. Maquette : `maquettes/web_engine/troupes.html`.
+
+```js
+const t = maillageTroupe({ couleur: '#3b6fd1', palier: 0, armes: { inf: 1500, leg: 300, cav: 400, art: 300 }, marche: true });
+t.position.set(x, y, z); t.rotation.y = Math.atan2(dx, dz); t.userData.avance = true; scene.add(t);
+```

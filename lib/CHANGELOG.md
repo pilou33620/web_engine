@@ -3,6 +3,25 @@
 Numérotation : on change le premier chiffre quand un jeu doit adapter son code (fonction renommée, format d'état modifié),
 le deuxième pour un ajout (nouveau modèle, nouvelle animation), le troisième pour une correction.
 
+## 2.32.0 — 2026-11-24
+
+Les troupes en campagne (demandées par web_conquete : de près, une armée de la carte de campagne était une longue file de figurines
+dessinée en 2D ; ajout, rien ne change pour un jeu qui ne s'en sert pas).
+
+- `maillageTroupe({ couleur, palier, armes, marche, leger })` (`modeles.js`) : une armée en petit groupe de figurines d'après ce qu'elle
+  compte (`armes = { inf, leg, cav, art }`, effectifs ou parts ; `compoTroupe` donne le compte) : porte-drapeau aux couleurs du camp,
+  infanterie de ligne (piquiers en 1700, grenadier ensuite), tirailleurs en habit vert, un ou deux cavaliers (dragons, cuirassiers,
+  hussards, lanciers selon le palier), un canon et son servant ; 10 figurines (6 en qualité légère). Au repos, la ligne en petit carré, le
+  drapeau derrière, deux tentes et un feu (sans eux en qualité légère) ; en marche, une colonne courte de deux de front, cavalerie en tête,
+  canon tiré par deux chevaux en queue, moins longue qu'une case. Uniformes du palier (`PALIERS`).
+- Animée sans rien rebâtir : le drapeau flotte (vu de face quel que soit le cap), et quand `userData.avance` est vrai la colonne marche au
+  pas (deux géométries en cache, jambes inversées, montrées en alternance, et un léger rebond) ; tant que le groupe est dans la scène,
+  rien s'il est masqué. `jeterTroupe(grp)` le retire et libère son drapeau.
+- `fantassin(…, pas)`, `canon(…, attele)` : paramètres facultatifs (jambes écartées pour la marche ; pièce sans avant-train ni attelage).
+  Les dessins d'avant ne changent pas.
+- Maquette `maquettes/web_engine/troupes.html` : une rangée par palier, au repos, en marche, infanterie seule, cavalerie et canons,
+  qualité légère (`?vue=colonne,rangée` : de tout près sur une case).
+
 ## 2.31.0 — 2026-11-23
 
 La vue de loin d'une grande carte, la qualité automatique et la première image (demandés par web_conquete ; options facultatives,

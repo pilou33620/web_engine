@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Troupes en campagne</title>
+<link rel="stylesheet" href="../../lib/rendu/rendu.css">
+<link rel="stylesheet" href="../../galerie/visionneuse.css">
+<style>
+  #etiquettes span { font-size: 11px; background: rgba(20, 26, 19, .72); }
+  #etiquettes span.titre { font-size: 14px; font-weight: 600; background: rgba(20, 26, 19, .88); }
+  .note { position: fixed; top: 54px; left: 8px; right: 8px; margin: 0; padding: 6px 10px; font-size: 13px; background: rgba(20, 26, 19, .7); border-radius: 8px; }
+</style>
+</head>
+<body>
+<canvas id="carte" aria-label="Troupes en campagne : une armée en petit groupe de figurines, au repos et en marche, pour chaque palier"></canvas>
+<div id="etiquettes"></div>
+<div id="eclair"></div>
+<form class="barre" id="choix">
+  <b>Troupes en campagne</b>
+  <label>Couleur <select name="couleur"><option value="#3b6fd1">Bleu</option><option value="#c0392b">Rouge</option><option value="#2e8b57">Vert</option><option value="#d4a017">Jaune</option></select></label>
+</form>
+<p class="note">maillageTroupe (lib 2.32.0) : une armée de la carte de campagne en 6 à 12 figurines d’après ce qu’elle compte (infanterie de ligne, tirailleurs, cavalerie, artillerie), au repos en carré au bivouac ou en colonne courte qui marche au pas ; drapeau du camp. Une rangée par palier (1700 → 1832).</p>
+<p class="aide">Glisser : déplacer · clic droit ou Maj : tourner · molette : zoom</p>
+<script type="module">
+import { THREE, scene, cam, camera, apresCamera } from '../../lib/rendu/scene.js';
+import { lot, put, fige, cyl, jeter } from '../../lib/rendu/toon.js';
+import { PALIERS, maillageTroupe, jeterTroupe } from '../../lib/rendu/modeles.js';
+import { appliquerMeteo } from '../../lib/rendu/meteo.js';
+import { climat } from '../../lib/rendu/vie.js';
+
+const COMPLETE = { inf: 1500, leg: 300, cav: 400, art: 300 };
+const VARIANTES = [
+  { nom: 'Au repos', txt: 'piquiers ou ligne, tirailleurs, cavalerie, artillerie : en carré, au bivouac', armes: COMPLETE },
+  { nom: 'En marche', txt: 'la même armée en colonne courte, qui avance au pas', armes: COMPLETE, marche: true },
+  { nom: 'Infanterie seule', txt: '2 000 fantassins de ligne, au repos', armes: { inf: 2000 } },
+  { nom: 'Cavalerie et canons', txt: 'cavalerie et artillerie, en marche', armes: { cav: 800, art: 200 }, marche: true },
+  { nom: 'Qualité légère', txt: 'l’armée complète en marche, 6 figurines', armes: COMPLETE, marche: true, leger: true },
+];
+const PAS = 2.6, SOL = 0x84c450, groupe = new THREE.Group(), etiq = document.getElementById('etiquettes'), f = document.getElementById('choix');
+let poses = [];
+scene.add(groupe);
+function afficher() {
+  for (const o of [...groupe.children]) o.userData.troupe ? jeterTroupe(o) : jeter(o);
+  etiq.textContent = ''; poses = [];
+  const couleur = f.couleur.value;
+  VARIANTES.forEach((v, c) => { const el = document.createElement('span'); el.className = 'titre'; el.textContent = v.nom; el.title = v.txt; etiq.append(el); poses.push({ el, p: new THREE.Vector3(c * PAS, 0, -PAS * 0.75) }); });
+  PALIERS.forEach((P, r) => {
+    const el = document.createElement('span'); el.className = 'titre'; el.textContent = P.date; etiq.append(el);
+    poses.push({ el, p: new THREE.Vector3(-PAS * 0.95, 0, r * PAS) });
+    VARIANTES.forEach((v, c) => {
+      const x = c * PAS, z = r * PAS, T = lot();
+      put(T, cyl(1.2, 1.24, 0.16, 6), SOL, 0, -0.08, 0, 0, 0);
+      fige(T, groupe).position.set(x, 0, z);
+      const m = maillageTroupe({ couleur, palier: r, armes: v.armes, marche: !!v.marche, leger: !!v.leger });
+      m.position.set(x, 0, z); m.rotation.y = v.marche ? 0.6 : 0.3; m.userData.avance = !!v.marche;
+      groupe.add(m);
+    });
+  });
+}
+apresCamera(() => {
+  const v = new THREE.Vector3();
+  for (const { el, p } of poses) { v.copy(p).project(camera); el.hidden = v.z > 1; el.style.transform = `translate(${(v.x + 1) / 2 * innerWidth}px, ${(1 - v.y) / 2 * innerHeight}px) translate(-50%, -50%)`; }
+});
+appliquerMeteo({ genre: 'soleil', temperature: 20, pluie: 0, vent: 0.4, neige_sol: 0 }, 2);
+climat.nuages = 0;  // vue de loin, les nuages passent devant les troupes
+f.addEventListener('change', afficher);
+afficher();
+Object.assign(cam, { l: 4 * PAS, h: 6 * PAS, x: 2 * PAS, z: 2.5 * PAS, cible: 15, d: 15, lacet: 0, auto: false });
+// ?vue=colonne,rangée : de tout près sur une case (captures)
+const vue = new URLSearchParams(location.search).get('vue')?.split(',').map(Number);
+if (vue) Object.assign(cam, { x: vue[0] * PAS, z: vue[1] * PAS, cible: 3, d: 3 });
+</script>
+</body>
+</html>
