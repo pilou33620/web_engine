@@ -12,8 +12,8 @@ pointe, bordés de sable, avec une cascade à la mer ; ajout, rien ne change pou
   débouchent (un détroit : de l'eau aux deux bouts), une liste de cases ou `{ cases, largeur }`. Un ruban d'eau de mer, du matériau
   translucide de la mer (même teinte, même transparence, suit `geler`), étroit au fond, qui s'élargit en trompe jusqu'à l'embouchure,
   y descend au niveau de la mer et s'élargit encore dans la case d'eau, où il se fond dans la mer (dessiné avant le plan de la mer,
-  qu'il cache : pas de double épaisseur d'eau) ; dessous, un fond de sable et un mince liseré de roche. Ni berge de sable, ni cascade,
-  ni barques ; arbres et rochers s'en écartent (`presRiviere`).
+  qu'il cache, et peint une seule fois là où il se recouvre : pas de double épaisseur d'eau) ; dessous, un fond de sable et un
+  mince liseré de roche. Ni berge de sable, ni cascade, ni barques ; arbres et rochers s'en écartent (`presRiviere`).
 - `ruban(pts, larg, y)` : `larg` peut être une demi-largeur par point.
 - Maquette `maquettes/web_engine/bras-de-mer.html` : une ria entre des collines, un fjord entre des montagnes, un estuaire où se
   jette une rivière, un détroit ; « En rivière » montre les mêmes chaînes comme avant (`#ria`, `#fjord`, `#estuaire`, `#detroit`,
